@@ -172,7 +172,7 @@ class Component extends DCLogic {
       view:'dia', date:ds, drawer:null, modal:null, modalData:{}, selPaciente:null,
       profs, types, patients, appts, fila, holidays, hours, membros,
       settings:{capPilates:4, noShowConsome:false, slot:15},
-      w:1440, toast:null, drag:null, ghost:null, configTab:'operacao', filtroPac:'', pacQuery:'', pacFiltro:'todos', filaPrio:'todas', repPeriodo:'hoje', profFiltro:'todos',
+      w:1440, toast:null, drag:null, ghost:null, configTab:'tipos', filtroPac:'', pacQuery:'', pacFiltro:'todos', filaPrio:'todas', repPeriodo:'mes', repProf:'todos', profFiltro:'todos',
     };
 
     // stable Icon component
@@ -302,7 +302,7 @@ class Component extends DCLogic {
       </div>`;
     }
     const histBlock=hist.length?html`<div style=${{marginTop:'16px',borderTop:'1px solid '+c.bs,paddingTop:'13px'}}>
-      <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'9px'}}>Histórico de pacotes</div>
+      <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'9px'}}>Histórico de pacotes</div>
       <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>${hist.map(pk=>{const tp=this.type(pk.typeId); return html`<div key=${pk.id} style=${{display:'flex',alignItems:'center',gap:'10px',fontSize:'12.5px'}}>
         <span style=${{width:'8px',height:'8px',borderRadius:'2px',background:tp.cor,flexShrink:0}}></span>
         <span style=${{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${tp.nome}</span>
@@ -338,10 +338,10 @@ class Component extends DCLogic {
         ${this.fld('Tipo de sessão',html`<select value=${typeId} onChange=${e=>this.setMD({typeId:e.target.value})} style=${sel}>${this.state.types.map(t=>html`<option key=${t.id} value=${t.id}>${t.nome}</option>`)}</select>`)}
         ${this.fld('Quantas sessões',html`<input type="number" min=${1} max=${40} value=${n} onChange=${e=>this.setMD({n:parseInt(e.target.value)||1})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
       </div>
-      <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,margin:'2px 0 8px'}}>Grade fixa da semana</div>
+      <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,margin:'2px 0 8px'}}>Grade fixa da semana</div>
       ${this.fld('Dias',html`<div style=${{display:'flex',gap:'6px'}}>${dlabels.map((l,i)=>html`<button key=${i} onClick=${()=>{const has=dows.includes(i); const nd=has?dows.filter(x=>x!==i):[...dows,i]; const nh={...horarios}; if(has) delete nh[i]; else nh[i]=nh[i]||'09:00'; this.setMD({dows:nd,horarios:nh});}} style=${{width:'40px',height:'40px',borderRadius:'8px',border:'1px solid '+(dows.includes(i)?'transparent':c.bs),background:dows.includes(i)?c.primary:c.surface,color:dows.includes(i)?c.onPrimary:c.muted,fontWeight:600,cursor:'pointer'}}>${l}</button>`)}</div>`)}
       ${dows.length?html`<div style=${{marginTop:'2px',marginBottom:'8px',padding:'11px 13px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
-        <div style=${{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'9px'}}><span style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.03em',textTransform:'uppercase',color:c.faint}}>Horário de cada dia</span>${dows.length>1?html`<button onClick=${()=>{const t=horarios[[...dows].sort((a,b)=>a-b)[0]]||'09:00'; const nh={}; dows.forEach(x=>nh[x]=t); this.setMD({horarios:nh});}} style=${{fontSize:'11px',color:c.teal.text,background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:0}}>Igualar todos</button>`:null}</div>
+        <div style=${{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'9px'}}><span style=${{fontSize:'11px',fontWeight:700,color:c.faint}}>Horário de cada dia</span>${dows.length>1?html`<button onClick=${()=>{const t=horarios[[...dows].sort((a,b)=>a-b)[0]]||'09:00'; const nh={}; dows.forEach(x=>nh[x]=t); this.setMD({horarios:nh});}} style=${{fontSize:'11px',color:c.teal.text,background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:0}}>Igualar todos</button>`:null}</div>
         <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>${dows.slice().sort((a,b)=>a-b).map(dw=>html`<div key=${dw} style=${{display:'flex',alignItems:'center',gap:'12px'}}>
           <span style=${{flex:1,fontSize:'13px',fontWeight:500}}>${this.dowLabel(dw)}</span>
           <input type="time" step=${900} value=${horarios[dw]||'09:00'} onChange=${e=>this.setMD({horarios:{...horarios,[dw]:e.target.value}})} style=${{...sel,width:'124px',fontFamily:"'Martian Mono', monospace"}}/>
@@ -512,7 +512,7 @@ class Component extends DCLogic {
     const dz=!!this.state.anexDrag;
     return html`<div style=${{marginTop:'16px'}}>
       <div style=${{display:'flex',alignItems:'center',marginBottom:'8px'}}>
-        <div style=${{fontSize:'12px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint}}>Anexos e documentos</div>
+        <div style=${{fontSize:'12px',fontWeight:700,color:c.faint}}>Anexos e documentos</div>
         <div style=${{flex:1}}></div>
         ${list.length?html`<span style=${{fontSize:'11.5px',color:c.faint,fontFamily:mono}}>${list.length} arquivo${list.length===1?'':'s'}</span>`:null}
       </div>
@@ -919,20 +919,23 @@ class Component extends DCLogic {
     </div>`;
   }
   sbRelatorios(){
-    const c=this.theme(); const html=this.html; const Icon=this.Icon; const f=this.state.repPeriodo||'hoje';
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const f=this.state.repPeriodo||'mes';
     const set=v=>this.setState({repPeriodo:v});
+    const pf=this.state.repProf||'todos';
+    const setP=v=>this.setState({repProf:v});
     return html`<div>
       ${this.sbHeader('Período')}
       ${this.sbRow('Hoje',f==='hoje',()=>set('hoje'),null,null,'CalendarDays')}
       ${this.sbRow('Esta semana',f==='semana',()=>set('semana'),null,null,'CalendarRange')}
       ${this.sbRow('Este mês',f==='mes',()=>set('mes'),null,null,'CalendarRange')}
-      ${this.sbHeader('')}
-      <button onClick=${()=>this.toast('Relatório exportado (demo)')} style=${{display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',width:'100%',padding:'8px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}><${Icon} name="Download" size=${14}/> Exportar relatório</button>
+      ${this.sbHeader('Profissional')}
+      ${this.sbRow('Todos',pf==='todos',()=>setP('todos'),null,null,'Users')}
+      ${this.state.profs.filter(p=>p.ativo).map(p=>this.sbRow(p.nome.replace(/^Dr[a]?\.\s*/,''),pf===p.id,()=>setP(p.id),null,null,'User'))}
     </div>`;
   }
   sbConfig(){
     const html=this.html; const tab=this.state.configTab;
-    const items=[['operacao','Operação','SlidersHorizontal'],['tipos','Tipos de atendimento','Stethoscope'],['horario','Horário','Clock'],['feriados','Exceções','CalendarOff'],['equipe','Equipe & acessos','Users']];
+    const items=[['tipos','Tipos de atendimento','Stethoscope'],['horario','Horário','Clock'],['feriados','Exceções','CalendarOff'],['equipe','Equipe & acessos','Users']];
     return html`<div>
       ${this.sbHeader('Ajustes')}
       ${items.map(it=>this.sbRow(it[1],tab===it[0],()=>this.setState({configTab:it[0]}),null,null,it[2]))}
@@ -1212,7 +1215,7 @@ class Component extends DCLogic {
     const maxN=Math.max(1,...rows.map(d=>this.dayAppts(this.dstr(d)).filter(a=>a.status!=='cancelado').length));
     return html`<div style=${{height:mobile?'auto':'100%',display:'flex',flexDirection:'column',padding:'14px 16px',minHeight:0}}>
       <div style=${{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'6px',marginBottom:'6px'}}>
-        ${wdh.map(w=>html`<div key=${w} style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,textAlign:'center'}}>${w}</div>`)}
+        ${wdh.map(w=>html`<div key=${w} style=${{fontSize:'11px',fontWeight:700,color:c.faint,textAlign:'center'}}>${w}</div>`)}
       </div>
       <div style=${{flex:1,minHeight:0,display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat('+usedWeeks+',1fr)',gap:'6px'}}>
         ${rows.map(d=>{const ds=this.dstr(d); const inMonth=d.getMonth()===m; const n=this.dayAppts(ds).filter(a=>a.status!=='cancelado').length; const isT=ds==='2026-06-25'; const isSel=ds===this.state.date;
@@ -1274,7 +1277,7 @@ class Component extends DCLogic {
           <div style=${{display:'flex',gap:'8px',alignItems:'center',marginBottom:'14px'}}>${this.statusPill(a.status)} ${a.encaixe?html`<span style=${{fontSize:'10px',fontWeight:700,color:'#fff',background:c.warning,padding:'2px 7px',borderRadius:'4px'}}>ENCAIXE</span>`:null}</div>
           ${this.drawerRow('Clock','Horário',this.m2t(a.start)+'–'+this.m2t(a.start+a.dur)+'  ('+a.dur+'min)')}
           ${this.drawerRow(tp.icon,'Tipo',tp.nome)}
-          ${a.patientIds?html`<div style=${{margin:'14px 0'}}><div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'8px',display:'flex',justifyContent:'space-between'}}><span>Pacientes na turma</span><span style=${{color:pats.length>=(tp.cap||99)?c.warning:c.faint}}>${pats.length}/${tp.cap||'∞'}</span></div>${pats.map(pt=>html`<div key=${pt.id} style=${{display:'flex',alignItems:'center',gap:'9px',padding:'6px 0'}}>${this.avatar(pt.nome,this.profColor(prof),26)}<button onClick=${()=>{this.setState({drawer:null,selPaciente:pt.id,screen:'pacientes'});}} style=${{flex:1,minWidth:0,textAlign:'left',background:'none',border:'none',cursor:'pointer',padding:0,fontSize:'13px',color:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pt.nome}</button><button onClick=${()=>this.removeParticipant(a.id,pt.id)} title="Remover da turma" style=${{border:'none',background:'none',cursor:'pointer',color:c.faint,display:'grid',placeItems:'center',padding:'4px',borderRadius:'6px'}}><${Icon} name="UserMinus" size=${15}/></button></div>`)}
+          ${a.patientIds?html`<div style=${{margin:'14px 0'}}><div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'8px',display:'flex',justifyContent:'space-between'}}><span>Pacientes na turma</span><span style=${{color:pats.length>=(tp.cap||99)?c.warning:c.faint}}>${pats.length}/${tp.cap||'∞'}</span></div>${pats.map(pt=>html`<div key=${pt.id} style=${{display:'flex',alignItems:'center',gap:'9px',padding:'6px 0'}}>${this.avatar(pt.nome,this.profColor(prof),26)}<button onClick=${()=>{this.setState({drawer:null,selPaciente:pt.id,screen:'pacientes'});}} style=${{flex:1,minWidth:0,textAlign:'left',background:'none',border:'none',cursor:'pointer',padding:0,fontSize:'13px',color:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pt.nome}</button><button onClick=${()=>this.removeParticipant(a.id,pt.id)} title="Remover da turma" style=${{border:'none',background:'none',cursor:'pointer',color:c.faint,display:'grid',placeItems:'center',padding:'4px',borderRadius:'6px'}}><${Icon} name="UserMinus" size=${15}/></button></div>`)}
             ${pats.length<(tp.cap||99)?html`<div style=${{marginTop:'8px'}}>${this.patientField({multi:true,hideSelected:true,selectedIds:a.patientIds||[],onPick:p=>{clearTimeout(this._patBlur); this.addParticipant(a.id,p.id);}})}</div>`:html`<div style=${{marginTop:'6px',fontSize:'11.5px',color:c.warning,fontWeight:600}}>Turma cheia</div>`}
           </div>`:html`<div style=${{marginTop:'16px',padding:'12px',border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface2}}>
             <div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>${this.avatar(pat.nome,this.profColor(prof),34)}<div><div style=${{fontWeight:600,fontSize:'13.5px'}}>${pat.nome}</div><div style=${{fontSize:'10.5px',color:c.muted,fontFamily:"'Martian Mono', monospace"}}>${pat.tel}</div></div></div>
@@ -1286,7 +1289,7 @@ class Component extends DCLogic {
             <button onClick=${()=>{this.setState({drawer:null,selPaciente:pat.id,screen:'pacientes'});}} style=${{marginTop:'10px',fontSize:'12px',color:c.teal.text,background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:0}}>Abrir ficha →</button>
           </div>`}
           <div style=${{marginTop:'18px'}}>
-            <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'8px'}}>Mudar status</div>
+            <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'8px'}}>Mudar status</div>
             <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
               ${actions.map(ac=>{const am=this.statusMeta(ac.s); const on=a.status===ac.s;
               return html`<button key=${ac.s} disabled=${on} onClick=${()=>this.setStatus(a.id,ac.s)} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px',borderRadius:'8px',border:'1px solid '+(on?am.color:c.bs),background:on?this.tint(am.base||am.color,c.d?.2:.1):c.surface,color:on?am.color:c.text,cursor:on?'default':'pointer',fontSize:'12.5px',fontWeight:600,opacity:on?1:1}}><${Icon} name=${ac.ic} size=${14} color=${on?am.color:c.muted}/> ${ac.l}</button>`;})}
@@ -1495,7 +1498,7 @@ class Component extends DCLogic {
       ${mobile?html`<div style=${{flexShrink:0,display:'flex',gap:'8px',padding:'11px 16px',overflowX:'auto',borderBottom:'1px solid '+c.bs,background:c.surface}}>${SECTIONS.map(navChip)}</div>`:null}
       <div style=${{flex:1,minHeight:0,display:'flex'}}>
         ${mobile?null:html`<div style=${{width:'236px',flexShrink:0,borderRight:'1px solid '+c.bs,padding:'16px 12px',overflowY:'auto',background:c.surface}}>
-          <div style=${{fontSize:'10.5px',fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:c.faint,padding:'0 8px 8px'}}>Seções</div>
+          <div style=${{fontSize:'10.5px',fontWeight:700,color:c.faint,padding:'0 8px 8px'}}>Seções</div>
           <div style=${{display:'flex',flexDirection:'column',gap:'2px'}}>${SECTIONS.map(navItem)}</div>
         </div>`}
         <div ref=${el=>{ this._formScrollEl=el; }} onScroll=${onScroll} style=${{flex:1,minHeight:0,overflowY:'auto',padding:mobile?'14px':'20px 24px'}}>
@@ -1990,7 +1993,7 @@ class Component extends DCLogic {
       </div>
     </div>`;
   }
-  renderFicha(){
+    renderFicha(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
     const p=this.patient(this.state.selPaciente); if(!p) return null;
     const mobile=this.state.w<860;
@@ -2333,7 +2336,7 @@ class Component extends DCLogic {
       ${mobile?html`<div style=${{flexShrink:0,display:'flex',gap:'8px',padding:'11px 16px',overflowX:'auto',borderBottom:'1px solid '+c.bs,background:c.surface}}>${SECTIONS.map(navChip)}</div>`:null}
       <div style=${{flex:1,minHeight:0,display:'flex'}}>
         ${mobile?null:html`<div style=${{width:'236px',flexShrink:0,borderRight:'1px solid '+c.bs,padding:'16px 12px',overflowY:'auto',background:c.surface}}>
-          <div style=${{fontSize:'10.5px',fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:c.faint,padding:'0 8px 8px'}}>Seções</div>
+          <div style=${{fontSize:'10.5px',fontWeight:700,color:c.faint,padding:'0 8px 8px'}}>Seções</div>
           <div style=${{display:'flex',flexDirection:'column',gap:'2px'}}>${SECTIONS.map(navItem)}</div>
         </div>`}
         <div ref=${el=>{ this._formScrollEl=el; }} onScroll=${onScroll} style=${{flex:1,minHeight:0,overflowY:'auto',padding:mobile?'14px':'20px 24px'}}>
@@ -2395,7 +2398,7 @@ class Component extends DCLogic {
                 ${this.fld('Razão social',html`<input value=${d.razaoSocial||''} onChange=${e=>this.setMD({razaoSocial:e.target.value})} placeholder="Empresa LTDA" style=${sel}/>`)}
                 ${this.fld('CNPJ',html`<input value=${d.cnpj||''} onChange=${e=>this.setMD({cnpj:this.maskCNPJ(e.target.value)})} inputMode="numeric" placeholder="00.000.000/0000-00" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
               </div>`:null}
-              <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,margin:'6px 0 10px'}}>Dados bancários para repasse</div>
+              <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,margin:'6px 0 10px'}}>Dados bancários para repasse</div>
               <div style=${gg('1.4fr 0.8fr 1fr')}>
                 ${this.fld('Banco',html`<input value=${d.banco||''} onChange=${e=>this.setMD({banco:e.target.value})} placeholder="Nome do banco" style=${sel}/>`)}
                 ${this.fld('Agência',html`<input value=${d.agencia||''} onChange=${e=>this.setMD({agencia:e.target.value})} placeholder="0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
@@ -2432,10 +2435,10 @@ class Component extends DCLogic {
   renderConfig(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
     const tab=this.state.configTab;
-    const tabs=[['operacao','Operação'],['tipos','Tipos de atendimento'],['horario','Horário'],['feriados','Exceções'],['equipe','Equipe & acessos']];
+    const tabs=[['tipos','Tipos de atendimento'],['horario','Horário'],['feriados','Exceções'],['equipe','Equipe & acessos']];
     const tBtn=([k,l])=>html`<button key=${k} onClick=${()=>this.setState({configTab:k})} style=${{padding:'7px 13px',borderRadius:'8px',border:'none',cursor:'pointer',background:tab===k?c.surface:'transparent',color:tab===k?c.text:c.muted,fontWeight:tab===k?600:500,fontSize:'13px',boxShadow:tab===k?'0 1px 2px rgba(0,0,0,.06)':'none',whiteSpace:'nowrap'}}>${l}</button>`;
     return html`<div style=${{padding:'16px 18px',maxWidth:tab==='equipe'?'920px':'760px'}}>
-      ${tab==='operacao'?this.cfgOperacao():tab==='tipos'?this.cfgTipos():tab==='horario'?this.cfgHorario():tab==='equipe'?this.cfgEquipe():this.cfgFeriados()}
+      ${tab==='horario'?this.cfgHorario():tab==='equipe'?this.cfgEquipe():tab==='feriados'?this.cfgFeriados():this.cfgTipos()}
     </div>`;
   }
   card(title,body){ const c=this.theme(); const html=this.html; return html`<div style=${{border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface,padding:'16px',marginBottom:'12px'}}>${title?html`<div style=${{fontWeight:600,fontSize:'14px',marginBottom:'12px'}}>${title}</div>`:null}${body}</div>`; }
@@ -2541,38 +2544,174 @@ class Component extends DCLogic {
   }
 
   // ================= RELATÓRIOS =================
+  // Histórico sintético determinístico (1–27 jun) para dar substância aos filtros de período.
+  // O dia de hoje (25/06) usa os agendamentos reais do state; os demais são gerados.
+  histAppts(){
+    if(this._hist) return this._hist;
+    let s=20260601; const rnd=()=>{s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff;};
+    const ri=(a,b)=>a+Math.floor(rnd()*(b-a+1));
+    const out=[]; const profs=this.state.profs; const tIds=this.state.types.map(t=>t.id);
+    const slots=[480,540,600,660,780,840,900,960,1020];
+    const today='2026-06-25';
+    for(let d=new Date(2026,5,1); d<=new Date(2026,5,27); d.setDate(d.getDate()+1)){
+      const dow=d.getDay(); if(dow===0) continue;
+      const ds=this.dstr(d); if(ds===today) continue;
+      const isPast=d<new Date(2026,5,25);
+      profs.forEach((p,pi)=>{
+        const n=dow===6?ri(2,4):ri(5,9);
+        for(let i=0;i<n;i++){
+          const tid=tIds[ri(0,tIds.length-1)]; const tp=this.type(tid);
+          let status; if(isPast){ const r=rnd(); status=r<0.79?'concluido':r<0.90?'faltou':'cancelado'; } else { status=rnd()<0.5?'confirmado':'agendado'; }
+          out.push({id:'h_'+ds+'_'+p.id+'_'+i,profId:p.id,typeId:tid,start:slots[i%slots.length],dur:tp.dur,date:ds,status,patientId:'pac'+ri(1,24),_hist:true});
+        }
+      });
+    }
+    this._hist=out; return out;
+  }
+  periodRange(){
+    const t=new Date(2026,5,25); const p=this.state.repPeriodo||'mes';
+    if(p==='hoje') return {from:'2026-06-25',to:'2026-06-25',label:'Hoje'};
+    if(p==='semana'){ const mon=new Date(t); mon.setDate(t.getDate()-((t.getDay()+6)%7)); const sat=new Date(mon); sat.setDate(mon.getDate()+5); return {from:this.dstr(mon),to:this.dstr(sat),label:'Esta semana'}; }
+    return {from:'2026-06-01',to:'2026-06-30',label:'Este mês'};
+  }
+  apptsInRange(from,to){
+    const h=this.histAppts().filter(a=>a.date>=from&&a.date<=to);
+    const r=this.state.appts.filter(a=>a.date>=from&&a.date<=to);
+    return h.concat(r);
+  }
+  reports2(){
+    const {from,to,label}=this.periodRange();
+    const profSel=this.state.repProf||'todos';
+    let appts=this.apptsInRange(from,to);
+    if(profSel!=='todos') appts=appts.filter(a=>a.profId===profSel);
+    const price={t1:180,t2:120,t3:130,t4:70,t5:90};
+    const ativos=appts.filter(a=>a.status!=='cancelado');
+    const conclA=appts.filter(a=>a.status==='concluido');
+    const faltA=appts.filter(a=>a.status==='faltou');
+    const cancA=appts.filter(a=>a.status==='cancelado');
+    const futA=appts.filter(a=>['agendado','confirmado','em_atendimento'].includes(a.status));
+    const taxaFalta=(conclA.length+faltA.length)>0?Math.round(faltA.length/(conclA.length+faltA.length)*100):0;
+    const fat=conclA.reduce((s,a)=>s+(price[a.typeId]||100),0);
+    const ticket=conclA.length?Math.round(fat/conclA.length):0;
+    let openDays=0; for(let d=new Date(from+'T00:00'); d<=new Date(to+'T00:00'); d.setDate(d.getDate()+1)){ if(d.getDay()!==0) openDays++; }
+    const activeProfs=profSel!=='todos'?1:this.state.profs.filter(p=>p.ativo).length;
+    const capacity=Math.max(1,openDays*activeProfs*9);
+    const ocup=Math.min(100,Math.round(ativos.length/capacity*100));
+    const porTipo=this.state.types.map(t=>({type:t,n:ativos.filter(a=>a.typeId===t.id).length,fat:conclA.filter(a=>a.typeId===t.id).length*(price[t.id]||100)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+    const maxTipo=Math.max(1,...porTipo.map(x=>x.n));
+    const dias=[]; for(let d=new Date(from+'T00:00'); d<=new Date(to+'T00:00'); d.setDate(d.getDate()+1)){ if(d.getDay()===0) continue; const ds=this.dstr(d); const list=ativos.filter(a=>a.date===ds); dias.push({ds,date:new Date(d),n:list.length,concl:list.filter(a=>a.status==='concluido').length}); }
+    const maxDia=Math.max(1,...dias.map(x=>x.n));
+    const porProf=this.state.profs.filter(p=>profSel==='todos'||p.id===profSel).map(p=>{
+      const pa=appts.filter(a=>a.profId===p.id&&a.status!=='cancelado');
+      const cc=pa.filter(a=>a.status==='concluido');
+      const ff=pa.filter(a=>a.status==='faltou').length;
+      return {prof:p,total:pa.length,concl:cc.length,falt:ff,taxa:(cc.length+ff)>0?Math.round(ff/(cc.length+ff)*100):0,fat:cc.reduce((s,a)=>s+(price[a.typeId]||100),0)};
+    }).sort((a,b)=>b.total-a.total);
+    const maxProf=Math.max(1,...porProf.map(x=>x.total));
+    const busiest=dias.slice().sort((a,b)=>b.n-a.n)[0]||null;
+    return {from,to,label,total:ativos.length,concl:conclA.length,falt:faltA.length,canc:cancA.length,fut:futA.length,taxaFalta,fat,ticket,ocup,porTipo,maxTipo,dias,maxDia,porProf,maxProf,busiest,openDays};
+  }
+  brl(n){ return 'R$ '+(n||0).toLocaleString('pt-BR'); }
   renderRelatorios(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
-    const narrow=this.state.w<640;
-    const r=this.reports(this.state.date);
-    const kpi=(label,val,sub,color,icon)=>html`<div style=${{flex:'1 1 160px',padding:'15px 16px',borderRadius:'12px',border:'1px solid '+c.bs,background:c.surface}}>
-      <div style=${{display:'flex',alignItems:'center',gap:'7px',color:c.muted,fontSize:'12px',marginBottom:'8px'}}><${Icon} name=${icon} size=${15} color=${color}/> ${label}</div>
-      <div style=${{fontFamily:"'Martian Mono', monospace",fontSize:'25px',fontWeight:600,color:color||c.text,fontVariantNumeric:'tabular-nums'}}>${val}</div>
-      <div style=${{fontSize:'11.5px',color:c.faint,marginTop:'2px'}}>${sub}</div>
+    const narrow=this.state.w<720;
+    const r=this.reports2();
+    const profSel=this.state.repProf||'todos';
+    const profNome=profSel==='todos'?'Todos os profissionais':(this.state.profs.find(p=>p.id===profSel)||{}).nome;
+    const fmtD=ds=>{const d=new Date(ds+'T00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
+    const rangeLbl=r.from===r.to?fmtD(r.from):(fmtD(r.from)+' – '+fmtD(r.to));
+    const card=(title,right,inner)=>html`<div style=${{border:'1px solid '+c.bs,borderRadius:'12px',background:c.surface,overflow:'hidden'}}>
+      <div style=${{padding:'13px 16px',borderBottom:'1px solid '+c.bs,display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px'}}><span style=${{fontWeight:600,fontSize:'14px'}}>${title}</span>${right||null}</div>
+      <div style=${{padding:'14px 16px'}}>${inner}</div>
     </div>`;
-    return html`<div style=${{padding:'16px 18px',maxWidth:'900px'}}>
-      <div style=${{fontSize:'13px',color:c.muted,marginBottom:'14px'}}>Visão de hoje · ${new Date(this.state.date+'T00:00').toLocaleDateString('pt-BR')}</div>
-      <div style=${{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'18px'}}>
-        ${kpi('Atendimentos',r.total,'agendados hoje',null,'CalendarDays')}
-        ${kpi('Concluídos',r.concl,'realizados',c.success,'CheckCircle2')}
-        ${kpi('Faltas',r.falt,'no-shows',c.danger,'UserX')}
-        ${kpi('Taxa de falta',r.taxa+'%','sobre realizados',r.taxa>20?c.danger:c.warning,'TrendingDown')}
-      </div>
-      <div style=${{border:'1px solid '+c.bs,borderRadius:'12px',overflow:'hidden',background:c.surface}}>
-        <div style=${{padding:'12px 16px',borderBottom:'1px solid '+c.bs,fontWeight:600,fontSize:'14px'}}>Desempenho por profissional</div>
-        ${r.porProf.map(pp=>html`<div key=${pp.prof.id} style=${{display:'flex',alignItems:'center',flexWrap:narrow?'wrap':'nowrap',gap:narrow?'8px 12px':'14px',padding:'12px 16px',borderBottom:'1px solid '+c.bs}}>
-          ${this.avatar(pp.prof.nome,this.profColor(pp.prof),30)}
-          <div style=${{flex:narrow?'1 1 auto':'0 0 150px',width:narrow?'auto':'150px',minWidth:0}}><div style=${{fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pp.prof.nome}</div><div style=${{fontSize:'11px',color:c.faint}}>${pp.prof.sub}</div></div>
-          <div style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted,textAlign:'right',order:narrow?0:3,width:narrow?'auto':'90px',flexShrink:0}}>${pp.concl}✓ · ${pp.falt}✕</div>
-          <div style=${{flex:narrow?'1 1 100%':'1',order:narrow?4:2}}>
-            <div style=${{display:'flex',justifyContent:'space-between',fontSize:'11px',color:c.muted,marginBottom:'3px'}}><span>Volume · ${pp.total}</span><span>Falta ${pp.taxa}%</span></div>
-            <div style=${{display:'flex',gap:'6px',alignItems:'center'}}>
-              <div style=${{flex:1,height:'8px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:Math.min(100,pp.total/12*100)+'%',height:'100%',background:this.profColor(pp.prof),opacity:.85}}></div></div>
-              <div style=${{width:'56px',height:'8px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:pp.taxa+'%',height:'100%',background:pp.taxa>20?c.danger:c.warning}}></div></div>
+    const kpi=(label,val,sub,color,icon)=>html`<div style=${{flex:'1 1 150px',minWidth:'150px',padding:'14px 15px',borderRadius:'12px',border:'1px solid '+c.bs,background:c.surface}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'7px',color:c.muted,fontSize:'11.5px',marginBottom:'7px'}}><${Icon} name=${icon} size=${14} color=${color||c.faint}/> ${label}</div>
+      <div style=${{fontFamily:"'Martian Mono', monospace",fontSize:'23px',fontWeight:600,color:color||c.text,fontVariantNumeric:'tabular-nums'}}>${val}</div>
+      <div style=${{fontSize:'11px',color:c.faint,marginTop:'2px'}}>${sub}</div>
+    </div>`;
+    // trend / volume
+    const showDaily=r.dias.length>1;
+    const trend=showDaily
+      ? html`<div style=${{display:'flex',alignItems:'flex-end',gap:r.dias.length>16?'3px':'6px',height:'132px'}}>
+          ${r.dias.map((x,i)=>{const hp=Math.round(x.n/r.maxDia*100); const cf=x.n?Math.round(x.concl/x.n*100):0; const lab=r.dias.length<=16||x.date.getDay()===1; const isT=x.ds==='2026-06-25';
+          return html`<div key=${x.ds} title=${fmtD(x.ds)+' · '+x.n+' atend. · '+x.concl+' concl.'} style=${{flex:1,minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:'5px',height:'100%'}}>
+            <div style=${{flex:1,width:'100%',display:'flex',alignItems:'flex-end'}}>
+              <div style=${{width:'100%',height:hp+'%',minHeight:x.n?'4px':'0',background:c.surface2,borderRadius:'4px 4px 0 0',display:'flex',alignItems:'flex-end',overflow:'hidden',outline:isT?'2px solid '+c.teal.solid:'none',outlineOffset:'-1px'}}>
+                <div style=${{width:'100%',height:cf+'%',background:c.teal.solid}}></div>
+              </div>
             </div>
-          </div>
-        </div>`)}
+            <div style=${{fontSize:'9px',fontFamily:"'Martian Mono', monospace",color:isT?c.teal.text:c.faint,fontWeight:isT?700:400,height:'12px'}}>${lab?x.date.getDate():''}</div>
+          </div>`;})}
+        </div>
+        <div style=${{display:'flex',gap:'16px',marginTop:'10px',fontSize:'11px',color:c.muted}}><span style=${{display:'inline-flex',alignItems:'center',gap:'5px'}}><span style=${{width:'9px',height:'9px',borderRadius:'2px',background:c.teal.solid}}></span> Concluídos</span><span style=${{display:'inline-flex',alignItems:'center',gap:'5px'}}><span style=${{width:'9px',height:'9px',borderRadius:'2px',background:c.surface2,border:'1px solid '+c.bs}}></span> Demais</span></div>`
+      : html`<div style=${{display:'flex',flexDirection:'column',gap:'11px'}}>
+          ${r.porProf.map(pp=>html`<div key=${pp.prof.id} style=${{display:'flex',alignItems:'center',gap:'10px'}}>
+            ${this.avatar(pp.prof.nome,this.profColor(pp.prof),26)}
+            <span style=${{width:'120px',fontSize:'12.5px',fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pp.prof.nome.replace(/^Dr[a]?\.\s*/,'')}</span>
+            <div style=${{flex:1,height:'10px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:Math.round(pp.total/r.maxProf*100)+'%',height:'100%',background:this.profColor(pp.prof)}}></div></div>
+            <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'12px',color:c.muted,width:'26px',textAlign:'right'}}>${pp.total}</span>
+          </div>`)}
+        </div>`;
+    // por tipo
+    const tipoCard=html`<div style=${{display:'flex',flexDirection:'column',gap:'12px'}}>
+      ${r.porTipo.map(x=>html`<div key=${x.type.id}>
+        <div style=${{display:'flex',alignItems:'center',gap:'8px',marginBottom:'5px'}}>
+          <span style=${{width:'9px',height:'9px',borderRadius:'2px',background:x.type.cor,flexShrink:0}}></span>
+          <span style=${{flex:1,fontSize:'12.5px',fontWeight:500,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${x.type.nome}</span>
+          <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'12px',color:c.muted}}>${x.n}</span>
+          <span style=${{fontSize:'11px',color:c.faint,width:'38px',textAlign:'right'}}>${Math.round(x.n/r.total*100)||0}%</span>
+        </div>
+        <div style=${{height:'7px',borderRadius:'4px',background:c.surface2,overflow:'hidden'}}><div style=${{width:Math.round(x.n/r.maxTipo*100)+'%',height:'100%',background:x.type.cor,opacity:.85}}></div></div>
+      </div>`)}
+    </div>`;
+    // resumo status
+    const totAll=r.concl+r.falt+r.canc+r.fut||1;
+    const stRow=(label,n,color)=>html`<div style=${{display:'flex',alignItems:'center',gap:'10px'}}>
+      <span style=${{width:'96px',fontSize:'12.5px',color:c.muted}}>${label}</span>
+      <div style=${{flex:1,height:'9px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:Math.round(n/totAll*100)+'%',height:'100%',background:color}}></div></div>
+      <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'12px',color:c.text,width:'34px',textAlign:'right'}}>${n}</span>
+    </div>`;
+    const statusCard=html`<div style=${{display:'flex',flexDirection:'column',gap:'12px'}}>
+      ${stRow('Concluídos',r.concl,c.success)}
+      ${stRow('Agendados',r.fut,c.info)}
+      ${stRow('Faltas',r.falt,c.danger)}
+      ${stRow('Cancelados',r.canc,c.faint)}
+    </div>`;
+    // tabela por prof
+    const cols='1.8fr 0.9fr 0.8fr 1.1fr';
+    const profTable=html`<div>
+      ${narrow?null:html`<div style=${{display:'grid',gridTemplateColumns:cols,gap:'10px',padding:'0 16px 8px',fontSize:'11px',fontWeight:600,color:c.faint}}><span>Profissional</span><span style=${{textAlign:'right'}}>Volume</span><span style=${{textAlign:'right'}}>Faltas</span><span style=${{textAlign:'right'}}>Taxa falta</span></div>`}
+      ${r.porProf.map(pp=>narrow?html`<div key=${pp.prof.id} style=${{display:'flex',flexDirection:'column',gap:'8px',padding:'12px 16px',borderTop:'1px solid '+c.bs}}>
+        <div style=${{display:'flex',alignItems:'center',gap:'10px'}}>${this.avatar(pp.prof.nome,this.profColor(pp.prof),28)}<div style=${{flex:1,minWidth:0}}><div style=${{fontWeight:600,fontSize:'13px'}}>${pp.prof.nome}</div><div style=${{fontSize:'11px',color:c.faint}}>${pp.prof.sub}</div></div></div>
+        <div style=${{display:'flex',gap:'14px',fontSize:'12px',color:c.muted,fontFamily:"'Martian Mono', monospace"}}><span>${pp.total} atend.</span><span>${pp.concl}✓</span><span style=${{color:pp.taxa>20?c.danger:c.muted}}>${pp.falt}✕ · ${pp.taxa}%</span></div>
+      </div>`:html`<div key=${pp.prof.id} style=${{display:'grid',gridTemplateColumns:cols,alignItems:'center',gap:'10px',padding:'11px 16px',borderTop:'1px solid '+c.bs}}>
+        <span style=${{display:'flex',alignItems:'center',gap:'10px',minWidth:0}}>${this.avatar(pp.prof.nome,this.profColor(pp.prof),28)}<span style=${{minWidth:0}}><span style=${{display:'block',fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pp.prof.nome}</span><span style=${{display:'block',fontSize:'11px',color:c.faint}}>${pp.prof.sub}</span></span></span>
+        <span style=${{textAlign:'right',fontFamily:"'Martian Mono', monospace",fontSize:'13px',fontWeight:600}}>${pp.total}</span>
+        <span style=${{textAlign:'right',fontFamily:"'Martian Mono', monospace",fontSize:'12.5px',color:c.muted}}>${pp.falt}</span>
+        <span style=${{textAlign:'right'}}><span style=${{display:'inline-flex',alignItems:'center',gap:'6px',justifyContent:'flex-end'}}><span style=${{width:'44px',height:'7px',borderRadius:'4px',background:c.surface2,overflow:'hidden',display:'inline-block'}}><span style=${{display:'block',width:pp.taxa+'%',height:'100%',background:pp.taxa>20?c.danger:c.warning}}></span></span><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'12px',color:pp.taxa>20?c.danger:c.muted,width:'30px',textAlign:'right'}}>${pp.taxa}%</span></span></span>
+      </div>`)}
+    </div>`;
+    return html`<div style=${{padding:'16px 18px',width:'100%'}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+        <span style=${{fontSize:'12.5px',fontWeight:600,padding:'4px 11px',borderRadius:'999px',background:c.teal.subtle,color:c.teal.text}}>${r.label}</span>
+        <span style=${{fontSize:'12.5px',color:c.muted,fontFamily:"'Martian Mono', monospace"}}>${rangeLbl}</span>
+        <span style=${{fontSize:'12.5px',color:c.faint}}>·</span>
+        <span style=${{fontSize:'12.5px',color:c.muted}}>${profNome}</span>
+        ${r.busiest&&r.dias.length>1?html`<span style=${{marginLeft:'auto',fontSize:'12px',color:c.faint}}>Pico: <b style=${{color:c.text}}>${fmtD(r.busiest.ds)}</b> (${r.busiest.n})</span>`:null}
       </div>
+      <div style=${{display:'flex',gap:'11px',flexWrap:'wrap',marginBottom:'14px'}}>
+        ${kpi('Atendimentos',r.total,r.fut+' ainda agendados',null,'CalendarDays')}
+        ${kpi('Concluídos',r.concl,r.total?Math.round(r.concl/r.total*100)+'% do volume':'—',c.success,'CircleCheck')}
+        ${kpi('Taxa de falta',r.taxaFalta+'%',r.falt+' faltas',r.taxaFalta>20?c.danger:c.warning,'TrendingDown')}
+        ${kpi('Cancelamentos',r.canc,'no período',c.faint,'CircleX')}
+        ${kpi('Ocupação',r.ocup+'%',r.openDays+' dias úteis',r.ocup>=70?c.success:c.info,'Gauge')}
+      </div>
+      <div style=${{marginBottom:'14px'}}>${card(showDaily?'Volume por dia':'Volume por profissional',showDaily?html`<span style=${{fontSize:'11.5px',color:c.faint}}>${r.total} atendimentos</span>`:null,trend)}</div>
+      <div style=${{display:'grid',gridTemplateColumns:narrow?'1fr':'1fr 1fr',gap:'14px',marginBottom:'14px'}}>
+        ${card('Por tipo de atendimento',null,r.porTipo.length?tipoCard:html`<div style=${{color:c.faint,fontSize:'13px',padding:'8px 0'}}>Sem dados no período.</div>`)}
+        ${card('Composição por status',null,statusCard)}
+      </div>
+      ${card('Desempenho por profissional',null,profTable)}
     </div>`;
   }
 
