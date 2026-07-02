@@ -156,11 +156,21 @@ class Component extends DCLogic {
     // Horário da clínica: cada dia é uma lista de períodos (permite mais de um período no mesmo dia). null = fechado.
     const hours={1:[['08:00','12:00'],['13:00','18:00']],2:[['08:00','12:00'],['13:00','18:00']],3:[['08:00','12:00'],['13:00','18:00']],4:[['08:00','12:00'],['13:00','18:00']],5:[['08:00','12:00'],['13:00','18:00']],6:[['08:00','12:00']],0:null};
 
+    // Membros da organização (acesso/login). Distinto de "profissionais": o vínculo é opcional (profId) e único.
+    // Repare: Thiago Alves (p4) e Carla Reis (p5) são profissionais SEM acesso ao sistema.
+    const membros=[
+      {id:'u1',nome:'Aline Santos',email:'aline.santos@movimento.com.br',papel:'admin',profId:null,status:'ativo',acesso:'Há 2 horas'},
+      {id:'u2',nome:'Dra. Marina Lopes',email:'marina.lopes@movimento.com.br',papel:'profissional',profId:'p1',status:'ativo',acesso:'Ontem'},
+      {id:'u3',nome:'Dr. Rafael Couto',email:'rafael.couto@movimento.com.br',papel:'profissional',profId:'p2',status:'ativo',acesso:'Há 3 dias'},
+      {id:'u4',nome:'Dra. Beatriz Nunes',email:'beatriz.nunes@movimento.com.br',papel:'profissional',profId:'p3',status:'pendente',acesso:null},
+      {id:'u5',nome:'João Pereira',email:'recepcao@movimento.com.br',papel:'membro',profId:null,status:'ativo',acesso:'Há 20 min'},
+    ];
+
     this.cat=cat; this.wd=wd;
     this.state={
       ready:false, screen:'agenda', dark:false, density:'espacoso',
       view:'dia', date:ds, drawer:null, modal:null, modalData:{}, selPaciente:null,
-      profs, types, patients, appts, fila, holidays, hours,
+      profs, types, patients, appts, fila, holidays, hours, membros,
       settings:{capPilates:4, noShowConsome:false, slot:15},
       w:1440, toast:null, drag:null, ghost:null, configTab:'operacao', filtroPac:'', pacQuery:'', pacFiltro:'todos', filaPrio:'todas', repPeriodo:'hoje', profFiltro:'todos',
     };
@@ -922,7 +932,7 @@ class Component extends DCLogic {
   }
   sbConfig(){
     const html=this.html; const tab=this.state.configTab;
-    const items=[['operacao','Operação','SlidersHorizontal'],['tipos','Tipos de atendimento','Stethoscope'],['horario','Horário','Clock'],['feriados','Exceções','CalendarOff']];
+    const items=[['operacao','Operação','SlidersHorizontal'],['tipos','Tipos de atendimento','Stethoscope'],['horario','Horário','Clock'],['feriados','Exceções','CalendarOff'],['equipe','Equipe & acessos','Users']];
     return html`<div>
       ${this.sbHeader('Ajustes')}
       ${items.map(it=>this.sbRow(it[1],tab===it[0],()=>this.setState({configTab:it[0]}),null,null,it[2]))}
@@ -1322,6 +1332,7 @@ class Component extends DCLogic {
       case 'quemCabe': return this.modalQuemCabe();
       case 'profEdit': return this.modalProf();
       case 'tipoEdit': return this.modalTipo();
+      case 'membroEdit': return this.modalMembro();
       case 'override': return this.modalOverride();
       case 'horarioConflitos': return this.modalHorarioConflitos();
       default: return null;
@@ -1797,6 +1808,110 @@ class Component extends DCLogic {
     const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP('Salvar',()=>this.saveType({id:d.id,nome:d.nome,dur:d.dur||50,cor,icon,grupo:!!d.grupo,cap:d.grupo?(d.cap||4):undefined}),!d.nome)}`;
     return this.modalShell(d.id?'Editar tipo':'Novo tipo de atendimento',body,footer,'480px');
   }
+
+  // ================= EQUIPE & ACESSOS =================
+  roleMeta(){
+    const c=this.theme();
+    return {
+      admin:{l:'Administrador',desc:'Acesso total — configurações, equipe, todas as agendas e relatórios',bg:c.teal.subtle,fg:c.teal.text,ic:'ShieldCheck'},
+      profissional:{l:'Profissional',desc:'Gerencia a própria agenda e seus pacientes',bg:this.tint(c.info,.14),fg:c.info,ic:'Stethoscope'},
+      membro:{l:'Membro',desc:'Opera a agenda de todos, sem configurações sensíveis',bg:c.surface2,fg:c.muted,ic:'User'},
+    };
+  }
+  roleBadge(papel){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const m=this.roleMeta()[papel]||this.roleMeta().membro;
+    return html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'11.5px',fontWeight:600,padding:'3px 9px',borderRadius:'999px',background:m.bg,color:m.fg}}><${Icon} name=${m.ic} size=${12}/> ${m.l}</span>`;
+  }
+  statusBadge(status){
+    const c=this.theme(); const html=this.html;
+    if(status==='pendente') return html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'11px',fontWeight:600,color:'#9a6a05'}}><span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.warning}}></span> Convite pendente</span>`;
+    return html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'11px',fontWeight:600,color:c.muted}}><span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.teal.solid}}></span> Ativo</span>`;
+  }
+  cfgEquipe(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const narrow=this.state.w<760;
+    const membros=this.state.membros||[];
+    const prof=(id)=>this.state.profs.find(p=>p.id===id);
+    const linkedIds=membros.filter(m=>m.papel==='profissional'&&m.profId).map(m=>m.profId);
+    const semAcesso=this.state.profs.filter(p=>p.ativo&&!linkedIds.includes(p.id));
+    const cols='2fr 1.3fr 1.3fr auto';
+    const vinc=(m)=>{ if(m.papel!=='profissional') return html`<span style=${{fontSize:'12px',color:c.faint}}>—</span>`; const p=prof(m.profId); return p?html`<span style=${{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12.5px',color:c.muted,minWidth:0}}>${this.avatar(p.nome,this.profColor(p),20)}<span style=${{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</span></span>`:html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'12px',fontWeight:600,color:c.danger}}><${Icon} name="AlertTriangle" size=${13}/> Sem vínculo</span>`; };
+    const acts=(m)=>html`<span style=${{display:'flex',gap:'4px',justifyContent:'flex-end'}}>
+      ${m.status==='pendente'?html`<button title="Reenviar convite" onClick=${()=>this.toast('Convite reenviado para '+m.email)} style=${this.iconBtn(c)}><${Icon} name="Send" size=${14}/></button>`:null}
+      <button title="Editar" onClick=${()=>this.openModal('membroEdit',{...m})} style=${this.iconBtn(c)}><${Icon} name="Pencil" size=${14}/></button>
+      <button title="Remover acesso" onClick=${()=>this.rmMembro(m.id)} style=${this.iconBtn(c)}><${Icon} name="Trash2" size=${14} color=${c.danger}/></button>
+    </span>`;
+    const idCell=(m)=>html`<span style=${{display:'flex',alignItems:'center',gap:'10px',minWidth:0}}>${this.avatar(m.nome,m.profId?this.profColor(prof(m.profId)||m.profId):c.faint,30)}<span style=${{minWidth:0}}><span style=${{display:'block',fontWeight:600,fontSize:'13.5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${m.nome}</span><span style=${{display:'block',fontSize:'11.5px',color:c.faint,fontFamily:"'Martian Mono', monospace",whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${m.email}</span></span></span>`;
+    const list=this.card(null,html`<div>
+      <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'12px',marginBottom:'14px'}}>
+        <div><div style=${{fontWeight:600,fontSize:'14px'}}>Membros da organização</div><div style=${{fontSize:'12.5px',color:c.muted,marginTop:'2px'}}>Quem tem login e acesso ao sistema. Cada acesso tem um papel e, se for profissional, um vínculo com a agenda.</div></div>
+        <button onClick=${()=>this.openModal('membroEdit',{papel:'membro'})} style=${{flexShrink:0,display:'flex',alignItems:'center',gap:'6px',padding:'8px 13px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="UserPlus" size=${15}/> Convidar membro</button>
+      </div>
+      ${narrow?html`<div style=${{display:'flex',flexDirection:'column'}}>
+        ${membros.map(m=>html`<div key=${m.id} style=${{display:'flex',flexDirection:'column',gap:'9px',padding:'13px 0',borderTop:'1px solid '+c.bs}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'8px'}}><div style=${{flex:1,minWidth:0}}>${idCell(m)}</div>${acts(m)}</div>
+          <div style=${{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>${this.roleBadge(m.papel)}${this.statusBadge(m.status)}</div>
+          ${m.papel==='profissional'?html`<div style=${{display:'flex',alignItems:'center',gap:'6px'}}><span style=${{fontSize:'11px',color:c.faint}}>Vínculo:</span>${vinc(m)}</div>`:null}
+        </div>`)}
+      </div>`:html`<div>
+        <div style=${{display:'grid',gridTemplateColumns:cols,gap:'10px',padding:'0 4px 8px',fontSize:'11.5px',fontWeight:600,color:c.faint}}>
+          <span>Membro</span><span>Papel e status</span><span>Vínculo</span><span></span>
+        </div>
+        ${membros.map(m=>html`<div key=${m.id} style=${{display:'grid',gridTemplateColumns:cols,alignItems:'center',gap:'10px',padding:'11px 4px',borderTop:'1px solid '+c.bs}}>
+          ${idCell(m)}
+          <span style=${{display:'flex',flexDirection:'column',gap:'5px',alignItems:'flex-start'}}>${this.roleBadge(m.papel)}${this.statusBadge(m.status)}</span>
+          ${vinc(m)}
+          ${acts(m)}
+        </div>`)}
+      </div>`}
+    </div>`);
+    const pend=this.card(null,html`<div>
+      <div style=${{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}><${Icon} name="KeyRound" size=${15} color=${c.faint}/><div style=${{fontWeight:600,fontSize:'14px'}}>Profissionais sem acesso</div></div>
+      <div style=${{fontSize:'12.5px',color:c.muted,marginBottom:'12px'}}>Trabalham na clínica mas não fazem login. Conceda acesso quando precisarem gerenciar a própria agenda.</div>
+      ${semAcesso.map(p=>html`<div key=${p.id} style=${{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderTop:'1px solid '+c.bs}}>
+        ${this.avatar(p.nome,this.profColor(p),28)}
+        <div style=${{flex:1,minWidth:0}}><div style=${{fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</div><div style=${{fontSize:'11px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${p.crefito||'—'}</div></div>
+        <button onClick=${()=>this.openModal('membroEdit',{papel:'profissional',profId:p.id,nome:p.nome,email:''})} style=${{flexShrink:0,display:'flex',alignItems:'center',gap:'5px',padding:'6px 11px',borderRadius:'7px',border:'1px solid '+c.bs,background:c.surface,color:c.teal.text,fontWeight:600,cursor:'pointer',fontSize:'12px'}}><${Icon} name="UserPlus" size=${13}/> Conceder acesso</button>
+      </div>`)}
+    </div>`);
+    return html`<div>${list}${semAcesso.length?pend:null}</div>`;
+  }
+  modalMembro(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
+    const rm=this.roleMeta(); const papel=d.papel||'membro';
+    const linkedIds=(this.state.membros||[]).filter(m=>m.papel==='profissional'&&m.profId&&m.id!==d.id).map(m=>m.profId);
+    const avail=this.state.profs.filter(p=>p.ativo&&!linkedIds.includes(p.id));
+    const roleBtn=(k)=>{const on=papel===k; const meta=rm[k]; return html`<button key=${k} onClick=${()=>this.setMD({papel:k,profId:k==='profissional'?d.profId:null})} style=${{textAlign:'left',padding:'11px 13px',borderRadius:'10px',border:'1px solid '+(on?c.teal.border:c.bs),background:on?c.teal.subtle:c.surface,cursor:'pointer'}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'8px',fontWeight:600,fontSize:'13px',color:c.text}}><${Icon} name=${meta.ic} size=${15} color=${on?c.teal.text:c.faint}/> ${meta.l}</div>
+      <div style=${{fontSize:'11.5px',color:c.muted,marginTop:'3px',lineHeight:1.35}}>${meta.desc}</div>
+    </button>`;};
+    const body=html`<div>
+      ${this.fld('Nome',html`<input value=${d.nome||''} onInput=${e=>this.setMD({nome:e.target.value})} placeholder="Nome completo" style=${sel}/>`)}
+      ${this.fld('E-mail (para onde vai o convite)',html`<input type="email" value=${d.email||''} onInput=${e=>this.setMD({email:e.target.value})} placeholder="nome@movimento.com.br" style=${sel}/>`)}
+      <div style=${{fontSize:'12px',fontWeight:600,color:c.muted,marginBottom:'7px'}}>Papel</div>
+      <div style=${{display:'flex',flexDirection:'column',gap:'8px',marginBottom:papel==='profissional'?'14px':'4px'}}>${['admin','profissional','membro'].map(roleBtn)}</div>
+      ${papel==='profissional'?html`<div style=${{borderTop:'1px solid '+c.bs,paddingTop:'14px'}}>
+        ${this.fld('Vincular ao profissional',html`<select value=${d.profId||''} onChange=${e=>this.setMD({profId:e.target.value||null})} style=${sel}>
+          <option value="">Selecione um profissional…</option>
+          ${avail.map(p=>html`<option key=${p.id} value=${p.id}>${p.nome}</option>`)}
+        </select>`)}
+        ${d.profId?null:html`<div style=${{display:'flex',gap:'8px',alignItems:'flex-start',padding:'10px 12px',borderRadius:'9px',background:this.tint(c.warning,.12),fontSize:'12px',color:'#9a6a05'}}><${Icon} name="Info" size=${14} style=${{flexShrink:0,marginTop:'1px'}}/> O papel Profissional exige um vínculo — escolha qual registro da agenda este acesso representa.</div>`}
+      </div>`:null}
+    </div>`;
+    const can=(d.nome||'').trim().length>1 && /\S+@\S+\.\S+/.test(d.email||'') && (papel!=='profissional'||!!d.profId);
+    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP(d.id?'Salvar':'Enviar convite',()=>this.saveMembro({...d,papel}),!can)}`;
+    return this.modalShell(d.id?'Editar membro':'Convidar membro',body,footer,'500px');
+  }
+  saveMembro(d){
+    const profId=d.papel==='profissional'?d.profId:null;
+    this.setState(st=>{
+      if(d.id) return {membros:st.membros.map(m=>m.id===d.id?{...m,nome:d.nome,email:d.email,papel:d.papel,profId}:m)};
+      return {membros:[...st.membros,{id:'u'+Date.now(),nome:d.nome,email:d.email,papel:d.papel,profId,status:'pendente',acesso:null}]};
+    });
+    this.closeModal();
+    this.toast(d.id?'Membro atualizado':'Convite enviado para '+d.email);
+  }
+  rmMembro(id){ this.setState(st=>({membros:st.membros.filter(m=>m.id!==id)})); this.toast('Acesso removido'); }
 
   prioMeta(p){ const m={urgente:{label:'Urgente',color:'#E5484D'},alta:{label:'Alta',color:'#F5A623'},normal:{label:'Normal',color:'#2B7FFF'},baixa:{label:'Baixa',color:'#AEB6BE'}}; return m[p]; }
   // ---- disponibilidade da fila ----
@@ -2317,10 +2432,10 @@ class Component extends DCLogic {
   renderConfig(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
     const tab=this.state.configTab;
-    const tabs=[['operacao','Operação'],['tipos','Tipos de atendimento'],['horario','Horário'],['feriados','Exceções']];
+    const tabs=[['operacao','Operação'],['tipos','Tipos de atendimento'],['horario','Horário'],['feriados','Exceções'],['equipe','Equipe & acessos']];
     const tBtn=([k,l])=>html`<button key=${k} onClick=${()=>this.setState({configTab:k})} style=${{padding:'7px 13px',borderRadius:'8px',border:'none',cursor:'pointer',background:tab===k?c.surface:'transparent',color:tab===k?c.text:c.muted,fontWeight:tab===k?600:500,fontSize:'13px',boxShadow:tab===k?'0 1px 2px rgba(0,0,0,.06)':'none',whiteSpace:'nowrap'}}>${l}</button>`;
-    return html`<div style=${{padding:'16px 18px',maxWidth:'760px'}}>
-      ${tab==='operacao'?this.cfgOperacao():tab==='tipos'?this.cfgTipos():tab==='horario'?this.cfgHorario():this.cfgFeriados()}
+    return html`<div style=${{padding:'16px 18px',maxWidth:tab==='equipe'?'920px':'760px'}}>
+      ${tab==='operacao'?this.cfgOperacao():tab==='tipos'?this.cfgTipos():tab==='horario'?this.cfgHorario():tab==='equipe'?this.cfgEquipe():this.cfgFeriados()}
     </div>`;
   }
   card(title,body){ const c=this.theme(); const html=this.html; return html`<div style=${{border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface,padding:'16px',marginBottom:'12px'}}>${title?html`<div style=${{fontWeight:600,fontSize:'14px',marginBottom:'12px'}}>${title}</div>`:null}${body}</div>`; }
