@@ -15,12 +15,14 @@
 <script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
 <style>
   *{box-sizing:border-box}
-  body{margin:0}
+  html,body{margin:0;overscroll-behavior-y:none}
+  #dc-root{min-height:100dvh}
   @keyframes mvPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.62)}}
   @keyframes mvPulseRow{0%,100%{opacity:1}50%{opacity:.45}}
   @keyframes mvFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   @keyframes mvScale{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:none}}
   @keyframes mvSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  @keyframes mvSlideL{from{transform:translateX(-100%)}to{transform:translateX(0)}}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:rgba(140,150,160,.32);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
   ::-webkit-scrollbar-thumb:hover{background:rgba(140,150,160,.5)}
@@ -30,7 +32,7 @@
   @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 </style>
 </helmet>
-<div style="width:100%;height:100vh;overflow:hidden">{{ app }}</div>
+<div style="width:100%;min-height:100dvh">{{ app }}</div>
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
@@ -47,11 +49,11 @@ class Component extends DCLogic {
     // ---------- domain seed ----------
     const cat=['#E69F00','#0072B2','#009E73','#D55E00','#CC79A7','#56B4E9','#7A52CC'];
     const profs=[
-      {id:'p1',nome:'Dra. Marina Lopes',sub:'Ortopedia',crefito:'CREFITO 3/123456-F',ci:1,ativo:true},
-      {id:'p2',nome:'Dr. Rafael Couto',sub:'Neurofuncional',crefito:'CREFITO 3/098234-F',ci:2,ativo:true},
-      {id:'p3',nome:'Dra. Beatriz Nunes',sub:'RPG',crefito:'CREFITO 3/145789-F',ci:3,ativo:true},
-      {id:'p4',nome:'Dr. Thiago Alves',sub:'Esportiva',crefito:'CREFITO 3/167432-F',ci:4,ativo:true},
-      {id:'p5',nome:'Dra. Carla Reis',sub:'Pilates',crefito:'CREFITO 3/178654-F',ci:5,ativo:true},
+      {id:'p1',nome:'Dra. Marina Lopes',sub:'Ortopedia',crefito:'CREFITO 3/123456-F',ci:1,ativo:true,profissao:'Fisioterapia',registroUF:'SP',anoConclusao:'2014',esp:['Traumato-Ortopedia'],vinculo:'PJ',tel:'(11) 98123-4451',email:'marina.lopes@movimento.com',cidade:'São Paulo',uf:'SP'},
+      {id:'p2',nome:'Dr. Rafael Couto',sub:'Neurofuncional',crefito:'CREFITO 3/098234-F',ci:2,ativo:true,profissao:'Fisioterapia',registroUF:'SP',anoConclusao:'2011',esp:['Neurologia'],vinculo:'CLT',tel:'(11) 99640-2210',email:'rafael.couto@movimento.com',cidade:'São Paulo',uf:'SP'},
+      {id:'p3',nome:'Dra. Beatriz Nunes',sub:'RPG',crefito:'CREFITO 3/145789-F',ci:3,ativo:true,profissao:'Fisioterapia',registroUF:'SP',anoConclusao:'2016',esp:['Osteopatia'],vinculo:'Autônomo',tel:'(11) 98877-3390',email:'beatriz.nunes@movimento.com',cidade:'Guarulhos',uf:'SP'},
+      {id:'p4',nome:'Dr. Thiago Alves',sub:'Esportiva',crefito:'CREFITO 3/167432-F',ci:4,ativo:true,profissao:'Fisioterapia',registroUF:'SP',anoConclusao:'2013',esp:['Desportiva','Traumato-Ortopedia'],vinculo:'PJ',tel:'(11) 99123-8876',email:'thiago.alves@movimento.com',cidade:'São Paulo',uf:'SP'},
+      {id:'p5',nome:'Dra. Carla Reis',sub:'Pilates',crefito:'CREFITO 3/178654-F',ci:5,ativo:true,profissao:'Fisioterapia',registroUF:'SP',anoConclusao:'2018',esp:['Pilates'],vinculo:'Autônomo',tel:'(11) 98455-1122',email:'carla.reis@movimento.com',cidade:'São Paulo',uf:'SP'},
     ];
     const wd=['dom','seg','ter','qua','qui','sex','sáb'];
     // Profissionais seguem o horário da clínica por padrão (followClinic). avail guarda apenas exceções por dia da semana.
@@ -99,11 +101,12 @@ class Component extends DCLogic {
         resp:i%7===0?'Maria Aparecida (mãe)':'',
         profissao:profissoes[i%profissoes.length], empresa:empresas[i%empresas.length],
         atendTipo:tipo, convenio:conv?convenios[i%convenios.length]:'', carteirinha:conv?pad(ri(0,999999999),9):'', validade:conv?('12/20'+ri(26,30)):'', medico:i%2===0?('Dr. '+nomes[(i+3)%nomes.length].split(' ')[0]+' '+nomes[(i+3)%nomes.length].split(' ').slice(-1)):'', crm:i%2===0?('CRM/SP '+ri(50000,189999)):'', comoConheceu:comoPool[i%comoPool.length],
-        prefs, tags, faltas:0, pkg:hasPkg?{tipo:'Sessão',total:tot,usadas:used}:null,
+        prefs, tags, faltas:0, pacotes:(function(){ if(!hasPkg) return []; const gd=[[1,3],[2,4],[1,3,5],[2,5]][i%4]; const gts=['08:00','14:00','09:00','16:00','11:00']; const gh={}; gd.forEach((dw,idx)=>{gh[dw]=gts[(i+idx)%gts.length];}); const gpid=prefs[0]||('p'+((i%5)+1)); const pt=['t2','t4','t3','t2'][i%4]; const arr=[]; if(i%6===0) arr.push({id:'pk'+(i+1)+'a',typeId:'t2',total:10,usadas:10,grade:{dows:[1,3],horarios:{1:'08:00',3:'08:00'},profId:gpid},criado:'2026-02-10',status:'concluido',renovadoDe:null}); arr.push({id:'pk'+(i+1),typeId:pt,total:tot,usadas:used,grade:{dows:gd,horarios:gh,profId:gpid},criado:'2026-05-05',status:'ativo',renovadoDe:i%6===0?('pk'+(i+1)+'a'):null}); return arr; })(),
         ci:ri(1,7), lgpd:true, comunicacao:i%5!==0,
       };
     });
     patients[4].faltas=2; patients[11].faltas=3; patients[18].faltas=1;
+    [3,12].forEach(ix=>{ const pk=(patients[ix].pacotes||[]).find(x=>x.status==='ativo'); if(pk) pk.usadas=pk.total-1; });
 
     // ---------- appointments for today ----------
     const today=new Date(2026,5,25); // Thu Jun 25 2026
@@ -210,6 +213,150 @@ class Component extends DCLogic {
   convLabel(p){ return p.atendTipo==='convenio'?(p.convenio||'Convênio'):(p.atendTipo==='reembolso'?'Reembolso':'Particular'); }
   patient(id){ return this.state.patients.find(p=>p.id===id); }
   type(id){ return this.state.types.find(t=>t.id===id); }
+  // ---------- pacotes ----------
+  pkgList(p){ return (p&&p.pacotes)||[]; }
+  pkgActive(p){ return this.pkgList(p).find(pk=>pk.status==='ativo') || null; }
+  pkgRemaining(pk){ return Math.max(0, pk.total - pk.usadas); }
+  pkgEnding(pk){ const r=this.pkgRemaining(pk); return pk.status==='ativo' && r>0 && r<=2; }
+  pkgDone(pk){ return pk.status==='concluido' || this.pkgRemaining(pk)===0; }
+  pkgAppts(pk){ return this.state.appts.filter(a=>a.pkgId===pk.id||(a.pkgOf&&Object.values(a.pkgOf).includes(pk.id))).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start); }
+  pkgLastDate(pk){ const ap=this.pkgAppts(pk); return ap.length?ap[ap.length-1].date:this.state.date; }
+  dowLabel(i){ return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][i]; }
+  pkgGradeLabel(pk){ const g=pk.grade||{}; const h=g.horarios||{}; const dl=(g.dows||[]).slice().sort((a,b)=>a-b).map(d=>this.dowLabel(d)+(h[d]?' '+h[d]:'')); const pr=this.state.profs.find(x=>x.id===g.profId); return [dl.join(', '),pr?pr.nome:''].filter(Boolean).join(' · '); }
+  pkgStatusMeta(pk){ const c=this.theme(); if(this.pkgDone(pk)) return {label:'Concluído',color:c.faint,bg:c.surface2}; if(this.pkgEnding(pk)) return {label:'Acabando',color:c.warning,bg:this.tint(c.warning,.14)}; return {label:'Ativo',color:c.teal.text,bg:c.teal.subtle}; }
+  openAgendarPacote(patientId){ this.openModal('agendarPacote',{patientId:patientId||'', dows:[1,3], horarios:{1:'09:00',3:'09:00'}, n:10, typeId:'t2', profId:''}); }
+  openRenovar(patientId,pkgId){ const p=this.patient(patientId); const pk=this.pkgList(p).find(x=>x.id===pkgId); if(!pk) return; const g=pk.grade||{}; this.openModal('agendarPacote',{patientId, typeId:pk.typeId, n:pk.total, dows:g.dows||[1,3], horarios:{...(g.horarios||{})}, profId:g.profId||'', renovadoDe:pk.id, fromDate:this.pkgLastDate(pk)}); }
+  createPacote(d){
+    const tp=this.type(d.typeId);
+    const occ=this.computeSerie(d);
+    const pkId='pk'+Date.now();
+    const isGroup=!!tp.grupo; const cap=tp.cap||this.state.settings.capPilates||4;
+    const nonHol=occ.filter(o=>!o.feriado);
+    let created=0, joined=0;
+    this.setState(st=>{
+      let appts=st.appts.slice();
+      nonHol.forEach((o,i)=>{
+        const stt=this.t2m((d.horarios&&d.horarios[o.dow])||'09:00');
+        if(isGroup){
+          const idx=appts.findIndex(b=>b.profId===d.profId&&b.date===o.data&&b.start===stt&&b.typeId===d.typeId&&b.patientIds&&b.status!=='cancelado');
+          if(idx>=0){ const g=appts[idx]; if(g.patientIds.includes(d.patientId)) return; appts[idx]={...g,patientIds:[...g.patientIds,d.patientId],pkgOf:{...(g.pkgOf||{}),[d.patientId]:pkId}}; joined++; return; }
+          const bad=!!this.checkAvail(d.profId,stt,tp.dur,o.data);
+          appts.push({id:'a'+Date.now()+'-'+i,profId:d.profId,typeId:d.typeId,start:stt,dur:tp.dur,date:o.data,status:'agendado',patientIds:[d.patientId],pkgOf:{[d.patientId]:pkId},encaixe:bad&&!!d.forcar}); created++;
+        } else {
+          const bad=!!(this.checkAvail(d.profId,stt,tp.dur,o.data)||this.checkConflict(d.profId,stt,tp.dur,o.data,null,false));
+          appts.push({id:'a'+Date.now()+'-'+i,profId:d.profId,typeId:d.typeId,start:stt,dur:tp.dur,date:o.data,status:'agendado',patientId:d.patientId,encaixe:bad,pkgId:pkId}); created++;
+        }
+      });
+      const pk={id:pkId,typeId:d.typeId,total:d.n,usadas:0,grade:{dows:d.dows,horarios:{...(d.horarios||{})},profId:d.profId},criado:d.fromDate||this.state.date,status:'ativo',renovadoDe:d.renovadoDe||null,grupo:isGroup};
+      const patients=st.patients.map(p=>{
+        if(p.id!==d.patientId) return p;
+        let pacotes=p.pacotes||[];
+        if(d.renovadoDe) pacotes=pacotes.map(x=>x.id===d.renovadoDe?{...x,status:'concluido'}:x);
+        return {...p,pacotes:[...pacotes,pk]};
+      });
+      return {appts,patients};
+    });
+    const skip=occ.filter(o=>o.feriado).length;
+    this.closeModal();
+    const total=created+joined;
+    const detail=isGroup&&joined?(' ('+joined+' em turma'+(created?', '+created+' nova'+(created>1?'s':''):'')+')'):'';
+    this.toast((d.renovadoDe?'Pacote renovado — ':'Pacote criado — ')+total+' sessões'+detail+(skip?' · '+skip+' feriado pulado'+(skip>1?'s':''):''));
+  }
+  pacotesCard(p){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const list=this.pkgList(p);
+    const active=this.pkgActive(p);
+    const ending=active?this.pkgEnding(active):false;
+    const hist=list.filter(pk=>pk!==active).slice().reverse();
+    const head=html`<div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'15px'}}><span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:c.teal.subtle,color:c.teal.text,flexShrink:0}}><${Icon} name="Package" size=${15}/></span><div style=${{fontWeight:700,fontSize:'14px',flex:1}}>Pacotes</div>${active?html`<button onClick=${()=>this.openAgendarPacote(p.id)} style=${{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',fontWeight:600,color:c.teal.text,background:'none',border:'none',cursor:'pointer',padding:0}}><${Icon} name="Plus" size=${14}/> Novo</button>`:null}</div>`;
+    let inner;
+    if(active){
+      const tp=this.type(active.typeId); const rem=this.pkgRemaining(active); const sm=this.pkgStatusMeta(active); const pct=Math.round(active.usadas/active.total*100);
+      inner=html`<div>
+        <div style=${{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'5px'}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'8px'}}><span style=${{width:'9px',height:'9px',borderRadius:'3px',background:tp.cor}}></span><span style=${{fontWeight:700,fontSize:'14px'}}>${tp.nome}</span></div>
+          <span style=${{fontSize:'11px',fontWeight:700,padding:'2px 9px',borderRadius:'999px',background:sm.bg,color:sm.color}}>${sm.label}</span>
+        </div>
+        <div style=${{fontSize:'12px',color:c.muted,marginBottom:'13px',display:'flex',alignItems:'center',gap:'6px'}}><${Icon} name="CalendarClock" size=${13}/> ${this.pkgGradeLabel(active)}</div>
+        <div style=${{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:'6px'}}><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'21px',fontWeight:700}}>${active.usadas}<span style=${{color:c.faint,fontSize:'14px'}}>/${active.total}</span></span><span style=${{fontSize:'12px',color:ending?c.warning:c.muted,fontWeight:ending?700:500}}>${rem} restante${rem===1?'':'s'}</span></div>
+        <div style=${{height:'9px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:pct+'%',height:'100%',background:ending?c.warning:c.teal.solid,transition:'width .3s'}}></div></div>
+        ${ending?html`<div style=${{marginTop:'12px',padding:'10px 12px',borderRadius:'10px',background:this.tint(c.warning,.12),display:'flex',gap:'9px',alignItems:'flex-start'}}><${Icon} name="TriangleAlert" size=${16} color=${c.warning} style=${{flexShrink:0,marginTop:'1px'}}/><div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'12.5px',fontWeight:600,color:c.text}}>Pacote acabando</div><div style=${{fontSize:'11.5px',color:c.muted,marginTop:'1px'}}>Renove para manter a grade fixa sem interrupção.</div></div></div>`:null}
+        <button onClick=${()=>this.openRenovar(p.id,active.id)} style=${{marginTop:'12px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'10px',borderRadius:'9px',border:'none',background:ending?c.warning:c.primary,color:ending?'#fff':c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="RefreshCw" size=${14}/> Renovar pacote</button>
+      </div>`;
+    } else {
+      inner=html`<div style=${{textAlign:'center',padding:'12px 8px'}}>
+        <div style=${{width:'44px',height:'44px',borderRadius:'12px',display:'grid',placeItems:'center',background:c.surface2,margin:'0 auto 10px'}}><${Icon} name="Package" size=${20} color=${c.faint}/></div>
+        <div style=${{fontSize:'13px',fontWeight:600,color:c.muted}}>Sem pacote ativo</div>
+        <div style=${{fontSize:'12px',color:c.faint,marginTop:'2px',marginBottom:'13px'}}>Agende um pacote e distribua a grade fixa da semana.</div>
+        <button onClick=${()=>this.openAgendarPacote(p.id)} style=${{display:'inline-flex',alignItems:'center',gap:'7px',padding:'9px 16px',borderRadius:'9px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="Plus" size=${15}/> Agendar pacote</button>
+      </div>`;
+    }
+    const histBlock=hist.length?html`<div style=${{marginTop:'16px',borderTop:'1px solid '+c.bs,paddingTop:'13px'}}>
+      <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'9px'}}>Histórico de pacotes</div>
+      <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>${hist.map(pk=>{const tp=this.type(pk.typeId); return html`<div key=${pk.id} style=${{display:'flex',alignItems:'center',gap:'10px',fontSize:'12.5px'}}>
+        <span style=${{width:'8px',height:'8px',borderRadius:'2px',background:tp.cor,flexShrink:0}}></span>
+        <span style=${{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${tp.nome}</span>
+        <span style=${{fontFamily:"'Martian Mono', monospace",color:c.muted}}>${pk.usadas}/${pk.total}</span>
+        <span style=${{fontSize:'10.5px',fontWeight:700,color:c.faint,background:c.surface2,padding:'2px 8px',borderRadius:'999px'}}>Concluído</span>
+      </div>`;})}</div>
+    </div>`:null;
+    return html`<div style=${{background:c.surface,border:'1px solid '+(ending?this.tint(c.warning,.5):c.bs),borderRadius:'14px',padding:'18px 20px'}}>${head}${inner}${histBlock}</div>`;
+  }
+  modalPacote(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
+    const isRenew=!!d.renovadoDe;
+    const dows=d.dows||[1,3]; const horarios=d.horarios||{}; const n=d.n||10; const typeId=d.typeId||'t2'; const profId=d.profId||'';
+    const oldPk=isRenew?this.pkgList(this.patient(d.patientId)).find(x=>x.id===d.renovadoDe):null;
+    const fromDate=isRenew?d.fromDate:null;
+    const preview=(d.patientId&&profId)?this.computeSerie({n,dows,typeId,fromDate}):[];
+    const nonHol=preview.filter(o=>!o.feriado);
+    const skipped=preview.filter(o=>o.feriado).length;
+    const dur=this.type(typeId).dur; const tpSel=this.type(typeId); const isGroup=!!tpSel.grupo; const cap=tpSel.cap||this.state.settings.capPilates||4;
+    const occIssue=(o)=>{ if(o.feriado||!profId) return null; const st=this.t2m(horarios[o.dow]||'09:00'); const av=this.checkAvail(profId,st,dur,o.data); if(av) return {kind:'fora',reason:av}; if(isGroup){ const g=this.dayAppts(o.data).find(b=>b.profId===profId&&b.start===st&&b.typeId===typeId&&b.patientIds&&b.status!=='cancelado'); if(g){ if(g.patientIds.length>=cap) return {kind:'cheia',reason:'Turma cheia ('+g.patientIds.length+'/'+cap+')'}; return {kind:'join',reason:'Entra na turma ('+g.patientIds.length+'/'+cap+')'}; } return null; } const cf=this.checkConflict(profId,st,dur,o.data,null,false); if(cf){const b=cf.patientId?this.patient(cf.patientId):null; return {kind:'conflito',reason:'Choca com '+this.type(cf.typeId).nome+(b?(' · '+b.nome.split(' ').slice(0,2).join(' ')):'')+' às '+this.m2t(cf.start)};} return null; };
+    const marks=nonHol.map(o=>({o,iss:occIssue(o)})).filter(x=>x.iss);
+    const issues=marks.filter(x=>x.iss.kind!=='join');
+    const joins=marks.filter(x=>x.iss.kind==='join');
+    const dlabels=['D','S','T','Q','Q','S','S'];
+    const fmt=ds=>{const dd=new Date(ds+'T00:00');return String(dd.getDate()).padStart(2,'0')+'/'+String(dd.getMonth()+1).padStart(2,'0');};
+    const body=html`<div>
+      ${isRenew?html`<div style=${{padding:'11px 13px',borderRadius:'10px',background:c.teal.subtle,color:c.teal.text,fontSize:'12.5px',marginBottom:'14px',display:'flex',gap:'9px',alignItems:'flex-start'}}><${Icon} name="RefreshCw" size=${16} style=${{flexShrink:0,marginTop:'1px'}}/><span>Renovando o pacote de <b>${this.type((oldPk||{}).typeId||typeId).nome}</b>. As novas sessões começam <b>logo após ${fromDate?fmt(fromDate):'a última'}</b>, mantendo a mesma grade. O pacote atual vai para o histórico.</span></div>`:null}
+      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+        ${this.fld('Paciente',this.patientField())}
+        ${this.fld('Profissional',html`<select value=${profId} onChange=${e=>this.setMD({profId:e.target.value})} style=${sel}><option value="">Selecione…</option>${this.state.profs.map(pp=>html`<option key=${pp.id} value=${pp.id}>${pp.nome}</option>`)}</select>`)}
+      </div>
+      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+        ${this.fld('Tipo de sessão',html`<select value=${typeId} onChange=${e=>this.setMD({typeId:e.target.value})} style=${sel}>${this.state.types.map(t=>html`<option key=${t.id} value=${t.id}>${t.nome}</option>`)}</select>`)}
+        ${this.fld('Quantas sessões',html`<input type="number" min=${1} max=${40} value=${n} onChange=${e=>this.setMD({n:parseInt(e.target.value)||1})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+      </div>
+      <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,margin:'2px 0 8px'}}>Grade fixa da semana</div>
+      ${this.fld('Dias',html`<div style=${{display:'flex',gap:'6px'}}>${dlabels.map((l,i)=>html`<button key=${i} onClick=${()=>{const has=dows.includes(i); const nd=has?dows.filter(x=>x!==i):[...dows,i]; const nh={...horarios}; if(has) delete nh[i]; else nh[i]=nh[i]||'09:00'; this.setMD({dows:nd,horarios:nh});}} style=${{width:'40px',height:'40px',borderRadius:'8px',border:'1px solid '+(dows.includes(i)?'transparent':c.bs),background:dows.includes(i)?c.primary:c.surface,color:dows.includes(i)?c.onPrimary:c.muted,fontWeight:600,cursor:'pointer'}}>${l}</button>`)}</div>`)}
+      ${dows.length?html`<div style=${{marginTop:'2px',marginBottom:'8px',padding:'11px 13px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
+        <div style=${{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'9px'}}><span style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.03em',textTransform:'uppercase',color:c.faint}}>Horário de cada dia</span>${dows.length>1?html`<button onClick=${()=>{const t=horarios[[...dows].sort((a,b)=>a-b)[0]]||'09:00'; const nh={}; dows.forEach(x=>nh[x]=t); this.setMD({horarios:nh});}} style=${{fontSize:'11px',color:c.teal.text,background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:0}}>Igualar todos</button>`:null}</div>
+        <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>${dows.slice().sort((a,b)=>a-b).map(dw=>html`<div key=${dw} style=${{display:'flex',alignItems:'center',gap:'12px'}}>
+          <span style=${{flex:1,fontSize:'13px',fontWeight:500}}>${this.dowLabel(dw)}</span>
+          <input type="time" step=${900} value=${horarios[dw]||'09:00'} onChange=${e=>this.setMD({horarios:{...horarios,[dw]:e.target.value}})} style=${{...sel,width:'124px',fontFamily:"'Martian Mono', monospace"}}/>
+        </div>`)}</div>
+      </div>`:null}
+      ${nonHol.length?html`<div style=${{marginTop:'8px',padding:'12px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
+        <div style=${{fontSize:'12px',fontWeight:700,marginBottom:'8px',display:'flex',justifyContent:'space-between',gap:'8px'}}><span>${nonHol.length} sessões serão agendadas</span><span style=${{color:c.teal.text,fontFamily:"'Martian Mono', monospace"}}>${fmt(nonHol[0].data)} → ${fmt(nonHol[nonHol.length-1].data)}</span></div>
+        ${isGroup?html`<div style=${{fontSize:'11.5px',color:c.muted,marginTop:'-4px',marginBottom:'9px',display:'flex',alignItems:'flex-start',gap:'6px'}}><${Icon} name="Users" size=${13} style=${{flexShrink:0,marginTop:'1px'}}/> ${tpSel.nome} é em grupo (até ${cap}) — cada sessão entra na turma do horário ou abre uma nova.</div>`:null}
+        <div style=${{display:'flex',flexWrap:'wrap',gap:'5px'}}>${preview.map((o,i)=>{const iss=occIssue(o); const join=iss&&iss.kind==='join'; const bad=iss&&iss.kind!=='join'; return html`<span key=${i} title=${iss?iss.reason:''} style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10px',padding:'2px 7px',borderRadius:'6px',background:o.feriado?this.tint(c.danger,.12):(bad?this.tint(c.warning,.16):(join?c.teal.subtle:c.surface)),color:o.feriado?c.danger:(bad?'#9a6a05':(join?c.teal.text:c.text)),border:'1px solid '+(o.feriado?'transparent':(bad?this.tint(c.warning,.55):(join?c.teal.border:c.bs))),textDecoration:o.feriado?'line-through':'none',fontWeight:(bad||join)?700:400}}>${fmt(o.data)}</span>`;})}</div>
+        ${joins.length?html`<div style=${{marginTop:'8px',fontSize:'11.5px',color:c.teal.text,fontWeight:600,display:'flex',alignItems:'center',gap:'6px'}}><${Icon} name="UserPlus" size=${13}/> ${joins.length} ${joins.length>1?'sessões entram':'sessão entra'} em turma já existente.</div>`:null}
+        ${skipped?html`<div style=${{marginTop:'8px',fontSize:'11.5px',color:c.warning,fontWeight:600}}>⚠ ${skipped} em feriado — série estendida +${skipped} para entregar as ${n} sessões.</div>`:null}
+        ${issues.length?html`<div style=${{marginTop:'10px',paddingTop:'10px',borderTop:'1px solid '+c.bs}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'7px',fontSize:'12.5px',fontWeight:700,color:'#9a6a05',marginBottom:'8px'}}><${Icon} name="TriangleAlert" size=${15}/> ${issues.length} horário${issues.length>1?'s':''} com conflito</div>
+          <div style=${{display:'flex',flexDirection:'column',gap:'6px',maxHeight:'132px',overflow:'auto'}}>${issues.map(({o,iss})=>html`<div key=${o.data} style=${{display:'flex',gap:'9px',fontSize:'11.5px',alignItems:'baseline'}}>
+            <span style=${{fontFamily:"'Martian Mono', monospace",color:c.text,fontWeight:600,flexShrink:0,minWidth:'104px'}}>${fmt(o.data)} ${this.dowLabel(o.dow)} ${horarios[o.dow]||'09:00'}</span>
+            <span style=${{color:iss.kind==='conflito'?c.danger:'#9a6a05'}}>${iss.reason}</span>
+          </div>`)}</div>
+          <label style=${{display:'flex',alignItems:'center',gap:'8px',marginTop:'10px',fontSize:'12px',cursor:'pointer',color:c.text}}><input type="checkbox" checked=${!!d.forcar} onChange=${e=>this.setMD({forcar:e.target.checked})} style=${{accentColor:c.warning,width:'15px',height:'15px'}}/> Agendar mesmo assim (encaixe) nesses horários</label>
+        </div>`:null}
+      </div>`:html`<div style=${{marginTop:'8px',fontSize:'12.5px',color:c.faint,textAlign:'center',padding:'12px'}}>Selecione paciente, profissional e dias para ver a prévia.</div>`}
+    </div>`;
+    const can=d.patientId&&profId&&dows.length&&n>0&&(!issues.length||d.forcar);
+    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP(isRenew?'Renovar e agendar':'Agendar pacote',()=>this.createPacote({...d,n,dows,horarios,typeId,profId}),!can)}`;
+    return this.modalShell(isRenew?'Renovar pacote':'Agendar pacote',body,footer,'560px');
+  }
   initials(nome){ const w=nome.replace(/Dra?\.\s*/,'').trim().split(/\s+/); return ((w[0]||'')[0]||'')+((w[w.length-1]||'')[0]||''); }
   m2t(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
   t2m(t){ const[a,b]=t.split(':').map(Number); return a*60+b; }
@@ -327,7 +474,7 @@ class Component extends DCLogic {
   }
 
   // ---------- actions ----------
-  go(screen){ this.setState({screen,drawer:null,modal:null,selPaciente:null}); }
+  go(screen){ this.setState({screen,drawer:null,modal:null,selPaciente:null,pacForm:false,profForm:false,sbOpen:false}); }
   openModal(modal,data){ clearTimeout(this._patT); const pid=data&&data.patientId; const pp=pid?this.patient(pid):null; this.setState({modal,modalData:data||{},pac:{q:pp?pp.nome:'',loading:false,open:false}}); }
   closeModal(){ clearTimeout(this._patT); this.setState({modal:null,modalData:{},pac:{q:'',loading:false,open:false}}); }
   onPatQuery(v){
@@ -377,7 +524,8 @@ class Component extends DCLogic {
         </div>`;})}</div>`:null}
     </div>`;
   }
-  patientField(){
+  patientField(opts){
+    opts=opts||{}; const multi=!!opts.multi; const selectedIds=opts.selectedIds||[]; const hideSelected=!!opts.hideSelected; const doPick=(p)=>{ if(opts.onPick) opts.onPick(p); else this.pickPat(p); };
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const sel=this.inputStyle(c);
     const d=this.state.modalData; const pac=this.state.pac||{q:'',loading:false,open:false};
     const term=(pac.q||'').trim();
@@ -388,7 +536,7 @@ class Component extends DCLogic {
       const byDoc=digits.length>=2&&(((p.cpf||'').replace(/\D/g,'').includes(digits))||((p.tel||'').replace(/\D/g,'').includes(digits)));
       return byName||byDoc;
     }):[];
-    const results=matched.slice(0,10);
+    const results=(multi?matched.filter(p=>!selectedIds.includes(p.id)):matched).slice(0,10);
     const open=pac.open&&term.length>=2;
     const skRow=i=>html`<div key=${'sk'+i} style=${{display:'flex',alignItems:'center',gap:'10px',padding:'8px 11px',animation:'mvPulseRow 1.1s ease-in-out infinite',animationDelay:(i*0.09)+'s'}}>
       <span style=${{width:'28px',height:'28px',borderRadius:'50%',background:c.surface2,flexShrink:0}}></span>
@@ -397,13 +545,13 @@ class Component extends DCLogic {
         <div style=${{height:'9px',width:'38%',borderRadius:'5px',background:c.surface2}}></div>
       </div>
     </div>`;
-    return html`<div style=${{position:'relative'}}>
+    return html`<div>${(multi&&!hideSelected&&selectedIds.length)?html`<div style=${{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'8px'}}>${selectedIds.map(id=>{const sp=this.patient(id); if(!sp) return null; return html`<span key=${id} style=${{display:'inline-flex',alignItems:'center',gap:'6px',padding:'3px 8px 3px 3px',borderRadius:'999px',background:c.surface2,border:'1px solid '+c.bs,fontSize:'12px'}}>${this.avatar(sp.nome,this.patientColor(sp),20)} ${sp.nome.split(' ').slice(0,2).join(' ')} <button type="button" onClick=${()=>opts.onRemove&&opts.onRemove(id)} style=${{border:'none',background:'none',cursor:'pointer',color:c.faint,display:'grid',placeItems:'center',padding:'1px'}}><${Icon} name="X" size=${13}/></button></span>`;})}</div>`:null}<div style=${{position:'relative'}}>
       <${Icon} name="Search" size=${15} color=${c.faint} style=${{position:'absolute',left:'11px',top:'19px',transform:'translateY(-50%)',pointerEvents:'none'}}/>
-      <input value=${pac.q||''} onInput=${e=>this.onPatQuery(e.target.value)} onFocus=${()=>{ if(((this.state.pac||{}).q||'').trim().length>=2) this.setState(st=>({pac:{...(st.pac||{}),open:true}})); }} onBlur=${()=>{ this._patBlur=setTimeout(()=>this.setState(st=>({pac:{...(st.pac||{}),open:false}})),160); }} placeholder="Digite ao menos 2 letras…" autoComplete="off" style=${{...sel,padding:'0 34px 0 34px'}}/>
+      <input value=${pac.q||''} onInput=${e=>this.onPatQuery(e.target.value)} onFocus=${()=>{ if(((this.state.pac||{}).q||'').trim().length>=2) this.setState(st=>({pac:{...(st.pac||{}),open:true}})); }} onBlur=${()=>{ this._patBlur=setTimeout(()=>this.setState(st=>({pac:{...(st.pac||{}),open:false}})),160); }} placeholder=${multi?'Buscar para adicionar…':'Digite ao menos 2 letras…'} autoComplete="off" style=${{...sel,padding:'0 34px 0 34px'}}/>
       ${(d.patientId||(pac.q||''))?html`<button type="button" onMouseDown=${e=>e.preventDefault()} onClick=${()=>this.clearPat()} title="Limpar" style=${{position:'absolute',right:'8px',top:'19px',transform:'translateY(-50%)',border:'none',background:'none',cursor:'pointer',color:c.faint,display:'grid',placeItems:'center',padding:'3px'}}><${Icon} name="X" size=${15}/></button>`:null}
       ${open?html`<div style=${{position:'absolute',top:'44px',left:0,right:0,zIndex:60,background:c.surface,border:'1px solid '+c.bd,borderRadius:'10px',boxShadow:'0 14px 34px rgba(0,0,0,'+(c.d?.5:.16)+')',overflow:'hidden',animation:'mvFade .12s ease'}}>
         <div style=${{maxHeight:'286px',overflowY:'auto'}}>
-        ${pac.loading?[0,1].map(i=>skRow(i)):(results.length?results.map(p=>html`<button key=${p.id} type="button" onMouseDown=${e=>e.preventDefault()} onClick=${()=>this.pickPat(p)} onMouseEnter=${e=>e.currentTarget.style.background=c.surface2} onMouseLeave=${e=>e.currentTarget.style.background=d.patientId===p.id?c.surface2:'transparent'} style=${{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'8px 11px',border:'none',borderBottom:'1px solid '+c.bs,background:d.patientId===p.id?c.surface2:'transparent',cursor:'pointer',textAlign:'left'}}>
+        ${pac.loading?[0,1].map(i=>skRow(i)):(results.length?results.map(p=>html`<button key=${p.id} type="button" onMouseDown=${e=>e.preventDefault()} onClick=${()=>doPick(p)} onMouseEnter=${e=>e.currentTarget.style.background=c.surface2} onMouseLeave=${e=>e.currentTarget.style.background=d.patientId===p.id?c.surface2:'transparent'} style=${{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'8px 11px',border:'none',borderBottom:'1px solid '+c.bs,background:d.patientId===p.id?c.surface2:'transparent',cursor:'pointer',textAlign:'left'}}>
           ${this.avatar(p.nome,this.patientColor(p),28)}
           <div style=${{flex:1,minWidth:0}}>
             <div style=${{fontSize:'13px',fontWeight:600,color:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</div>
@@ -414,7 +562,7 @@ class Component extends DCLogic {
         </div>
         ${(!pac.loading&&matched.length>10)?html`<div style=${{padding:'7px 11px',fontSize:'10px',color:c.faint,fontFamily:"'Martian Mono', monospace",borderTop:'1px solid '+c.bs,background:c.surface2}}>Mostrando 10 de ${matched.length} — refine a busca</div>`:null}
       </div>`:null}
-    </div>`;
+    </div></div>`;
   }
   toast(msg){ this.setState({toast:msg}); clearTimeout(this._tt); this._tt=setTimeout(()=>this.setState({toast:null}),2800); }
 
@@ -423,15 +571,24 @@ class Component extends DCLogic {
       const appts=st.appts.map(a=>a.id===id?{...a,status}:a);
       let patients=st.patients;
       const a=st.appts.find(x=>x.id===id);
-      if(status==='faltou'&&a&&a.patientId){
-        patients=patients.map(p=>p.id===a.patientId?{...p,faltas:p.faltas+1}:p);
-        if(st.settings.noShowConsome&&a&&a.patientId){
-          const pat=patients.find(p=>p.id===a.patientId);
-          if(pat&&pat.pkg) patients=patients.map(p=>p.id===a.patientId&&p.pkg?{...p,pkg:{...p.pkg,usadas:Math.min(p.pkg.total,p.pkg.usadas+1)}}:p);
-        }
-      }
-      if(status==='concluido'&&a&&a.patientId){
-        patients=patients.map(p=>(p.id===a.patientId&&p.pkg)?{...p,pkg:{...p.pkg,usadas:Math.min(p.pkg.total,p.pkg.usadas+1)}}:p);
+      if(a){
+        const affected=a.patientIds?a.patientIds:(a.patientId?[a.patientId]:[]);
+        const consumes=s=>s==='concluido'||(s==='faltou'&&st.settings.noShowConsome);
+        const faltaDelta=(status==='faltou'?1:0)-(a.status==='faltou'?1:0);
+        const pkgDelta=(consumes(status)?1:0)-(consumes(a.status)?1:0);
+        const pkgIdFor=pid=>(a.pkgOf&&a.pkgOf[pid])||(!a.patientIds&&a.pkgId)||null;
+        if(faltaDelta||pkgDelta) patients=patients.map(p=>{
+          if(!affected.includes(p.id)) return p;
+          const np={...p};
+          if(faltaDelta) np.faltas=Math.max(0,(p.faltas||0)+faltaDelta);
+          const pid=pkgIdFor(p.id);
+          if(pkgDelta&&pid) np.pacotes=(p.pacotes||[]).map(pk=>{
+            if(pk.id!==pid) return pk;
+            const usadas=Math.min(pk.total,Math.max(0,pk.usadas+pkgDelta));
+            return {...pk,usadas,status:usadas>=pk.total?'concluido':(pk.status==='concluido'?'ativo':pk.status)};
+          });
+          return np;
+        });
       }
       return {appts,patients};
     });
@@ -441,24 +598,37 @@ class Component extends DCLogic {
   }
   createAppt(d){
     const tp=this.type(d.typeId);
-    const a={id:'a'+Date.now(),profId:d.profId,typeId:d.typeId,start:this.t2m(d.hora),dur:tp.dur,date:d.date,status:'agendado',patientId:d.patientId,encaixe:!!d.encaixe};
-    this.setState(st=>({appts:[...st.appts,a]}));
+    const start=this.t2m(d.hora); const date=d.date;
+    this.setState(st=>{
+      let appts=st.appts.slice();
+      if(tp.grupo){
+        const ids=d.patientIds||(d.patientId?[d.patientId]:[]);
+        const idx=appts.findIndex(b=>b.profId===d.profId&&b.date===date&&b.start===start&&b.typeId===d.typeId&&b.patientIds&&b.status!=='cancelado');
+        if(idx>=0){ const g=appts[idx]; const merged=[...g.patientIds]; ids.forEach(id=>{if(!merged.includes(id))merged.push(id);}); appts[idx]={...g,patientIds:merged}; }
+        else appts.push({id:'a'+Date.now(),profId:d.profId,typeId:d.typeId,start,dur:tp.dur,date,status:'agendado',patientIds:ids,encaixe:!!d.encaixe});
+      } else {
+        appts.push({id:'a'+Date.now(),profId:d.profId,typeId:d.typeId,start,dur:tp.dur,date,status:'agendado',patientId:d.patientId,encaixe:!!d.encaixe});
+      }
+      return {appts};
+    });
     this.closeModal();
-    this.toast('Agendamento criado');
+    this.toast(tp.grupo?'Turma agendada':'Agendamento criado');
   }
   moveAppt(id,profId,start){
     this.setState(st=>({appts:st.appts.map(a=>a.id===id?{...a,profId,start}:a)}));
   }
+  addParticipant(apptId,patientId){ this.setState(st=>({appts:st.appts.map(a=>{ if(a.id!==apptId||!a.patientIds) return a; if(a.patientIds.includes(patientId)) return a; return {...a,patientIds:[...a.patientIds,patientId]}; })})); this.setState({pac:{q:'',loading:false,open:false}}); this.toast('Adicionado à turma'); }
+  removeParticipant(apptId,patientId){ this.setState(st=>({appts:st.appts.map(a=>{ if(a.id!==apptId||!a.patientIds) return a; const patientIds=a.patientIds.filter(x=>x!==patientId); const pkgOf=a.pkgOf?Object.fromEntries(Object.entries(a.pkgOf).filter(([k])=>k!==patientId)):a.pkgOf; return {...a,patientIds,pkgOf}; })})); this.toast('Removido da turma'); }
   savePatient(d){
     const tags=Array.isArray(d.tags)?d.tags:[];
     const prefs=Array.isArray(d.prefs)?d.prefs:[];
     const f={nome:d.nome,nomeSocial:d.nomeSocial||'',cpf:d.cpf,rg:d.rg||'',genero:d.genero||'',estadoCivil:d.estadoCivil||'',nasc:d.nasc||'',tel:d.tel,email:d.email||'',endereco:d.endereco||'',numero:d.numero||'',complemento:d.complemento||'',bairro:d.bairro||'',cidade:d.cidade||'',uf:d.uf||'',cep:d.cep||'',emNome:d.emNome||'',emParentesco:d.emParentesco||'',emTel:d.emTel||'',resp:d.resp||'',profissao:d.profissao||'',empresa:d.empresa||'',atendTipo:d.atendTipo||'particular',convenio:d.convenio||'',carteirinha:d.carteirinha||'',validade:d.validade||'',medico:d.medico||'',crm:d.crm||'',comoConheceu:d.comoConheceu||'',prefs,tags,lgpd:!!d.lgpd,comunicacao:!!d.comunicacao};
     this.setState(st=>{
       if(d.id) return {patients:st.patients.map(p=>p.id===d.id?{...p,...f}:p)};
-      const p={id:'pac'+Date.now(),...f,faltas:0,pkg:null,ci:1+Math.floor(Math.random()*7)};
+      const p={id:'pac'+Date.now(),...f,faltas:0,pacotes:[],ci:1+Math.floor(Math.random()*7)};
       return {patients:[p,...st.patients]};
     });
-    this.closeModal(); this.toast(d.id?'Paciente atualizado':'Paciente cadastrado');
+    this.closePacForm(); this.toast(d.id?'Paciente atualizado':'Paciente cadastrado');
   }
   createSerie(d){
     const tp=this.type(d.typeId);
@@ -472,7 +642,7 @@ class Component extends DCLogic {
     this.closeModal(); this.toast(novos.length+' sessões agendadas'+(occ.some(o=>o.feriado)?' (1 pulou feriado, série estendida)':''));
   }
   computeSerie(d){
-    const out=[]; const start=new Date(this.state.date+'T00:00');
+    const out=[]; const start=new Date((d.fromDate||this.state.date)+'T00:00');
     let cur=new Date(start); let count=0; let guard=0;
     const dows=d.dows;
     while(count<d.n && guard<400){
@@ -488,6 +658,7 @@ class Component extends DCLogic {
     return out;
   }
   navDay(delta){ const d=new Date(this.state.date+'T00:00'); d.setDate(d.getDate()+delta); this.setState({date:this.dstr(d)}); }
+  navShift(delta){ const v=this.state.view; const d=new Date(this.state.date+'T00:00'); if(v==='semana') d.setDate(d.getDate()+delta*7); else if(v==='mes') d.setMonth(d.getMonth()+delta); else d.setDate(d.getDate()+delta); this.setState({date:this.dstr(d)}); }
   goToday(){ this.setState({date:'2026-06-25'}); }
   resolveFila(id){ this.setState(st=>({fila:st.fila.filter(f=>f.id!==id)})); this.toast('Excluído da fila de espera'); }
   addFila(d){ this.setState(st=>{ if(d.id) return {fila:st.fila.map(f=>f.id===d.id?{...f,...d}:f)}; return {fila:[{id:'f'+Date.now(),...d},...st.fila]}; }); this.closeModal(); this.toast(d.id?'Fila atualizada':'Adicionado à fila'); }
@@ -496,8 +667,11 @@ class Component extends DCLogic {
       if(d.id) return {profs:st.profs.map(p=>p.id===d.id?{...p,...d}:p)};
       return {profs:[...st.profs,{...d,id:'p'+Date.now()}]};
     });
-    this.closeModal(); this.toast('Profissional salvo');
+    if(this.state.profForm) this.closeProfForm(); else this.closeModal();
+    this.toast('Profissional salvo');
   }
+  openProfForm(data){ this._formScrollEl=null; this.setState({screen:'profissionais',drawer:null,modal:null,profForm:true,modalData:data||{},formSec:'ident'}); }
+  closeProfForm(){ this._formScrollEl=null; this.setState({profForm:false,modalData:{},formSec:'ident'}); }
   saveType(d){ this.setState(st=>{ if(d.id) return {types:st.types.map(t=>t.id===d.id?{...t,...d}:t)}; return {types:[...st.types,{...d,id:'t'+Date.now()}]}; }); this.closeModal(); this.toast('Tipo de atendimento salvo'); }
   rmType(id){ this.setState(st=>({types:st.types.filter(t=>t.id!==id)})); this.toast('Tipo removido'); }
   addHoliday(d){ this.setState(st=>({holidays:[...st.holidays,{...d,id:'h'+Date.now()}]})); }
@@ -512,6 +686,8 @@ class Component extends DCLogic {
     e.preventDefault();
     const grid=this._gridEl; if(!grid) return;
     const origCol=a.profId;
+    const blockRect=e.currentTarget.getBoundingClientRect();
+    const grabDy=e.clientY-blockRect.top;
     const sx=e.clientX, sy=e.clientY; let moved=false;
     this.setState({drag:{id:a.id,origCol,origStart:a.start},ghost:{colId:origCol,start:a.start}});
     const onMove=(ev)=>{
@@ -521,7 +697,7 @@ class Component extends DCLogic {
       for(const cEl of cols){ const r=cEl.getBoundingClientRect(); if(ev.clientX>=r.left&&ev.clientX<=r.right){ colId=cEl.getAttribute('data-col'); break; } }
       const body=grid.querySelector('[data-col="'+colId+'"] [data-body]')||grid.querySelector('[data-body]');
       const r=body.getBoundingClientRect();
-      let mins=480+(ev.clientY-r.top)/this.ppm();
+      let mins=480+(ev.clientY-grabDy-r.top)/this.ppm();
       mins=Math.max(480,Math.min(1080-a.dur,Math.round(mins/15)*15));
       this.setState({ghost:{colId,start:mins}});
     };
@@ -561,16 +737,22 @@ class Component extends DCLogic {
     if(this.state.screen==='login') return this.renderLogin();
     const mobile=this.state.w<860;
     const html=this.html;
-    return html`<div style=${{height:'100vh',width:'100%',display:'flex',background:c.canvas,color:c.text,fontFamily:"'Hanken Grotesk', sans-serif",fontSize:'14px',position:'relative',overflow:'hidden'}}>
-      ${this.renderRail(mobile)}
+    return html`<div style=${{height:mobile?'auto':'100dvh',minHeight:mobile?'100dvh':'auto',width:'100%',display:'flex',background:c.canvas,color:c.text,fontFamily:"'Hanken Grotesk', sans-serif",fontSize:'14px',position:'relative',overflow:mobile?'visible':'hidden'}}>
+      ${mobile?null:this.renderRail(mobile)}
       ${mobile?null:this.renderSidebar()}
       <div style=${{flex:1,display:'flex',flexDirection:'column',minWidth:0,position:'relative'}}>
         ${this.renderTopbar(mobile)}
-        <div style=${{flex:1,minHeight:0,overflow:this.state.screen==='agenda'?'hidden':'auto'}}>
+        <div style=${{flex:1,minHeight:0,overflow:mobile?'visible':(this.state.screen==='agenda'?'hidden':'auto'),overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
           ${this.renderScreen(mobile)}
         </div>
       </div>
       ${this.renderDrawer()}
+      ${mobile&&this.state.sbOpen?html`<div onClick=${()=>this.setState({sbOpen:false})} style=${{position:'fixed',inset:0,zIndex:44,background:'rgba(8,10,12,.42)'}}>
+        <div onClick=${(e)=>{e.stopPropagation(); if(e.target.closest('button')) this.setState({sbOpen:false});}} style=${{position:'absolute',top:0,bottom:0,left:0,maxWidth:'calc(100vw - 8px)',display:'flex',boxShadow:'0 12px 40px rgba(8,10,12,.35)'}}>
+          ${this.renderRail(mobile)}
+          ${this.renderSidebar()}
+        </div>
+      </div>`:null}
       ${this.renderModal()}
       ${this.renderToast()}
     </div>`;
@@ -578,9 +760,9 @@ class Component extends DCLogic {
   renderScreen(mobile){
     switch(this.state.screen){
       case 'agenda': return this.renderAgenda(mobile);
-      case 'pacientes': return this.state.selPaciente?this.renderFicha():this.renderPacientes();
+      case 'pacientes': return this.state.pacForm?this.renderPacienteForm():(this.state.selPaciente?this.renderFicha():this.renderPacientes());
       case 'fila': return this.renderFila();
-      case 'profissionais': return this.renderProfissionais();
+      case 'profissionais': return this.state.profForm?this.renderProfForm():this.renderProfissionais();
       case 'config': return this.renderConfig();
       case 'relatorios': return this.renderRelatorios();
       default: return this.renderAgenda(mobile);
@@ -632,9 +814,9 @@ class Component extends DCLogic {
     const screen=this.state.screen;
     const acts={
       agenda:{l:'Novo agendamento',ic:'Plus',fn:()=>this.openModal('novoAgendamento',{date:this.state.date})},
-      pacientes:{l:'Novo paciente',ic:'UserPlus',fn:()=>this.openModal('novoPaciente',{lgpd:false})},
+      pacientes:{l:'Novo paciente',ic:'UserPlus',fn:()=>this.openPacForm({})},
       fila:{l:'Adicionar à fila',ic:'Plus',fn:()=>this.openModal('addFila',{})},
-      profissionais:{l:'Novo profissional',ic:'Plus',fn:()=>this.openModal('profEdit',{ativo:true,ci:6})},
+      profissionais:{l:'Novo profissional',ic:'Plus',fn:()=>this.openProfForm({ativo:true,ci:6})},
     };
     const titles={agenda:'Agenda',pacientes:'Pacientes',fila:'Fila de espera',profissionais:'Profissionais',relatorios:'Relatórios',config:'Configurações'};
     const act=acts[screen];
@@ -677,16 +859,21 @@ class Component extends DCLogic {
   }
   sbAgenda(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const mono="'Martian Mono', monospace";
+    const mobile=this.state.w<860;
     const hidden=this.state.hiddenProfs||[];
     const active=this.state.profs.filter(p=>p.ativo);
     const anyHidden=hidden.length>0;
     const toggle=id=>this.setState(st=>{ const h=st.hiddenProfs||[]; return {hiddenProfs:h.includes(id)?h.filter(x=>x!==id):[...h,id]}; });
-    const right=anyHidden
+    const right=(anyHidden&&!mobile)
       ?html`<button onClick=${()=>this.setState({hiddenProfs:[]})} style=${{border:'none',background:'none',color:c.teal.text,cursor:'pointer',fontSize:'11px',fontWeight:600}}>mostrar todos</button>`
       :html`<button onClick=${()=>this.go('profissionais')} style=${{border:'none',background:'none',color:c.teal.text,cursor:'pointer',fontSize:'11px',fontWeight:600}}>gerenciar</button>`;
     return html`<div>
       ${this.sbHeader('Profissionais',right)}
-      ${active.map(p=>{const on=!hidden.includes(p.id); return html`<button key=${p.id} onClick=${()=>toggle(p.id)} title=${on?'Ocultar da agenda':'Mostrar na agenda'} style=${{display:'flex',alignItems:'center',gap:'9px',width:'100%',padding:'6px 8px',borderRadius:'8px',border:'none',cursor:'pointer',background:'transparent',textAlign:'left'}}>
+      ${active.map(p=>{const on=!hidden.includes(p.id); return mobile?html`<div key=${p.id} style=${{display:'flex',alignItems:'center',gap:'9px',width:'100%',padding:'6px 8px'}}>
+        ${this.avatar(p.nome,this.profColor(p),22)}
+        <span style=${{minWidth:0,flex:1}}><span style=${{display:'block',fontSize:'12.5px',fontWeight:500,color:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</span></span>
+        <span style=${{fontFamily:mono,fontSize:'10.5px',fontWeight:600,color:c.muted,fontVariantNumeric:'tabular-nums'}}>${this.profLoad(p.id,this.state.date)}%</span>
+      </div>`:html`<button key=${p.id} onClick=${()=>toggle(p.id)} title=${on?'Ocultar da agenda':'Mostrar na agenda'} style=${{display:'flex',alignItems:'center',gap:'9px',width:'100%',padding:'6px 8px',borderRadius:'8px',border:'none',cursor:'pointer',background:'transparent',textAlign:'left'}}>
         <span style=${{width:'17px',height:'17px',borderRadius:'5px',flexShrink:0,display:'grid',placeItems:'center',background:on?c.teal.solid:'transparent',border:'1.5px solid '+(on?c.teal.solid:c.bd)}}>${on?html`<${Icon} name="Check" size=${12} color="#fff"/>`:null}</span>
         <span style=${{opacity:on?1:.5,display:'flex',alignItems:'center',gap:'9px',flex:1,minWidth:0}}>
           ${this.avatar(p.nome,this.profColor(p),22)}
@@ -698,11 +885,12 @@ class Component extends DCLogic {
   }
   sbPacientes(){
     const html=this.html; const ps=this.state.patients; const f=this.state.pacFiltro||'todos';
-    const set=v=>this.setState({pacFiltro:v,selPaciente:null});
+    const set=v=>this.setState({pacFiltro:v,selPaciente:null,pacForm:false});
     return html`<div>
       ${this.sbHeader('Segmentos')}
       ${this.sbRow('Todos os pacientes',f==='todos',()=>set('todos'),ps.length,null,'Users')}
-      ${this.sbRow('Com pacote ativo',f==='pacote',()=>set('pacote'),ps.filter(p=>p.pkg).length,null,'Package')}
+      ${this.sbRow('Com pacote ativo',f==='pacote',()=>set('pacote'),ps.filter(p=>this.pkgActive(p)).length,null,'Package')}
+      ${this.sbRow('Pacote acabando',f==='acabando',()=>set('acabando'),ps.filter(p=>{const pk=this.pkgActive(p);return pk&&this.pkgEnding(pk);}).length,'#F5A623','TriangleAlert')}
       ${this.sbRow('Com faltas',f==='faltas',()=>set('faltas'),ps.filter(p=>p.faltas>0).length,null,'UserX')}
       ${this.sbRow('Com responsável',f==='resp',()=>set('resp'),ps.filter(p=>p.resp).length,null,'UserCog')}
     </div>`;
@@ -742,7 +930,7 @@ class Component extends DCLogic {
   }
   sbProfissionais(){
     const html=this.html; const ps=this.state.profs; const f=this.state.profFiltro||'todos';
-    const set=v=>this.setState({profFiltro:v});
+    const set=v=>this.setState({profFiltro:v,profForm:false});
     return html`<div>
       ${this.sbHeader('Filtrar')}
       ${this.sbRow('Todos',f==='todos',()=>set('todos'),ps.length,null,'Users')}
@@ -759,21 +947,20 @@ class Component extends DCLogic {
   }
   renderTopbar(mobile){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
-    const titles={agenda:'Agenda',pacientes:this.state.selPaciente?'Ficha do paciente':'Pacientes',fila:'Fila de espera',profissionais:'Profissionais',config:'Configurações',relatorios:'Relatórios'};
-    return html`<div style=${{position:'relative',flexShrink:0,background:c.surface,borderBottom:'1px solid '+c.bs}}>
+    const titles={agenda:'Agenda',pacientes:this.state.pacForm?(this.state.modalData&&this.state.modalData.id?'Editar paciente':'Novo paciente'):(this.state.selPaciente?'Ficha do paciente':'Pacientes'),fila:'Fila de espera',profissionais:this.state.profForm?(this.state.modalData&&this.state.modalData.id?'Editar profissional':'Novo profissional'):'Profissionais',config:'Configurações',relatorios:'Relatórios'};
+    const noForm=!(this.state.pacForm||this.state.profForm||this.state.selPaciente);
+    const topActs={agenda:{t:'Novo agendamento',fn:()=>this.openModal('novoAgendamento',{date:this.state.date})},pacientes:{t:'Novo paciente',fn:()=>this.openPacForm({})},fila:{t:'Adicionar à fila',fn:()=>this.openModal('addFila',{})},profissionais:{t:'Novo profissional',fn:()=>this.openProfForm({ativo:true,ci:6})}};
+    const topAct=noForm?topActs[this.state.screen]:null;
+    return html`<div style=${{position:mobile?'sticky':'relative',top:mobile?0:'auto',zIndex:mobile?20:'auto',flexShrink:0,background:c.surface,borderBottom:'1px solid '+c.bs}}>
       <div style=${{height:'2px',background:c.teal.solid}}></div>
       <div style=${{height:'52px',display:'flex',alignItems:'center',gap:'12px',padding:'0 16px'}}>
+        ${mobile?html`<button onClick=${()=>this.setState({sbOpen:true})} title="Menu" style=${{width:'34px',height:'34px',borderRadius:'8px',border:'none',background:'transparent',color:c.text,cursor:'pointer',display:'grid',placeItems:'center',flexShrink:0,marginLeft:'-8px'}}><${Icon} name="Menu" size=${20}/></button>`:null}
         <div style=${{fontWeight:700,fontSize:'15px',whiteSpace:'nowrap'}}>${titles[this.state.screen]||'Movimento'}</div>
-        <div style=${{flex:1,maxWidth:'420px',marginLeft:'8px',position:'relative',display:(mobile||this.state.screen==='pacientes')?'none':'block'}}>
-          <${Icon} name="Search" size=${15} color=${c.faint} style=${{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)'}}/>
-          <input placeholder="Buscar paciente, profissional…" onFocus=${()=>this.go('pacientes')} style=${{width:'100%',height:'34px',padding:'0 36px 0 32px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface2,color:c.text,fontSize:'13px'}}/>
-          <span style=${{position:'absolute',right:'8px',top:'50%',transform:'translateY(-50%)',fontFamily:"'Martian Mono', monospace",fontSize:'10px',color:c.faint,border:'1px solid '+c.bd,borderRadius:'4px',padding:'1px 5px'}}>⌘K</span>
-        </div>
         <div style=${{flex:1}}></div>
         <button onClick=${()=>this.setState({dark:!this.state.dark})} title="Tema" style=${{width:'34px',height:'34px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface2,color:c.muted,cursor:'pointer',display:'grid',placeItems:'center'}}>
           <${Icon} name=${c.d?'Sun':'Moon'} size=${16}/>
         </button>
-        ${mobile?html`<button onClick=${()=>this.openModal('novoAgendamento',{date:this.state.date})} style=${{height:'34px',padding:'0 12px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}><${Icon} name="Plus" size=${15}/></button>`:null}
+        ${mobile&&topAct?html`<button onClick=${topAct.fn} title=${topAct.t} style=${{height:'34px',padding:'0 12px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}><${Icon} name="Plus" size=${15}/></button>`:null}
       </div>
     </div>`;
   }
@@ -796,25 +983,31 @@ class Component extends DCLogic {
   renderAgenda(mobile){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
     const dt=new Date(this.state.date+'T00:00');
-    const dlabel=dt.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+    let dlabel=dt.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+    if(this.state.view==='semana'){ const dow=dt.getDay(); const mon=new Date(dt); mon.setDate(dt.getDate()-((dow+6)%7)); const sat=new Date(mon); sat.setDate(mon.getDate()+5); const f=x=>x.getDate()+' '+x.toLocaleDateString('pt-BR',{month:'short'}); dlabel=f(mon)+' – '+f(sat); }
+    else if(this.state.view==='mes'){ dlabel=dt.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); }
     const isToday=this.state.date==='2026-06-25';
     const tabBtn=(v,l)=>html`<button onClick=${()=>this.setState({view:v})} style=${{padding:'5px 12px',borderRadius:'7px',border:'none',cursor:'pointer',background:this.state.view===v?c.surface:'transparent',color:this.state.view===v?c.text:c.muted,fontWeight:this.state.view===v?600:500,fontSize:'13px',boxShadow:this.state.view===v?'0 1px 2px rgba(0,0,0,.06)':'none'}}>${l}</button>`;
     const densBtn=(v,icon)=>html`<button title=${v} onClick=${()=>this.setState({density:v})} style=${{width:'30px',height:'28px',display:'grid',placeItems:'center',border:'none',cursor:'pointer',background:this.state.density===v?c.surface:'transparent',color:this.state.density===v?c.teal.text:c.faint,borderRadius:'6px'}}><${Icon} name=${icon} size=${15}/></button>`;
-    return html`<div style=${{height:'100%',display:'flex',flexDirection:'column'}}>
-      <div style=${{flexShrink:0,padding:'10px 16px',borderBottom:'1px solid '+c.bs,display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',background:c.surface}}>
+    return (()=>{
+    const nav=html`<div style=${{flexShrink:0,padding:'10px 16px',borderBottom:'1px solid '+c.bs,display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',background:c.surface}}>
         <div style=${{display:'flex',alignItems:'center',gap:'2px'}}>
-          <button onClick=${()=>this.navDay(-1)} style=${this.iconBtn(c)}><${Icon} name="ChevronLeft" size=${17}/></button>
+          <button onClick=${()=>this.navShift(-1)} style=${this.iconBtn(c)}><${Icon} name="ChevronLeft" size=${17}/></button>
           <button onClick=${()=>this.goToday()} style=${{padding:'6px 12px',borderRadius:'7px',border:'1px solid '+c.bs,background:isToday?c.teal.subtle:c.surface,color:isToday?c.teal.text:c.text,fontWeight:600,fontSize:'13px',cursor:'pointer'}}>Hoje</button>
-          <button onClick=${()=>this.navDay(1)} style=${this.iconBtn(c)}><${Icon} name="ChevronRight" size=${17}/></button>
+          <button onClick=${()=>this.navShift(1)} style=${this.iconBtn(c)}><${Icon} name="ChevronRight" size=${17}/></button>
         </div>
         <div style=${{textTransform:'capitalize',fontWeight:600,fontSize:'14.5px'}}>${dlabel}${isToday?html` <span style=${{color:c.teal.text,fontWeight:600}}>· hoje</span>`:''}</div>
         <div style=${{flex:1}}></div>
-        <div style=${{display:'flex',gap:'2px',background:c.surface2,borderRadius:'9px',padding:'3px'}}>${tabBtn('dia','Dia')}${tabBtn('semana','Semana')}${tabBtn('lista','Lista')}</div>
-      </div>
+        <div style=${{display:'flex',gap:'2px',background:c.surface2,borderRadius:'9px',padding:'3px'}}>${tabBtn('dia','Dia')}${tabBtn('semana','Semana')}${tabBtn('mes','Mês')}${tabBtn('lista','Lista')}</div>
+      </div>`;
+    if(mobile&&this.state.view==='dia') return this.renderAgendaMobile(nav);
+    return html`<div style=${{height:mobile?'auto':'100%',minHeight:mobile?'100%':'auto',display:'flex',flexDirection:'column'}}>
+      ${nav}
       <div style=${{flex:1,minHeight:0}}>
-        ${this.state.view==='dia'?(mobile?this.renderAgendaMobile():this.renderDayGrid()):this.state.view==='semana'?this.renderWeek():this.renderList()}
+        ${this.state.view==='dia'?this.renderDayGrid():this.state.view==='semana'?this.renderWeek(mobile):this.state.view==='mes'?this.renderMonth(mobile):this.renderList(mobile)}
       </div>
     </div>`;
+    })();
   }
   iconBtn(c){ return {width:'30px',height:'30px',display:'grid',placeItems:'center',borderRadius:'7px',border:'1px solid '+c.bs,background:c.surface,color:c.muted,cursor:'pointer'}; }
 
@@ -950,7 +1143,7 @@ class Component extends DCLogic {
     </div>`;
   }
 
-  renderAgendaMobile(){
+  renderAgendaMobile(nav){
     const c=this.theme(); const html=this.html;
     const profs=this.state.profs.filter(p=>p.ativo);
     if(!this._mobProf) this._mobProf=profs[0].id;
@@ -958,26 +1151,34 @@ class Component extends DCLogic {
     const p=profs.find(x=>x.id===cur)||profs[0];
     const ppm=this.ppm(); const gridH=(1080-480)*ppm; const hours=[]; for(let h=8;h<=18;h++) hours.push(h);
     const appts=this.profAppts(p.id,this.state.date);
-    return html`<div style=${{height:'100%',display:'flex',flexDirection:'column'}}>
-      <div style=${{display:'flex',gap:'6px',padding:'10px',overflowX:'auto',borderBottom:'1px solid '+c.bs,background:c.surface}}>
-        ${profs.map(pr=>html`<button key=${pr.id} onClick=${()=>this.setState({mobProf:pr.id})} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'6px 10px',borderRadius:'999px',border:'1px solid '+(pr.id===cur?'transparent':c.bs),background:pr.id===cur?c.primary:c.surface,color:pr.id===cur?c.onPrimary:c.text,cursor:'pointer',whiteSpace:'nowrap',fontSize:'12.5px',fontWeight:600,flexShrink:0}}>${this.avatar(pr.nome,this.profColor(pr),18)} ${pr.nome.split(' ')[1]}</button>`)}
-      </div>
-      <div style=${{flex:1,overflow:'auto',position:'relative',background:c.canvas,padding:'0 10px'}}>
-        <div data-body style=${{position:'relative',height:gridH+'px'}}>
-          ${hours.map(h=>html`<div key=${h} style=${{position:'absolute',left:0,right:0,top:((h*60-480)*ppm)+'px',borderTop:'1px solid '+c.bs}}><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10px',color:c.faint,position:'absolute',left:0,top:'-7px',background:c.canvas,paddingRight:'4px'}}>${String(h).padStart(2,'0')}:00</span></div>`)}
-          <div style=${{position:'absolute',left:'34px',right:0,top:((720-480)*ppm)+'px',height:(60*ppm)+'px',background:'repeating-linear-gradient(135deg,'+this.tint(c.muted,.07)+' 0 7px,transparent 7px 14px)'}}></div>
-          <div style=${{position:'absolute',left:'34px',right:0,height:'100%'}}>${appts.map(a=>this.renderBlock(a,ppm,false))}</div>
+    const lay=this.layoutAppts(appts);
+    const laneW=140; const bodyW='max(100%, '+(lay.maxLanes*laneW)+'px)';
+    return html`<div style=${{background:c.canvas,minHeight:'100%'}}>
+        ${nav||null}
+        <div style=${{position:'sticky',top:'54px',zIndex:6,display:'flex',gap:'6px',padding:'10px',overflowX:'auto',borderBottom:'1px solid '+c.bs,background:c.surface}}>
+          ${profs.map(pr=>html`<button key=${pr.id} onClick=${()=>this.setState({mobProf:pr.id})} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'6px 10px',borderRadius:'999px',border:'1px solid '+(pr.id===cur?'transparent':c.bs),background:pr.id===cur?c.primary:c.surface,color:pr.id===cur?c.onPrimary:c.text,cursor:'pointer',whiteSpace:'nowrap',fontSize:'12.5px',fontWeight:600,flexShrink:0}}>${this.avatar(pr.nome,this.profColor(pr),18)} ${pr.nome.split(' ')[1]}</button>`)}
         </div>
-      </div>
+        <div style=${{display:'flex',padding:'14px 8px 12px 0'}}>
+          <div style=${{width:'34px',flexShrink:0,position:'relative',height:gridH+'px'}}>
+            ${hours.map(h=>html`<span key=${h} style=${{position:'absolute',left:'8px',top:((h*60-480)*ppm-6)+'px',fontFamily:"'Martian Mono', monospace",fontSize:'10px',color:c.faint}}>${String(h).padStart(2,'0')}</span>`)}
+          </div>
+          <div style=${{flex:1,minWidth:0,overflowX:'visible'}}>
+            <div data-body style=${{position:'relative',height:gridH+'px',width:bodyW}}>
+              ${hours.map(h=>html`<div key=${h} style=${{position:'absolute',left:0,right:0,top:((h*60-480)*ppm)+'px',borderTop:'1px solid '+c.bs}}></div>`)}
+              <div style=${{position:'absolute',left:0,right:0,top:((720-480)*ppm)+'px',height:(60*ppm)+'px',background:'repeating-linear-gradient(135deg,'+this.tint(c.muted,.07)+' 0 7px,transparent 7px 14px)'}}></div>
+              ${appts.map(a=>this.renderBlock(a,ppm,false,0,lay.byId[a.id]))}
+            </div>
+          </div>
+        </div>
     </div>`;
   }
-  renderWeek(){
+  renderWeek(mobile){
     const c=this.theme(); const html=this.html;
     const base=new Date(this.state.date+'T00:00'); const dow=base.getDay();
     const mon=new Date(base); mon.setDate(base.getDate()-((dow+6)%7));
     const days=[]; for(let i=0;i<6;i++){const d=new Date(mon); d.setDate(mon.getDate()+i); days.push(d);}
-    return html`<div style=${{height:'100%',overflow:'auto',padding:'16px'}}>
-      <div style=${{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'10px',height:'100%'}}>
+    return html`<div style=${{height:mobile?'auto':'100%',overflow:mobile?'visible':'auto',padding:'16px'}}>
+      <div style=${{display:'grid',gridTemplateColumns:mobile?'repeat(2,1fr)':'repeat(6,1fr)',gap:'10px',height:mobile?'auto':'100%'}}>
         ${days.map(d=>{const ds=this.dstr(d); const n=this.dayAppts(ds).filter(a=>a.status!=='cancelado').length; const isT=ds===this.state.date;
         return html`<button key=${ds} onClick=${()=>this.setState({date:ds,view:'dia'})} style=${{textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',padding:'12px',borderRadius:'10px',border:'1px solid '+(isT?c.teal.border:c.bs),background:isT?c.teal.subtle:c.surface,cursor:'pointer'}}>
           <div style=${{fontSize:'11px',color:c.faint,textTransform:'capitalize'}}>${d.toLocaleDateString('pt-BR',{weekday:'short'})}</div>
@@ -988,17 +1189,47 @@ class Component extends DCLogic {
       </div>
     </div>`;
   }
-  renderList(){
+  renderMonth(mobile){
+    const c=this.theme(); const html=this.html;
+    const wdh=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const base=new Date(this.state.date+'T00:00');
+    const y=base.getFullYear(), m=base.getMonth();
+    const first=new Date(y,m,1); const startDow=first.getDay();
+    const gridStart=new Date(first); gridStart.setDate(1-startDow);
+    const cells=[]; for(let i=0;i<42;i++){ const d=new Date(gridStart); d.setDate(gridStart.getDate()+i); cells.push(d); }
+    const weeks=cells.length/7; const usedWeeks=Math.ceil((startDow+new Date(y,m+1,0).getDate())/7);
+    const rows=cells.slice(0,usedWeeks*7);
+    const maxN=Math.max(1,...rows.map(d=>this.dayAppts(this.dstr(d)).filter(a=>a.status!=='cancelado').length));
+    return html`<div style=${{height:mobile?'auto':'100%',display:'flex',flexDirection:'column',padding:'14px 16px',minHeight:0}}>
+      <div style=${{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'6px',marginBottom:'6px'}}>
+        ${wdh.map(w=>html`<div key=${w} style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,textAlign:'center'}}>${w}</div>`)}
+      </div>
+      <div style=${{flex:1,minHeight:0,display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat('+usedWeeks+',1fr)',gap:'6px'}}>
+        ${rows.map(d=>{const ds=this.dstr(d); const inMonth=d.getMonth()===m; const n=this.dayAppts(ds).filter(a=>a.status!=='cancelado').length; const isT=ds==='2026-06-25'; const isSel=ds===this.state.date;
+        return html`<button key=${ds} onClick=${()=>this.setState({date:ds,view:'dia'})} style=${{textAlign:'left',display:'flex',flexDirection:'column',gap:'6px',padding:'8px 9px',minHeight:mobile?'74px':'auto',borderRadius:'10px',border:'1px solid '+(isSel?c.teal.border:c.bs),background:isSel?c.teal.subtle:(inMonth?c.surface:c.surface2),cursor:'pointer',opacity:inMonth?1:.5}}>
+          <div style=${{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'14px',fontWeight:600,width:'26px',height:'26px',display:'grid',placeItems:'center',borderRadius:'50%',background:isT?c.teal.solid:'transparent',color:isT?'#fff':(inMonth?c.text:c.faint)}}>${String(d.getDate()).padStart(2,'0')}</span>
+            ${n?html`<span style=${{fontSize:'11px',fontWeight:700,color:c.teal.text,fontFamily:"'Martian Mono', monospace"}}>${n}</span>`:null}
+          </div>
+          ${n?html`<div style=${{marginTop:'auto'}}>
+            <div style=${{fontSize:'10.5px',color:c.muted,marginBottom:'4px'}}>agend.</div>
+            <div style=${{height:'4px',borderRadius:'3px',background:c.surface2,overflow:'hidden'}}><div style=${{width:Math.min(100,n/maxN*100)+'%',height:'100%',background:c.teal.solid}}></div></div>
+          </div>`:html`<div style=${{marginTop:'auto',fontSize:'10.5px',color:c.faint}}>—</div>`}
+        </button>`;})}
+      </div>
+    </div>`;
+  }
+  renderList(mobile){
     const c=this.theme(); const html=this.html;
     const appts=this.dayAppts(this.state.date).slice().sort((a,b)=>a.start-b.start);
-    return html`<div style=${{height:'100%',overflow:'auto'}}>
+    return html`<div style=${{height:mobile?'auto':'100%',overflow:mobile?'visible':'auto'}}>
       ${appts.map(a=>{const m=this.statusMeta(a.status); const tp=this.type(a.typeId); const pats=this.apptPatients(a); const prof=this.state.profs.find(p=>p.id===a.profId);
       return html`<button key=${a.id} onClick=${()=>this.setState({drawer:a.id})} style=${{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:'11px 16px',borderBottom:'1px solid '+c.bs,background:'transparent',border:'none',borderLeft:'none',cursor:'pointer',textAlign:'left'}}>
         <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11.5px',fontWeight:600,width:'46px',color:c.text}}>${this.m2t(a.start)}</span>
         ${this.avatar(prof.nome,this.profColor(prof),26)}
         <div style=${{flex:1,minWidth:0}}>
-          <div style=${{fontWeight:600,fontSize:'13.5px',textDecoration:m.strike?'line-through':'none',color:m.strike?c.faint:c.text}}>${a.patientIds?(tp.nome+' · '+pats.length+' pacientes'):pats[0].nome}</div>
-          <div style=${{fontSize:'12px',color:c.muted}}>${tp.nome} · ${prof.nome}</div>
+          <div style=${{fontWeight:600,fontSize:'13.5px',textDecoration:m.strike?'line-through':'none',color:m.strike?c.faint:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${a.patientIds?(tp.nome+' · '+pats.length+' pacientes'):pats[0].nome}</div>
+          <div style=${{fontSize:'12px',color:c.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${tp.nome} · ${prof.nome}</div>
         </div>
         ${a.encaixe?html`<span style=${{fontSize:'10px',fontWeight:700,color:'#fff',background:c.warning,padding:'1px 6px',borderRadius:'4px'}}>Encaixe</span>`:null}
         ${this.statusPill(a.status,true)}
@@ -1019,7 +1250,7 @@ class Component extends DCLogic {
       {s:'faltou',l:'Faltou',ic:'UserX'},
       {s:'cancelado',l:'Cancelar',ic:'X'},
     ];
-    return html`<div onClick=${()=>this.setState({drawer:null})} style=${{position:'absolute',inset:0,background:'rgba(8,10,12,.32)',zIndex:40,display:'flex',justifyContent:'flex-end'}}>
+    return html`<div onClick=${()=>this.setState({drawer:null})} style=${{position:'fixed',inset:0,background:'rgba(8,10,12,.32)',zIndex:40,display:'flex',justifyContent:'flex-end'}}>
       <div onClick=${e=>e.stopPropagation()} style=${{width:'404px',maxWidth:'92vw',height:'100%',background:c.surface,borderLeft:'1px solid '+c.bs,display:'flex',flexDirection:'column',animation:'mvSlide .22s ease-out',boxShadow:'-8px 0 30px rgba(8,10,12,.18)'}}>
         <div style=${{padding:'14px 16px',borderBottom:'1px solid '+c.bs,display:'flex',alignItems:'center',gap:'10px'}}>
           <span style=${{width:'7px',height:'7px',borderRadius:'50%',background:this.profColor(prof)}}></span>
@@ -1033,12 +1264,15 @@ class Component extends DCLogic {
           <div style=${{display:'flex',gap:'8px',alignItems:'center',marginBottom:'14px'}}>${this.statusPill(a.status)} ${a.encaixe?html`<span style=${{fontSize:'10px',fontWeight:700,color:'#fff',background:c.warning,padding:'2px 7px',borderRadius:'4px'}}>ENCAIXE</span>`:null}</div>
           ${this.drawerRow('Clock','Horário',this.m2t(a.start)+'–'+this.m2t(a.start+a.dur)+'  ('+a.dur+'min)')}
           ${this.drawerRow(tp.icon,'Tipo',tp.nome)}
-          ${a.patientIds?html`<div style=${{margin:'14px 0'}}><div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'8px'}}>Pacientes (${pats.length}/${tp.cap})</div>${pats.map(pt=>html`<div key=${pt.id} style=${{display:'flex',alignItems:'center',gap:'9px',padding:'5px 0'}}>${this.avatar(pt.nome,this.profColor(prof),24)}<span style=${{fontSize:'13px'}}>${pt.nome}</span></div>`)}</div>`:html`<div style=${{marginTop:'16px',padding:'12px',border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface2}}>
+          ${a.patientIds?html`<div style=${{margin:'14px 0'}}><div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'8px',display:'flex',justifyContent:'space-between'}}><span>Pacientes na turma</span><span style=${{color:pats.length>=(tp.cap||99)?c.warning:c.faint}}>${pats.length}/${tp.cap||'∞'}</span></div>${pats.map(pt=>html`<div key=${pt.id} style=${{display:'flex',alignItems:'center',gap:'9px',padding:'6px 0'}}>${this.avatar(pt.nome,this.profColor(prof),26)}<button onClick=${()=>{this.setState({drawer:null,selPaciente:pt.id,screen:'pacientes'});}} style=${{flex:1,minWidth:0,textAlign:'left',background:'none',border:'none',cursor:'pointer',padding:0,fontSize:'13px',color:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pt.nome}</button><button onClick=${()=>this.removeParticipant(a.id,pt.id)} title="Remover da turma" style=${{border:'none',background:'none',cursor:'pointer',color:c.faint,display:'grid',placeItems:'center',padding:'4px',borderRadius:'6px'}}><${Icon} name="UserMinus" size=${15}/></button></div>`)}
+            ${pats.length<(tp.cap||99)?html`<div style=${{marginTop:'8px'}}>${this.patientField({multi:true,hideSelected:true,selectedIds:a.patientIds||[],onPick:p=>{clearTimeout(this._patBlur); this.addParticipant(a.id,p.id);}})}</div>`:html`<div style=${{marginTop:'6px',fontSize:'11.5px',color:c.warning,fontWeight:600}}>Turma cheia</div>`}
+          </div>`:html`<div style=${{marginTop:'16px',padding:'12px',border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface2}}>
             <div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>${this.avatar(pat.nome,this.profColor(prof),34)}<div><div style=${{fontWeight:600,fontSize:'13.5px'}}>${pat.nome}</div><div style=${{fontSize:'10.5px',color:c.muted,fontFamily:"'Martian Mono', monospace"}}>${pat.tel}</div></div></div>
             <div style=${{display:'flex',gap:'14px',fontSize:'12px'}}>
               <div><span style=${{color:c.faint}}>Faltas</span> <b style=${{color:pat.faltas>0?c.danger:c.text,fontFamily:"'Martian Mono', monospace"}}>${pat.faltas}</b></div>
-              ${pat.pkg?html`<div><span style=${{color:c.faint}}>Pacote</span> <b style=${{fontFamily:"'Martian Mono', monospace"}}>${pat.pkg.usadas}/${pat.pkg.total}</b></div>`:html`<div style=${{color:c.faint}}>Sem pacote</div>`}
+              ${(()=>{const pk=this.pkgActive(pat); return pk?html`<div><span style=${{color:c.faint}}>Pacote</span> <b style=${{fontFamily:"'Martian Mono', monospace",color:this.pkgEnding(pk)?c.warning:c.text}}>${pk.usadas}/${pk.total}</b></div>`:html`<div style=${{color:c.faint}}>Sem pacote</div>`;})()}
             </div>
+            ${(()=>{const pk=this.pkgActive(pat); return pk&&this.pkgEnding(pk)?html`<button onClick=${()=>{this.setState({drawer:null}); this.openRenovar(pat.id,pk.id);}} style=${{marginTop:'10px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',padding:'7px',borderRadius:'8px',border:'none',background:c.warning,color:'#fff',fontWeight:600,cursor:'pointer',fontSize:'12px'}}><${Icon} name="RefreshCw" size=${13}/> Renovar pacote</button>`:null;})()}
             <button onClick=${()=>{this.setState({drawer:null,selPaciente:pat.id,screen:'pacientes'});}} style=${{marginTop:'10px',fontSize:'12px',color:c.teal.text,background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:0}}>Abrir ficha →</button>
           </div>`}
           <div style=${{marginTop:'18px'}}>
@@ -1068,8 +1302,8 @@ class Component extends DCLogic {
   // ================= MODALS =================
   modalShell(title,body,footer,width){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
-    return html`<div onClick=${()=>this.closeModal()} style=${{position:'absolute',inset:0,background:'rgba(8,10,12,.42)',zIndex:50,display:'grid',placeItems:'center',padding:'20px'}}>
-      <div onClick=${e=>e.stopPropagation()} style=${{width:(width||'440px'),maxWidth:'94vw',maxHeight:'90vh',display:'flex',flexDirection:'column',background:c.surface,borderRadius:'12px',boxShadow:'0 24px 60px rgba(8,10,12,.4)',animation:'mvScale .18s ease-out',overflow:'hidden'}}>
+    return html`<div onClick=${()=>this.closeModal()} style=${{position:'fixed',inset:0,background:'rgba(8,10,12,.42)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+      <div onClick=${e=>e.stopPropagation()} style=${{width:(width||'440px'),maxWidth:'100%',maxHeight:'90vh',display:'flex',flexDirection:'column',background:c.surface,borderRadius:'12px',boxShadow:'0 24px 60px rgba(8,10,12,.4)',animation:'mvScale .18s ease-out',overflow:'hidden'}}>
         <div style=${{padding:'15px 18px',borderBottom:'1px solid '+c.bs,display:'flex',alignItems:'center'}}>
           <div style=${{fontWeight:700,fontSize:'15.5px',flex:1}}>${title}</div>
           <button onClick=${()=>this.closeModal()} style=${this.iconBtn(c)}><${Icon} name="X" size=${16}/></button>
@@ -1083,8 +1317,7 @@ class Component extends DCLogic {
     if(!this.state.modal) return null;
     switch(this.state.modal){
       case 'novoAgendamento': return this.modalNovoAgendamento();
-      case 'novoPaciente': return this.modalNovoPaciente();
-      case 'novaSerie': return this.modalNovaSerie();
+      case 'agendarPacote': return this.modalPacote();
       case 'addFila': return this.modalAddFila();
       case 'quemCabe': return this.modalQuemCabe();
       case 'profEdit': return this.modalProf();
@@ -1094,7 +1327,7 @@ class Component extends DCLogic {
       default: return null;
     }
   }
-  fld(label,el){ const c=this.theme(); const html=this.html; return html`<label style=${{display:'block',marginBottom:'12px'}}><span style=${{display:'block',fontSize:'12px',fontWeight:600,color:c.muted,marginBottom:'5px'}}>${label}</span>${el}</label>`; }
+  fld(label,el){ const c=this.theme(); const html=this.html; return html`<label style=${{display:'block',marginBottom:'12px',minWidth:0}}><span style=${{display:'block',fontSize:'12px',fontWeight:600,color:c.muted,marginBottom:'5px'}}>${label}</span>${el}</label>`; }
   inputStyle(c){ return {width:'100%',height:'38px',padding:'0 11px',borderRadius:'8px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontSize:'13.5px'}; }
   btnP(label,onClick,disabled){ const c=this.theme(); const html=this.html; return html`<button disabled=${disabled} onClick=${onClick} style=${{padding:'9px 16px',borderRadius:'8px',border:'none',cursor:disabled?'not-allowed':'pointer',background:disabled?c.bd:c.primary,color:c.onPrimary,fontWeight:600,fontSize:'13.5px',opacity:disabled?.6:1}}>${label}</button>`; }
   btnS(label,onClick){ const c=this.theme(); const html=this.html; return html`<button onClick=${onClick} style=${{padding:'9px 16px',borderRadius:'8px',border:'1px solid '+c.bs,cursor:'pointer',background:c.surface,color:c.text,fontWeight:600,fontSize:'13.5px'}}>${label}</button>`; }
@@ -1124,6 +1357,7 @@ class Component extends DCLogic {
   maskCEP(v){ const d=(v||'').replace(/\D/g,'').slice(0,8); return d.length>5?d.slice(0,5)+'-'+d.slice(5):d; }
   maskDate(v){ const d=(v||'').replace(/\D/g,'').slice(0,8); let o=d.slice(0,2); if(d.length>2)o+='/'+d.slice(2,4); if(d.length>4)o+='/'+d.slice(4,8); return o; }
   maskMY(v){ const d=(v||'').replace(/\D/g,'').slice(0,6); let o=d.slice(0,2); if(d.length>2)o+='/'+d.slice(2,6); return o; }
+  maskCNPJ(v){ const d=(v||'').replace(/\D/g,'').slice(0,14); let o=d.slice(0,2); if(d.length>2)o+='.'+d.slice(2,5); if(d.length>5)o+='.'+d.slice(5,8); if(d.length>8)o+='/'+d.slice(8,12); if(d.length>12)o+='-'+d.slice(12,14); return o; }
   modalNovoAgendamento(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
     const sel=this.inputStyle(c);
@@ -1131,34 +1365,47 @@ class Component extends DCLogic {
     const typeId=d.typeId||'t2'; const tp=this.type(typeId);
     const hora=d.hora||'08:00';
     const start=this.t2m(hora); const date=d.date||this.state.date;
-    const conf=d.patientId?this.checkConflict(profId,start,tp.dur,date,null,d.encaixe):null;
+    const isGroup=!!tp.grupo; const cap=tp.cap||this.state.settings.capPilates||4;
+    const groupIds=d.patientIds||(d.patientId?[d.patientId]:[]);
+    const existing=isGroup?this.dayAppts(date).find(b=>b.profId===profId&&b.start===start&&b.typeId===typeId&&b.patientIds&&b.status!=='cancelado'):null;
+    const newOnes=groupIds.filter(id=>!(existing&&existing.patientIds.includes(id)));
+    const totalAfter=(existing?existing.patientIds.length:0)+newOnes.length;
+    const overCap=isGroup&&totalAfter>cap;
     const avail=this.checkAvail(profId,start,tp.dur,date);
+    const conf=(!isGroup&&d.patientId)?this.checkConflict(profId,start,tp.dur,date,null,d.encaixe):null;
     const body=html`<div>
-      ${this.fld('Paciente',this.patientField())}
+      ${isGroup
+        ?this.fld('Participantes ('+totalAfter+'/'+cap+')',this.patientField({multi:true,selectedIds:groupIds,onPick:p=>{const ids=[...groupIds]; if(!ids.includes(p.id)) ids.push(p.id); clearTimeout(this._patBlur); this.setMD({patientIds:ids}); this.setState({pac:{q:'',loading:false,open:false}});},onRemove:id=>this.setMD({patientIds:groupIds.filter(x=>x!==id)})}))
+        :this.fld('Paciente',this.patientField())}
       <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
         ${this.fld('Profissional',html`<select value=${profId} onChange=${e=>this.setMD({profId:e.target.value})} style=${sel}>${this.state.profs.filter(p=>p.ativo).map(p=>html`<option key=${p.id} value=${p.id}>${p.nome}</option>`)}</select>`)}
-        ${this.fld('Tipo',html`<select value=${typeId} onChange=${e=>this.setMD({typeId:e.target.value})} style=${sel}>${this.state.types.map(t=>html`<option key=${t.id} value=${t.id}>${t.nome} (${t.dur}min)</option>`)}</select>`)}
+        ${this.fld('Tipo',html`<select value=${typeId} onChange=${e=>this.setMD({typeId:e.target.value})} style=${sel}>${this.state.types.map(t=>html`<option key=${t.id} value=${t.id}>${t.nome} (${t.dur}min)${t.grupo?' · grupo':''}</option>`)}</select>`)}
       </div>
       <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
         ${this.fld('Data',html`<input type="date" value=${date} onChange=${e=>this.setMD({date:e.target.value})} style=${sel}/>`)}
         ${this.fld('Hora',html`<input type="time" step=${900} value=${hora} onChange=${e=>this.setMD({hora:e.target.value})} style=${sel}/>`)}
       </div>
+      ${isGroup&&existing?html`<div style=${{marginTop:'2px',marginBottom:'6px',padding:'9px 12px',borderRadius:'9px',background:c.teal.subtle,border:'1px solid '+c.teal.border,fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',color:c.teal.text,fontWeight:600}}><${Icon} name="Users" size=${14}/> Entra na turma existente (${existing.patientIds.length} já agendado${existing.patientIds.length>1?'s':''})</div>`:null}
       <label style=${{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',padding:'4px 0'}}>
         <input type="checkbox" checked=${!!d.encaixe} onChange=${e=>this.setMD({encaixe:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px'}}/>
-        Encaixe <span style=${{color:c.faint,fontSize:'12px'}}>(ignora verificação de conflito)</span>
+        Encaixe <span style=${{color:c.faint,fontSize:'12px'}}>(ignora conflito${isGroup?' e capacidade':''})</span>
       </label>
       ${conf?html`<div style=${{marginTop:'8px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.danger,.1),color:c.danger,fontSize:'12.5px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="TriangleAlert" size=${16}/><span>Conflito: ${this.state.profs.find(p=>p.id===conf.profId).nome.split(' ')[1]} já tem agendamento às ${this.m2t(conf.start)}. Marque “Encaixe” para forçar.</span></div>`:null}
+      ${overCap&&!d.encaixe?html`<div style=${{marginTop:'8px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.warning,.12),color:'#9a6a05',fontSize:'12.5px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="TriangleAlert" size=${16}/><span>A turma ficaria com ${totalAfter}/${cap}. Marque “Encaixe” para exceder a capacidade.</span></div>`:null}
       ${avail?html`<div style=${{marginTop:'8px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.warning,.12),color:'#9a6a05',fontSize:'12.5px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="Clock" size=${16}/><span>${avail}</span></div>`:null}
     </div>`;
-    const canSave=d.patientId&&!avail&&(!conf||d.encaixe);
+    const canSave=isGroup?(groupIds.length>0&&!avail&&(!overCap||d.encaixe)):(d.patientId&&!avail&&(!conf||d.encaixe));
     const footer=html`<div style=${{display:'flex',gap:'9px',width:'100%',justifyContent:'space-between',alignItems:'center'}}>
-      <button onClick=${()=>this.openModal('novaSerie',{patientId:d.patientId,profId,typeId})} style=${{background:'none',border:'none',color:c.teal.text,fontWeight:600,fontSize:'13px',cursor:'pointer'}}>Criar série/pacote →</button>
-      <div style=${{display:'flex',gap:'9px'}}>${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP('Agendar',()=>this.createAppt({...d,profId,typeId,hora,date}),!canSave)}</div>
+      <button onClick=${()=>this.openModal('agendarPacote',{patientId:isGroup?(groupIds[0]||''):d.patientId,profId,typeId,dows:[1,3],horarios:{1:hora,3:hora},n:10})} style=${{background:'none',border:'none',color:c.teal.text,fontWeight:600,fontSize:'13px',cursor:'pointer'}}>Agendar pacote →</button>
+      <div style=${{display:'flex',gap:'9px'}}>${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP(isGroup&&existing?'Adicionar':'Agendar',()=>this.createAppt({...d,profId,typeId,hora,date}),!canSave)}</div>
     </div>`;
-    return this.modalShell('Novo agendamento',body,footer,'520px');
+    return this.modalShell(isGroup?(existing?'Adicionar à turma':'Novo agendamento em grupo'):'Novo agendamento',body,footer,'520px');
   }
-  modalNovoPaciente(){
+  openPacForm(data){ clearTimeout(this._patT); this._formScrollEl=null; this._formSecEls={}; this.setState({screen:'pacientes',selPaciente:null,drawer:null,modal:null,pacForm:true,modalData:data||{},formSec:'ident'}); }
+  closePacForm(){ this._formScrollEl=null; this.setState({pacForm:false,modalData:{},formSec:'ident'}); }
+  renderPacienteForm(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
+    const mobile=this.state.w<860;
     const sel=this.inputStyle(c);
     const dup=this.state.patients.find(p=> p.id!==d.id && ((d.cpf&&p.cpf===d.cpf) || (d.tel&&p.tel===d.tel)));
     const tags=d.tags||[];
@@ -1169,99 +1416,179 @@ class Component extends DCLogic {
     const togPref=(id)=>{ const has=prefs.includes(id); this.setMD({prefs:has?prefs.filter(x=>x!==id):[...prefs,id]}); };
     const idade=this.idadeDe(d.nasc);
     const tipo=d.atendTipo||'particular';
-    const sec=(t,first)=>html`<div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:c.teal.text,margin:(first?'0':'22px')+' 0 12px',paddingBottom:'7px',borderBottom:'1px solid '+c.bs}}>${t}</div>`;
-    const body=html`<div>
-      ${sec('I · Identificação pessoal',true)}
-      ${this.fld('Nome completo',html`<input value=${d.nome||''} onChange=${e=>this.setMD({nome:e.target.value})} placeholder="Nome do paciente" style=${sel}/>`)}
-      ${this.fld('Nome social (caso aplicável)',html`<input value=${d.nomeSocial||''} onChange=${e=>this.setMD({nomeSocial:e.target.value})} placeholder="Como prefere ser chamado(a)" style=${sel}/>`)}
-      <div style=${{display:'grid',gridTemplateColumns:'1.3fr 1.3fr 0.8fr',gap:'10px'}}>
-        ${this.fld('CPF',html`<input value=${d.cpf||''} onChange=${e=>this.setMD({cpf:this.maskCPF(e.target.value)})} inputMode="numeric" placeholder="000.000.000-00" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-        ${this.fld('RG',html`<input value=${d.rg||''} onChange=${e=>this.setMD({rg:e.target.value})} placeholder="Órgão emissor incl." style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-        ${this.fld('Idade',html`<input value=${idade!==''?idade+' anos':''} disabled placeholder="—" style=${{...sel,fontFamily:"'Martian Mono', monospace",color:c.muted,background:c.surface2}}/>`)}
-      </div>
-      ${dup?html`<div style=${{marginBottom:'12px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.warning,.12),color:'#9a6a05',fontSize:'12.5px',display:'flex',gap:'8px'}}><${Icon} name="UserSearch" size=${16}/><span><b>Possível duplicado:</b> ${dup.nome} já tem este ${d.cpf&&dup.cpf===d.cpf?'CPF':'celular'}.</span></div>`:null}
-      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}}>
-        ${this.fld('Data de nascimento',html`<input value=${d.nasc||''} onChange=${e=>this.setMD({nasc:this.maskDate(e.target.value)})} inputMode="numeric" placeholder="DD/MM/AAAA" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-        ${this.fld('Gênero',html`<select value=${d.genero||''} onChange=${e=>this.setMD({genero:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Masculino</option><option>Feminino</option><option>Outro / Não informar</option></select>`)}
-        ${this.fld('Estado civil',html`<select value=${d.estadoCivil||''} onChange=${e=>this.setMD({estadoCivil:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select>`)}
-      </div>
-      ${this.fld('Responsável legal (menores de idade)',html`<input value=${d.resp||''} onChange=${e=>this.setMD({resp:e.target.value})} placeholder="Nome e parentesco — opcional" style=${sel}/>`)}
+    const gg=(cols)=>({display:'grid',gridTemplateColumns:mobile?'1fr':cols,gap:'10px'});
+    const nascLabel='Data de nascimento'+(idade!==''?' · '+idade+' anos':'');
+    const needResp=(idade!==''&&idade<18)||!!d.resp||!!d.showResp;
+    const temConv=(d.temConvenio!==undefined)?d.temConvenio:!!(d.convenio||d.carteirinha||d.validade);
 
-      ${sec('II · Contato e endereço')}
-      <div style=${{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'10px'}}>
-        ${this.fld('Telefone / WhatsApp',html`<input value=${d.tel||''} onChange=${e=>this.setMD({tel:this.maskTel(e.target.value)})} inputMode="tel" placeholder="(11) 90000-0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-        ${this.fld('E-mail',html`<input value=${d.email||''} onChange=${e=>this.setMD({email:e.target.value})} placeholder="email@exemplo.com" style=${sel}/>`)}
-      </div>
-      <div style=${{display:'grid',gridTemplateColumns:'0.9fr 2.3fr',gap:'10px'}}>
-        ${this.fld('CEP',html`<input value=${d.cep||''} onChange=${e=>{const v=this.maskCEP(e.target.value); const dig=v.replace(/\D/g,'').length; this.setMD(dig===8?{cep:v}:{cep:v,cepStatus:null}); if(dig===8) this.lookupCep(v);}} onBlur=${e=>this.lookupCep(e.target.value)} inputMode="numeric" placeholder="00000-000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-        ${this.fld('Endereço residencial',html`<input value=${d.endereco||''} onChange=${e=>this.setMD({endereco:e.target.value})} placeholder="Preenchido automaticamente pelo CEP" style=${sel}/>`)}
-      </div>
-      ${d.cepStatus?html`<div style=${{marginTop:'-4px',marginBottom:'12px',fontSize:'11.5px',display:'flex',alignItems:'center',gap:'6px',color:d.cepStatus==='ok'?c.success:(d.cepStatus==='loading'?c.muted:c.danger)}}><${Icon} name=${d.cepStatus==='ok'?'CheckCircle2':d.cepStatus==='loading'?'Loader':'CircleAlert'} size=${13}/> ${d.cepStatus==='loading'?'Buscando endereço…':d.cepStatus==='ok'?'Endereço preenchido pelo CEP':d.cepStatus==='notfound'?'CEP não encontrado — preencha manualmente':'Não foi possível consultar o CEP agora'}</div>`:null}
-      <div style=${{display:'grid',gridTemplateColumns:'1.5fr 1.6fr 0.5fr 0.7fr',gap:'10px'}}>
-        ${this.fld('Bairro',html`<input value=${d.bairro||''} onChange=${e=>this.setMD({bairro:e.target.value})} style=${sel}/>`)}
-        ${this.fld('Cidade',html`<input value=${d.cidade||''} onChange=${e=>this.setMD({cidade:e.target.value})} style=${sel}/>`)}
-        ${this.fld('UF',html`<input value=${d.uf||''} maxLength=${2} onChange=${e=>this.setMD({uf:(e.target.value||'').toUpperCase()})} placeholder="SP" style=${{...sel,textTransform:'uppercase'}}/>`)}
-        ${this.fld('Nº',html`<input value=${d.numero||''} onChange=${e=>this.setMD({numero:e.target.value})} placeholder="000" style=${sel}/>`)}
-      </div>
-      ${this.fld('Complemento',html`<input value=${d.complemento||''} onChange=${e=>this.setMD({complemento:e.target.value})} placeholder="Apto / bloco (opcional)" style=${sel}/>`)}
+    const SECTIONS=[
+      {id:'ident',icon:'User',t:'Identificação',sub:'Nome, contato principal e documento',keys:['nome','nomeSocial','tel','cpf','nasc','genero','estadoCivil','rg']},
+      {id:'contato',icon:'MapPin',t:'Endereço & e-mail',sub:'E-mail e endereço residencial',keys:['email','cep','endereco','bairro','cidade','uf','numero','complemento']},
+      {id:'emergencia',icon:'Siren',t:'Emergência',sub:'Quem acionar se necessário',keys:['emNome','emParentesco','emTel']},
+      {id:'profissional',icon:'Briefcase',t:'Dados profissionais',sub:'Ocupação e vínculo',keys:['profissao','empresa']},
+      {id:'atendimento',icon:'CreditCard',t:'Atendimento',sub:'Como a clínica cobra e encaminhamento',keys:['medico','crm','comoConheceu']},
+      {id:'convenio',icon:'BadgeCheck',t:'Convênio do paciente',sub:'Plano de saúde — útil também para encaminhar',keys:['convenio','carteirinha','validade']},
+      {id:'clinico',icon:'Stethoscope',t:'Preferências clínicas',sub:'Profissional preferido e condições',keys:['prefs','tags']},
+      {id:'consentimento',icon:'ShieldCheck',t:'Consentimento',sub:'Autorizações LGPD e contato',keys:['lgpd','comunicacao']},
+    ];
+    const filled=(k)=>{ const v=d[k]; if(Array.isArray(v)) return v.length>0; if(typeof v==='boolean') return v; return v!==undefined&&v!==null&&String(v).trim()!==''; };
+    const secCount=(s)=>s.keys.filter(filled).length;
+    const totalKeys=SECTIONS.reduce((a,s)=>a+s.keys.length,0);
+    const totalFilled=SECTIONS.reduce((a,s)=>a+secCount(s),0);
+    const active=this.state.formSec||'ident';
+    const secTop=(el,sc)=>el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+    const scrollableAncestor=(el)=>{ let n=el&&el.parentElement; while(n){ const s=getComputedStyle(n); if(/(auto|scroll)/.test(s.overflowY) && n.scrollHeight-n.clientHeight>4) return n; n=n.parentElement; } return null; };
+    const secEl=(id)=>document.querySelector('[data-fsec="'+id+'"]');
+    const goSec=(id)=>{ const el=secEl(id); const sc=el&&scrollableAncestor(el); this._navLock=true; if(sc){ sc.scrollTop=Math.max(0,secTop(el,sc)-14); } this.setState({formSec:id}); clearTimeout(this._navT); this._navT=setTimeout(()=>{ this._navLock=false; },150); };
+    const onScroll=(e)=>{ if(this._navLock) return; const sc=e.currentTarget; let cur=SECTIONS[0].id; for(const s of SECTIONS){ const el=secEl(s.id); if(el && secTop(el,sc)-56<=sc.scrollTop) cur=s.id; } if(cur!==this.state.formSec) this.setState({formSec:cur}); };
 
-      ${sec('III · Contato de emergência')}
-      <div style=${{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr',gap:'10px'}}>
-        ${this.fld('Nome do contato',html`<input value=${d.emNome||''} onChange=${e=>this.setMD({emNome:e.target.value})} style=${sel}/>`)}
-        ${this.fld('Parentesco / ligação',html`<input value=${d.emParentesco||''} onChange=${e=>this.setMD({emParentesco:e.target.value})} placeholder="Cônjuge, mãe…" style=${sel}/>`)}
-        ${this.fld('Telefone',html`<input value=${d.emTel||''} onChange=${e=>this.setMD({emTel:this.maskTel(e.target.value)})} inputMode="tel" placeholder="(11) 90000-0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+    const card=(s,inner)=>html`<section key=${s.id} data-fsec=${s.id} style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'14px',padding:mobile?'16px':'20px 22px',marginBottom:'14px'}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'11px',marginBottom:'16px'}}>
+        <span style=${{width:'34px',height:'34px',borderRadius:'9px',display:'grid',placeItems:'center',background:c.teal.subtle,color:c.teal.text,flexShrink:0}}><${Icon} name=${s.icon} size=${17}/></span>
+        <div style=${{flex:1,minWidth:0}}><div style=${{fontWeight:700,fontSize:'15px'}}>${s.t}</div><div style=${{fontSize:'11.5px',color:c.faint}}>${s.sub}</div></div>
+        <span style=${{fontSize:'10.5px',fontFamily:"'Martian Mono', monospace",color:secCount(s)?c.teal.text:c.faint,whiteSpace:'nowrap'}}>${secCount(s)}/${s.keys.length}</span>
       </div>
+      ${inner}
+    </section>`;
 
-      ${sec('IV · Dados profissionais')}
-      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-        ${this.fld('Profissão / ocupação',html`<input value=${d.profissao||''} onChange=${e=>this.setMD({profissao:e.target.value})} style=${sel}/>`)}
-        ${this.fld('Empresa / instituição (opcional)',html`<input value=${d.empresa||''} onChange=${e=>this.setMD({empresa:e.target.value})} style=${sel}/>`)}
+    const navItem=(s)=>{ const on=active===s.id; const cnt=secCount(s); return html`<button key=${s.id} onClick=${()=>goSec(s.id)} style=${{display:'flex',alignItems:'center',gap:'10px',width:'100%',padding:'9px 11px',borderRadius:'9px',border:'none',cursor:'pointer',textAlign:'left',background:on?c.teal.subtle:'transparent',color:on?c.teal.text:c.muted,fontWeight:on?700:500,fontSize:'13px'}}>
+      <${Icon} name=${s.icon} size=${16}/>
+      <span style=${{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${s.t}</span>
+      ${cnt?html`<span style=${{width:'7px',height:'7px',borderRadius:'50%',background:c.teal.solid,flexShrink:0}}></span>`:null}
+    </button>`; };
+    const navChip=(s)=>{ const on=active===s.id; return html`<button key=${s.id} onClick=${()=>goSec(s.id)} style=${{display:'inline-flex',alignItems:'center',gap:'6px',padding:'7px 12px',borderRadius:'999px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.muted,fontWeight:on?700:500,fontSize:'12.5px',whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}><${Icon} name=${s.icon} size=${14}/> ${s.t}</button>`; };
+
+    const nm=(d.nome||'').trim();
+    const header=html`<div style=${{flexShrink:0,padding:mobile?'12px 16px':'14px 24px',borderBottom:'1px solid '+c.bs,background:c.surface,display:'flex',alignItems:'center',gap:'14px'}}>
+      <button onClick=${()=>this.closePacForm()} title="Voltar" style=${{width:'34px',height:'34px',display:'grid',placeItems:'center',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.muted,cursor:'pointer',flexShrink:0}}><${Icon} name="ChevronLeft" size=${18}/></button>
+      ${this.avatar(nm||'?',d.id?this.patientColor(d):c.teal.solid,42)}
+      <div style=${{flex:1,minWidth:0}}>
+        <div style=${{fontWeight:700,fontSize:mobile?'16px':'18px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${nm||(d.id?'Editar paciente':'Novo paciente')}</div>
+        <div style=${{fontSize:'12px',color:c.faint}}>${d.id?'Editando ficha cadastral':'Cadastro de novo paciente'}${idade!==''?' · '+idade+' anos':''}</div>
       </div>
-
-      ${sec('V · Atendimento')}
-      ${this.fld('Tipo de atendimento',html`<div style=${{display:'flex',gap:'8px'}}>${[['particular','Particular'],['reembolso','Reembolso'],['convenio','Convênio']].map(([v,l])=>html`<button key=${v} onClick=${()=>this.setMD({atendTipo:v})} style=${{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+(tipo===v?'transparent':c.bs),background:tipo===v?c.primary:c.surface,color:tipo===v?c.onPrimary:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${l}</button>`)}</div>`)}
-      <div style=${{display:'grid',gridTemplateColumns:'1.7fr 1fr',gap:'10px'}}>
-        ${this.fld('Médico solicitante / encaminhador',html`<input value=${d.medico||''} onChange=${e=>this.setMD({medico:e.target.value})} placeholder="Dr(a). Nome" style=${sel}/>`)}
-        ${this.fld('CRM',html`<input value=${d.crm||''} onChange=${e=>this.setMD({crm:e.target.value})} placeholder="CRM/SP 000000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-      </div>
-      ${this.fld('Como conheceu a nossa clínica?',html`<select value=${d.comoConheceu||''} onChange=${e=>this.setMD({comoConheceu:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Indicação Médica</option><option>Indicação de Amigos</option><option>Instagram</option><option>Google / Mapas</option><option>Outros</option></select>`)}
-
-      ${sec('VI · Convênio')}
-      <div style=${{fontSize:'12px',color:c.muted,marginTop:'-4px',marginBottom:'10px'}}>Preencha se o paciente possui plano de saúde — vale também para atendimento particular ou por reembolso.</div>
-      <div style=${{display:'grid',gridTemplateColumns:'1.6fr 1.2fr 0.9fr',gap:'10px'}}>
-        ${this.fld('Nome do convênio',html`<input value=${d.convenio||''} onChange=${e=>this.setMD({convenio:e.target.value})} placeholder="Nome do plano" style=${sel}/>`)}
-        ${this.fld('Nº da carteirinha',html`<input value=${d.carteirinha||''} onChange=${e=>this.setMD({carteirinha:e.target.value})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-        ${this.fld('Validade',html`<input value=${d.validade||''} onChange=${e=>this.setMD({validade:this.maskMY(e.target.value)})} inputMode="numeric" placeholder="MM/AAAA" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-      </div>
-
-      ${sec('Preferências clínicas')}
-      ${this.fld('Profissional preferido — pode escolher mais de um',html`<div style=${{display:'flex',flexWrap:'wrap',gap:'7px'}}>${this.state.profs.filter(p=>p.ativo).map(p=>{const on=prefs.includes(p.id); return html`<button key=${p.id} onClick=${()=>togPref(p.id)} style=${{display:'flex',alignItems:'center',gap:'7px',padding:'6px 11px 6px 7px',borderRadius:'999px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${this.avatar(p.nome,this.profColor(p),20)} ${p.nome.replace(/^Dra?\.\s*/,'')}${on?html` <${Icon} name="Check" size=${13}/>`:''}</button>`;})}</div>`)}
-      ${this.fld('Tags / condições clínicas',html`<div>
-        <div style=${{display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center',padding:'6px',borderRadius:'8px',border:'1px solid '+c.bd,background:c.surface,minHeight:'38px'}}>
-          ${tags.map(t=>html`<span key=${t} style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'12px',padding:'3px 5px 3px 9px',borderRadius:'6px',background:c.teal.subtle,color:c.teal.text,fontWeight:600}}>${t}<button onClick=${()=>rmTag(t)} style=${{display:'grid',placeItems:'center',width:'15px',height:'15px',borderRadius:'4px',border:'none',background:'transparent',color:c.teal.text,cursor:'pointer',padding:0}}><${Icon} name="X" size=${12}/></button></span>`)}
-          <input value=${d.tagInput||''} onChange=${e=>this.setMD({tagInput:e.target.value})} onKeyDown=${e=>{ if(e.key==='Enter'||e.key===','){ e.preventDefault(); addTag(e.target.value); } else if(e.key==='Backspace'&&!e.target.value&&tags.length){ rmTag(tags[tags.length-1]); } }} onBlur=${e=>addTag(e.target.value)} placeholder=${tags.length?'':'Digite e tecle Enter'} style=${{flex:1,minWidth:'130px',border:'none',outline:'none',background:'transparent',color:c.text,fontSize:'13px',height:'26px'}}/>
-        </div>
-        <div style=${{display:'flex',flexWrap:'wrap',gap:'5px',marginTop:'7px'}}>
-          ${sugg.filter(s=>!tags.includes(s)).slice(0,8).map(s=>html`<button key=${s} onClick=${()=>addTag(s)} style=${{fontSize:'11.5px',padding:'2px 8px',borderRadius:'999px',border:'1px dashed '+c.bd,background:'transparent',color:c.muted,cursor:'pointer'}}>+ ${s}</button>`)}
-        </div>
-      </div>`)}
-
-      ${sec('VII · Termos e consentimento (LGPD)')}
-      <label style=${{display:'flex',alignItems:'flex-start',gap:'9px',cursor:'pointer',fontSize:'12.5px',padding:'8px 10px',borderRadius:'8px',background:c.surface2,border:'1px solid '+c.bs}}>
-        <input type="checkbox" checked=${!!d.lgpd} onChange=${e=>this.setMD({lgpd:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px',marginTop:'1px'}}/>
-        <span style=${{color:c.muted}}>Autorizo o tratamento dos meus dados pessoais e dados sensíveis de saúde para compor o prontuário, emitir documentos e planejar a assistência, conforme a <b style=${{color:c.text}}>LGPD (Lei nº 13.709/2018)</b>.</span>
-      </label>
-      <label style=${{display:'flex',alignItems:'flex-start',gap:'9px',cursor:'pointer',fontSize:'12.5px',padding:'8px 10px',borderRadius:'8px',background:c.surface2,border:'1px solid '+c.bs,marginTop:'9px'}}>
-        <input type="checkbox" checked=${!!d.comunicacao} onChange=${e=>this.setMD({comunicacao:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px',marginTop:'1px'}}/>
-        <span style=${{color:c.muted}}>Autorizo contato por <b style=${{color:c.text}}>WhatsApp, ligação ou e-mail</b> para confirmações, lembretes e orientações terapêuticas.</span>
-      </label>
+      ${mobile?null:html`<div style=${{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+        <div style=${{width:'120px',height:'6px',borderRadius:'4px',background:c.surface2,overflow:'hidden'}}><div style=${{width:(totalFilled/totalKeys*100)+'%',height:'100%',background:c.teal.solid,transition:'width .2s'}}></div></div>
+        <span style=${{fontSize:'11px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${totalFilled}/${totalKeys}</span>
+      </div>`}
     </div>`;
-    const can=d.nome&&d.cpf&&d.tel&&d.lgpd;
-    const footer=html`<div style=${{display:'flex',gap:'9px',width:'100%',justifyContent:'space-between',alignItems:'center'}}>
-      <span style=${{fontSize:'11.5px',color:c.faint}}>${can?'':'Nome, CPF, telefone e consentimento LGPD são obrigatórios'}</span>
-      <div style=${{display:'flex',gap:'9px'}}>${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP(d.id?'Salvar alterações':'Cadastrar paciente',()=>this.savePatient(d),!can)}</div>
+
+    const footer=html`<div style=${{flexShrink:0,padding:mobile?'11px 16px':'12px 24px',borderTop:'1px solid '+c.bs,background:c.surface,display:'flex',alignItems:'center',gap:'12px'}}>
+      <span style=${{fontSize:'12px',color:c.faint,flex:1,display:mobile?'none':'block'}}>Nenhum campo é obrigatório — salve a qualquer momento e complete depois.</span>
+      ${mobile?html`<div style=${{flex:1}}></div>`:null}
+      ${this.btnS('Cancelar',()=>this.closePacForm())}
+      ${this.btnP('Salvar',()=>this.savePatient(d))}
     </div>`;
-    return this.modalShell(d.id?'Editar paciente':'Novo paciente',body,footer,'680px');
+
+    return html`<div style=${{height:'100%',display:'flex',flexDirection:'column',background:c.canvas,minHeight:0}}>
+      ${header}
+      ${mobile?html`<div style=${{flexShrink:0,display:'flex',gap:'8px',padding:'11px 16px',overflowX:'auto',borderBottom:'1px solid '+c.bs,background:c.surface}}>${SECTIONS.map(navChip)}</div>`:null}
+      <div style=${{flex:1,minHeight:0,display:'flex'}}>
+        ${mobile?null:html`<div style=${{width:'236px',flexShrink:0,borderRight:'1px solid '+c.bs,padding:'16px 12px',overflowY:'auto',background:c.surface}}>
+          <div style=${{fontSize:'10.5px',fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:c.faint,padding:'0 8px 8px'}}>Seções</div>
+          <div style=${{display:'flex',flexDirection:'column',gap:'2px'}}>${SECTIONS.map(navItem)}</div>
+        </div>`}
+        <div ref=${el=>{ this._formScrollEl=el; }} onScroll=${onScroll} style=${{flex:1,minHeight:0,overflowY:'auto',padding:mobile?'14px':'20px 24px'}}>
+          <div style=${{maxWidth:'720px',margin:'0 auto',paddingBottom:'8px'}}>
+            ${card(SECTIONS[0],html`<div>
+              ${this.fld('Nome completo',html`<input value=${d.nome||''} onChange=${e=>this.setMD({nome:e.target.value})} placeholder="Nome do paciente" style=${sel}/>`)}
+              ${this.fld('Nome social (caso aplicável)',html`<input value=${d.nomeSocial||''} onChange=${e=>this.setMD({nomeSocial:e.target.value})} placeholder="Como prefere ser chamado(a)" style=${sel}/>`)}
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('Telefone / WhatsApp',html`<input value=${d.tel||''} onChange=${e=>this.setMD({tel:this.maskTel(e.target.value)})} inputMode="tel" placeholder="(11) 90000-0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('CPF',html`<input value=${d.cpf||''} onChange=${e=>this.setMD({cpf:this.maskCPF(e.target.value)})} inputMode="numeric" placeholder="000.000.000-00" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              ${dup?html`<div style=${{marginBottom:'12px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.warning,.12),color:'#9a6a05',fontSize:'12.5px',display:'flex',gap:'8px'}}><${Icon} name="UserSearch" size=${16}/><span><b>Possível duplicado:</b> ${dup.nome} já tem este ${d.cpf&&dup.cpf===d.cpf?'CPF':'celular'}.</span></div>`:null}
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld(nascLabel,html`<input value=${d.nasc||''} onChange=${e=>this.setMD({nasc:this.maskDate(e.target.value)})} inputMode="numeric" placeholder="DD/MM/AAAA" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('RG',html`<input value=${d.rg||''} onChange=${e=>this.setMD({rg:e.target.value})} placeholder="Órgão emissor incl." style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('Gênero',html`<select value=${d.genero||''} onChange=${e=>this.setMD({genero:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Masculino</option><option>Feminino</option><option>Outro / Não informar</option></select>`)}
+                ${this.fld('Estado civil',html`<select value=${d.estadoCivil||''} onChange=${e=>this.setMD({estadoCivil:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select>`)}
+              </div>
+              ${needResp?this.fld('Responsável legal (menor de idade)',html`<input value=${d.resp||''} onChange=${e=>this.setMD({resp:e.target.value})} placeholder="Nome e parentesco" style=${sel}/>`):html`<button onClick=${()=>this.setMD({showResp:true})} style=${{display:'inline-flex',alignItems:'center',gap:'6px',padding:'8px 12px',borderRadius:'8px',border:'1px dashed '+c.bd,background:'transparent',color:c.muted,cursor:'pointer',fontSize:'12.5px'}}><${Icon} name="Plus" size=${14}/> Adicionar responsável legal</button>`}
+            </div>`)}
+
+            ${card(SECTIONS[1],html`<div>
+              ${this.fld('E-mail',html`<input value=${d.email||''} onChange=${e=>this.setMD({email:e.target.value})} placeholder="email@exemplo.com" style=${sel}/>`)}
+              <div style=${gg('0.9fr 2.3fr')}>
+                ${this.fld('CEP',html`<input value=${d.cep||''} onChange=${e=>{const v=this.maskCEP(e.target.value); const dig=v.replace(/\D/g,'').length; this.setMD(dig===8?{cep:v}:{cep:v,cepStatus:null}); if(dig===8) this.lookupCep(v);}} onBlur=${e=>this.lookupCep(e.target.value)} inputMode="numeric" placeholder="00000-000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('Endereço residencial',html`<input value=${d.endereco||''} onChange=${e=>this.setMD({endereco:e.target.value})} placeholder="Preenchido automaticamente pelo CEP" style=${sel}/>`)}
+              </div>
+              ${d.cepStatus?html`<div style=${{marginTop:'-4px',marginBottom:'12px',fontSize:'11.5px',display:'flex',alignItems:'center',gap:'6px',color:d.cepStatus==='ok'?c.success:(d.cepStatus==='loading'?c.muted:c.danger)}}><${Icon} name=${d.cepStatus==='ok'?'CheckCircle2':d.cepStatus==='loading'?'Loader':'CircleAlert'} size=${13}/> ${d.cepStatus==='loading'?'Buscando endereço…':d.cepStatus==='ok'?'Endereço preenchido pelo CEP':d.cepStatus==='notfound'?'CEP não encontrado — preencha manualmente':'Não foi possível consultar o CEP agora'}</div>`:null}
+              <div style=${gg('1.5fr 1.6fr 0.5fr 0.7fr')}>
+                ${this.fld('Bairro',html`<input value=${d.bairro||''} onChange=${e=>this.setMD({bairro:e.target.value})} style=${sel}/>`)}
+                ${this.fld('Cidade',html`<input value=${d.cidade||''} onChange=${e=>this.setMD({cidade:e.target.value})} style=${sel}/>`)}
+                ${this.fld('UF',html`<input value=${d.uf||''} maxLength=${2} onChange=${e=>this.setMD({uf:(e.target.value||'').toUpperCase()})} placeholder="SP" style=${{...sel,textTransform:'uppercase'}}/>`)}
+                ${this.fld('Nº',html`<input value=${d.numero||''} onChange=${e=>this.setMD({numero:e.target.value})} placeholder="000" style=${sel}/>`)}
+              </div>
+              ${this.fld('Complemento',html`<input value=${d.complemento||''} onChange=${e=>this.setMD({complemento:e.target.value})} placeholder="Apto / bloco (opcional)" style=${sel}/>`)}
+            </div>`)}
+
+            ${card(SECTIONS[2],html`<div>
+              <div style=${gg('1.6fr 1fr 1fr')}>
+                ${this.fld('Nome do contato',html`<input value=${d.emNome||''} onChange=${e=>this.setMD({emNome:e.target.value})} style=${sel}/>`)}
+                ${this.fld('Parentesco / ligação',html`<input value=${d.emParentesco||''} onChange=${e=>this.setMD({emParentesco:e.target.value})} placeholder="Cônjuge, mãe…" style=${sel}/>`)}
+                ${this.fld('Telefone',html`<input value=${d.emTel||''} onChange=${e=>this.setMD({emTel:this.maskTel(e.target.value)})} inputMode="tel" placeholder="(11) 90000-0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+            </div>`)}
+
+            ${card(SECTIONS[3],html`<div>
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('Profissão / ocupação',html`<input value=${d.profissao||''} onChange=${e=>this.setMD({profissao:e.target.value})} style=${sel}/>`)}
+                ${this.fld('Empresa / instituição (opcional)',html`<input value=${d.empresa||''} onChange=${e=>this.setMD({empresa:e.target.value})} style=${sel}/>`)}
+              </div>
+            </div>`)}
+
+            ${card(SECTIONS[4],html`<div>
+              ${this.fld('Tipo de atendimento',html`<div><div style=${{display:'flex',gap:'8px'}}>${[['particular','Particular'],['reembolso','Reembolso'],['convenio','Convênio']].map(([v,l])=>html`<button key=${v} onClick=${()=>this.setMD({atendTipo:v})} style=${{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+(tipo===v?'transparent':c.bs),background:tipo===v?c.primary:c.surface,color:tipo===v?c.onPrimary:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${l}</button>`)}</div><div style=${{fontSize:'11.5px',color:c.faint,marginTop:'6px'}}>Como esta clínica cobra o atendimento — não depende do convênio do paciente.</div></div>`)}
+              <div style=${gg('1.7fr 1fr')}>
+                ${this.fld('Médico solicitante / encaminhador',html`<input value=${d.medico||''} onChange=${e=>this.setMD({medico:e.target.value})} placeholder="Dr(a). Nome" style=${sel}/>`)}
+                ${this.fld('CRM',html`<input value=${d.crm||''} onChange=${e=>this.setMD({crm:e.target.value})} placeholder="CRM/SP 000000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              ${this.fld('Como conheceu a nossa clínica?',html`<select value=${d.comoConheceu||''} onChange=${e=>this.setMD({comoConheceu:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Indicação Médica</option><option>Indicação de Amigos</option><option>Instagram</option><option>Google / Mapas</option><option>Outros</option></select>`)}
+            </div>`)}
+
+            ${card(SECTIONS[5],html`<div>
+              <div style=${{fontSize:'12.5px',color:c.muted,marginBottom:'12px',lineHeight:1.45}}>Registre o plano de saúde do paciente <b style=${{color:c.text}}>mesmo em atendimento particular</b> — fica guardado caso seja preciso encaminhar para outro tratamento coberto pelo convênio.</div>
+              <label style=${{display:'flex',alignItems:'center',gap:'9px',cursor:'pointer',fontSize:'13px',padding:'10px 12px',borderRadius:'8px',background:c.surface2,border:'1px solid '+c.bs,marginBottom:temConv?'14px':'0'}}>
+                <input type="checkbox" checked=${temConv} onChange=${e=>this.setMD({temConvenio:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px'}}/>
+                <span style=${{fontWeight:600}}>O paciente possui convênio / plano de saúde</span>
+              </label>
+              ${temConv?html`<div style=${gg('1.6fr 1.2fr 0.9fr')}>
+                ${this.fld('Nome do convênio',html`<input value=${d.convenio||''} onChange=${e=>this.setMD({convenio:e.target.value})} placeholder="Nome do plano" style=${sel}/>`)}
+                ${this.fld('Nº da carteirinha',html`<input value=${d.carteirinha||''} onChange=${e=>this.setMD({carteirinha:e.target.value})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('Validade',html`<input value=${d.validade||''} onChange=${e=>this.setMD({validade:this.maskMY(e.target.value)})} inputMode="numeric" placeholder="MM/AAAA" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>`:null}
+            </div>`)}
+
+            ${card(SECTIONS[6],html`<div>
+              ${this.fld('Profissional preferido — pode escolher mais de um',html`<div style=${{display:'flex',flexWrap:'wrap',gap:'7px'}}>${this.state.profs.filter(p=>p.ativo).map(p=>{const on=prefs.includes(p.id); return html`<button key=${p.id} onClick=${()=>togPref(p.id)} style=${{display:'flex',alignItems:'center',gap:'7px',padding:'6px 11px 6px 7px',borderRadius:'999px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${this.avatar(p.nome,this.profColor(p),20)} ${p.nome.replace(/^Dra?\.\s*/,'')}${on?html` <${Icon} name="Check" size=${13}/>`:''}</button>`;})}</div>`)}
+              ${this.fld('Tags / condições clínicas',html`<div>
+                <div style=${{display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center',padding:'6px',borderRadius:'8px',border:'1px solid '+c.bd,background:c.surface,minHeight:'38px'}}>
+                  ${tags.map(t=>html`<span key=${t} style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'12px',padding:'3px 5px 3px 9px',borderRadius:'6px',background:c.teal.subtle,color:c.teal.text,fontWeight:600}}>${t}<button onClick=${()=>rmTag(t)} style=${{display:'grid',placeItems:'center',width:'15px',height:'15px',borderRadius:'4px',border:'none',background:'transparent',color:c.teal.text,cursor:'pointer',padding:0}}><${Icon} name="X" size=${12}/></button></span>`)}
+                  <input value=${d.tagInput||''} onChange=${e=>this.setMD({tagInput:e.target.value})} onKeyDown=${e=>{ if(e.key==='Enter'||e.key===','){ e.preventDefault(); addTag(e.target.value); } else if(e.key==='Backspace'&&!e.target.value&&tags.length){ rmTag(tags[tags.length-1]); } }} onBlur=${e=>addTag(e.target.value)} placeholder=${tags.length?'':'Digite e tecle Enter'} style=${{flex:1,minWidth:'130px',border:'none',outline:'none',background:'transparent',color:c.text,fontSize:'13px',height:'26px'}}/>
+                </div>
+                <div style=${{display:'flex',flexWrap:'wrap',gap:'5px',marginTop:'7px'}}>
+                  ${sugg.filter(s=>!tags.includes(s)).slice(0,8).map(s=>html`<button key=${s} onClick=${()=>addTag(s)} style=${{fontSize:'11.5px',padding:'2px 8px',borderRadius:'999px',border:'1px dashed '+c.bd,background:'transparent',color:c.muted,cursor:'pointer'}}>+ ${s}</button>`)}
+                </div>
+              </div>`)}
+            </div>`)}
+
+            ${card(SECTIONS[7],html`<div>
+              <label style=${{display:'flex',alignItems:'flex-start',gap:'9px',cursor:'pointer',fontSize:'12.5px',padding:'10px 12px',borderRadius:'8px',background:c.surface2,border:'1px solid '+c.bs}}>
+                <input type="checkbox" checked=${!!d.lgpd} onChange=${e=>this.setMD({lgpd:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px',marginTop:'1px'}}/>
+                <span style=${{color:c.muted}}>Autorizo o tratamento dos meus dados pessoais e dados sensíveis de saúde para compor o prontuário, emitir documentos e planejar a assistência, conforme a <b style=${{color:c.text}}>LGPD (Lei nº 13.709/2018)</b>.</span>
+              </label>
+              <label style=${{display:'flex',alignItems:'flex-start',gap:'9px',cursor:'pointer',fontSize:'12.5px',padding:'10px 12px',borderRadius:'8px',background:c.surface2,border:'1px solid '+c.bs,marginTop:'9px'}}>
+                <input type="checkbox" checked=${!!d.comunicacao} onChange=${e=>this.setMD({comunicacao:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px',marginTop:'1px'}}/>
+                <span style=${{color:c.muted}}>Autorizo contato por <b style=${{color:c.text}}>WhatsApp, ligação ou e-mail</b> para confirmações, lembretes e orientações terapêuticas.</span>
+              </label>
+            </div>`)}
+          </div>
+        </div>
+      </div>
+      ${footer}
+    </div>`;
   }
   modalNovaSerie(){
     const c=this.theme(); const html=this.html; const d=this.state.modalData; const sel=this.inputStyle(c);
@@ -1494,13 +1821,15 @@ class Component extends DCLogic {
   // ================= PACIENTES =================
   renderPacientes(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const narrow=this.state.w<640;
+    const mobile=this.state.w<860;
     const q=(this.state.pacQuery||'').toLowerCase();
     const ff=this.state.pacFiltro||'todos';
     const at=this.state.pacAtend||'todos';
     const pf=this.state.pacProf||'';
     const list=this.state.patients.filter(p=>{
       if(q&&!(p.nome.toLowerCase().includes(q)||p.cpf.includes(q)||p.tel.includes(q))) return false;
-      if(!(ff==='todos'||(ff==='pacote'&&p.pkg)||(ff==='faltas'&&p.faltas>0)||(ff==='resp'&&p.resp))) return false;
+      if(!(ff==='todos'||(ff==='pacote'&&this.pkgActive(p))||(ff==='acabando'&&(()=>{const pk=this.pkgActive(p);return pk&&this.pkgEnding(pk);})())||(ff==='faltas'&&p.faltas>0)||(ff==='resp'&&p.resp))) return false;
       if(at!=='todos'&&(p.atendTipo||'particular')!==at) return false;
       if(pf&&!(p.prefs||[]).includes(pf)) return false;
       return true;
@@ -1510,95 +1839,145 @@ class Component extends DCLogic {
     const fgrp=(label,children)=>html`<div style=${{marginBottom:'12px'}}><div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,marginBottom:'7px'}}>${label}</div><div style=${{display:'flex',gap:'6px',flexWrap:'wrap'}}>${children}</div></div>`;
     return html`<div style=${{padding:'16px 18px'}}>
       <div style=${{display:'flex',gap:'10px',marginBottom:'14px',alignItems:'center'}}>
-        <div style=${{flex:1,maxWidth:'380px',position:'relative'}}>
+        <div style=${{flex:1,maxWidth:mobile?'none':'380px',position:'relative'}}>
           <${Icon} name="Search" size=${15} color=${c.faint} style=${{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)'}}/>
           <input value=${this.state.pacQuery||''} onInput=${e=>this.setState({pacQuery:e.target.value})} placeholder="Buscar por nome, CPF ou telefone" style=${{width:'100%',height:'36px',padding:'0 12px 0 32px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontSize:'13px'}}/>
         </div>
-        <div style=${{flex:1}}></div>
+        ${mobile?null:html`<div style=${{flex:1}}></div>`}
+        ${mobile?null:html`<button onClick=${()=>this.openPacForm({})} style=${{display:'flex',alignItems:'center',gap:'7px',padding:'9px 14px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px',flexShrink:0}}><${Icon} name="UserPlus" size=${15}/> Novo paciente</button>`}
       </div>
       <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',overflow:'hidden',background:c.surface}}>
-        <div style=${{display:'grid',gridTemplateColumns:'2.1fr 1.2fr 1.3fr 1fr 0.7fr',padding:'9px 14px',borderBottom:'1px solid '+c.bs,fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,background:c.surface2}}>
+        ${narrow?null:html`<div style=${{display:'grid',gridTemplateColumns:'2.1fr 1.2fr 1.3fr 1fr 0.7fr',padding:'12px 14px 9px',borderBottom:'1px solid '+c.bs,fontSize:'12px',fontWeight:500,color:c.faint}}>
           <span>Paciente</span><span>Telefone</span><span>Preferência</span><span>Tags</span><span style=${{textAlign:'right'}}>Faltas</span>
-        </div>
-        ${list.map(p=>{const pn=this.prefNomes(p);
-        return html`<button key=${p.id} onClick=${()=>this.setState({selPaciente:p.id})} style=${{width:'100%',display:'grid',gridTemplateColumns:'2.1fr 1.2fr 1.3fr 1fr 0.7fr',alignItems:'center',padding:'9px 14px',borderBottom:'1px solid '+c.bs,background:'transparent',border:'none',cursor:'pointer',textAlign:'left',gap:'8px'}}>
+        </div>`}
+        ${list.length?list.map(p=>{const pn=this.prefNomes(p);
+        return narrow?html`<button key=${p.id} onClick=${()=>this.setState({selPaciente:p.id})} style=${{width:'100%',display:'flex',flexDirection:'column',gap:'8px',padding:'12px 14px',background:'transparent',border:'none',borderBottom:'1px solid '+c.bs,cursor:'pointer',textAlign:'left'}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'10px',width:'100%'}}>
+            ${this.avatar(p.nome,this.patientColor(p),34)}
+            <div style=${{flex:1,minWidth:0}}>
+              <div style=${{fontWeight:600,fontSize:'14px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</div>
+              <div style=${{fontSize:'10.5px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${p.cpf||'—'}</div>
+            </div>
+            ${p.faltas>0?html`<span style=${{flexShrink:0,fontSize:'11px',fontWeight:700,color:c.danger,background:this.tint(c.danger,.1),padding:'3px 9px',borderRadius:'999px'}}>${p.faltas} falta${p.faltas>1?'s':''}</span>`:null}
+          </div>
+          <div style=${{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',fontSize:'12px',color:c.muted}}>
+            <span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontFamily:"'Martian Mono', monospace"}}><${Icon} name="Phone" size=${12}/> ${p.tel||'—'}</span>
+            ${pn.length?html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',minWidth:0}}><${Icon} name="Stethoscope" size=${12}/> <span style=${{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pn[0].replace(/^Dra?\.\s*/,'')}${pn.length>1?' +'+(pn.length-1):''}</span></span>`:null}
+          </div>
+          ${p.tags.length?html`<div style=${{display:'flex',gap:'5px',flexWrap:'wrap'}}>${p.tags.slice(0,3).map(t=>html`<span key=${t} style=${{fontSize:'10.5px',padding:'1px 7px',borderRadius:'4px',background:c.surface2,color:c.muted,border:'1px solid '+c.bs}}>${t}</span>`)}${p.tags.length>3?html`<span style=${{fontSize:'10.5px',color:c.faint,alignSelf:'center'}}>+${p.tags.length-3}</span>`:null}</div>`:null}
+        </button>`:html`<button key=${p.id} onClick=${()=>this.setState({selPaciente:p.id})} style=${{width:'100%',display:'grid',gridTemplateColumns:'2.1fr 1.2fr 1.3fr 1fr 0.7fr',alignItems:'center',padding:'9px 14px',background:'transparent',border:'none',borderBottom:'1px solid '+c.bs,cursor:'pointer',textAlign:'left',gap:'8px'}}>
           <span style=${{display:'flex',alignItems:'center',gap:'9px',minWidth:0}}>${this.avatar(p.nome,this.patientColor(p),28)}<span style=${{minWidth:0}}><span style=${{display:'block',fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</span><span style=${{fontSize:'10px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${p.cpf}</span></span></span>
           <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted}}>${p.tel}</span>
           <span style=${{fontSize:'12.5px',color:c.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pn.length?(pn[0].replace(/^Dra?\.\s*/,'')+(pn.length>1?' +'+(pn.length-1):'')):'—'}</span>
           <span style=${{display:'flex',gap:'4px',flexWrap:'wrap'}}>${p.tags.slice(0,1).map(t=>html`<span key=${t} style=${{fontSize:'10.5px',padding:'1px 7px',borderRadius:'4px',background:c.surface2,color:c.muted,border:'1px solid '+c.bs}}>${t}</span>`)}${p.tags.length>1?html`<span style=${{fontSize:'10.5px',color:c.faint}}>+${p.tags.length-1}</span>`:null}</span>
           <span style=${{textAlign:'right',fontFamily:"'Martian Mono', monospace",fontWeight:600,fontSize:'11.5px',color:p.faltas>0?c.danger:c.faint}}>${p.faltas}</span>
-        </button>`;})}
+        </button>`;}):html`<div style=${{padding:'28px',textAlign:'center',fontSize:'13px',color:c.faint}}>Nenhum paciente encontrado.</div>`}
       </div>
     </div>`;
   }
   renderFicha(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
     const p=this.patient(this.state.selPaciente); if(!p) return null;
+    const mobile=this.state.w<860;
     const pn=this.prefNomes(p); const idade=this.idadeDe(p.nasc);
     const hist=this.state.appts.filter(a=>a.patientId===p.id||(a.patientIds&&a.patientIds.includes(p.id))).sort((a,b)=>b.date.localeCompare(a.date)||b.start-a.start);
-    const info=(l,v,mono)=>html`<div style=${{marginBottom:'10px'}}><div style=${{fontSize:'11px',color:c.faint,marginBottom:'2px'}}>${l}</div><div style=${{fontSize:'12px',fontWeight:500,fontFamily:mono?"'Martian Mono', monospace":'inherit'}}>${v}</div></div>`;
-    const sl=(t,first)=>html`<div style=${{fontSize:'10.5px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.teal.text,margin:(first?'0':'15px')+' 0 9px'}}>${t}</div>`;
-    return html`<div style=${{padding:'16px 18px'}}>
+    const endereco=[p.endereco,p.numero&&('nº '+p.numero),p.complemento].filter(Boolean).join(', ');
+    const cidadeUf=[p.cidade,p.uf].filter(Boolean).join(' / ');
+
+    const cardBox=(inner)=>html`<div style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'14px',padding:'18px 20px'}}>${inner}</div>`;
+    const cardHead=(icon,title,right)=>html`<div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'15px'}}><span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:c.teal.subtle,color:c.teal.text,flexShrink:0}}><${Icon} name=${icon} size=${15}/></span><div style=${{fontWeight:700,fontSize:'14px',flex:1}}>${title}</div>${right||null}</div>`;
+    const kv=(l,v,mono)=>{ const empty=(v===undefined||v===null||v===''||v==='—'); return html`<div style=${{minWidth:0}}><div style=${{fontSize:'11px',color:c.faint,marginBottom:'3px'}}>${l}</div><div style=${{fontSize:'13.5px',fontWeight:500,color:empty?c.faint:c.text,fontFamily:mono?"'Martian Mono', monospace":'inherit',wordBreak:'break-word'}}>${empty?'—':v}</div></div>`; };
+    const kvGrid=(rows)=>html`<div style=${{display:'grid',gridTemplateColumns:mobile?'1fr 1fr':'1fr 1fr',gap:'14px 18px'}}>${rows}</div>`;
+    const stat=(label,value,accent)=>html`<div style=${{flex:'1 1 120px',minWidth:'110px',padding:'11px 13px',borderRadius:'11px',border:'1px solid '+c.bs,background:c.surface2}}><div style=${{fontSize:'10.5px',color:c.faint,textTransform:'uppercase',letterSpacing:'.04em',marginBottom:'5px'}}>${label}</div><div style=${{fontSize:'16px',fontWeight:700,color:accent||c.text,fontFamily:"'Martian Mono', monospace"}}>${value}</div></div>`;
+
+    return html`<div style=${{padding:mobile?'14px':'18px 22px',maxWidth:'1180px',margin:'0 auto'}}>
       <button onClick=${()=>this.setState({selPaciente:null})} style=${{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:c.muted,cursor:'pointer',fontSize:'13px',marginBottom:'14px',padding:0}}><${Icon} name="ChevronLeft" size=${16}/> Pacientes</button>
-      <div style=${{display:'flex',gap:'18px',flexWrap:'wrap'}}>
-        <div style=${{flex:'1 1 300px',minWidth:'280px'}}>
-          <div style=${{display:'flex',alignItems:'center',gap:'14px',marginBottom:'16px'}}>
-            ${this.avatar(p.nome,this.patientColor(p),52)}
-            <div style=${{minWidth:0}}><div style=${{fontWeight:700,fontSize:'19px'}}>${p.nome}</div>${p.nomeSocial?html`<div style=${{fontSize:'12.5px',color:c.muted}}>“${p.nomeSocial}”</div>`:null}<div style=${{fontSize:'11.5px',color:c.muted,fontFamily:"'Martian Mono', monospace"}}>${p.cpf}${idade!==''?' · '+idade+' anos':''}</div></div>
+
+      <div style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'16px',padding:mobile?'18px':'22px 24px',marginBottom:'16px'}}>
+        <div style=${{display:'flex',alignItems:'flex-start',gap:'16px',flexWrap:'wrap'}}>
+          ${this.avatar(p.nome,this.patientColor(p),mobile?54:64)}
+          <div style=${{flex:'1 1 240px',minWidth:0}}>
+            <div style=${{fontWeight:700,fontSize:mobile?'20px':'24px',lineHeight:1.15}}>${p.nome}</div>
+            ${p.nomeSocial?html`<div style=${{fontSize:'13px',color:c.muted,marginTop:'2px'}}>“${p.nomeSocial}”</div>`:null}
+            <div style=${{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap',marginTop:'7px',fontSize:'12.5px',color:c.muted}}>
+              <span style=${{fontFamily:"'Martian Mono', monospace"}}>${p.cpf||'CPF não informado'}</span>
+              <span style=${{display:'inline-flex',alignItems:'center',gap:'5px',padding:'2px 9px',borderRadius:'999px',background:c.teal.subtle,color:c.teal.text,fontWeight:600,fontSize:'11.5px'}}><${Icon} name="CreditCard" size=${12}/> ${this.convLabel(p)}</span>
+              ${p.comunicacao?html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'11.5px',color:c.success}}><${Icon} name="BellRing" size=${13}/> Contato autorizado</span>`:html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'11.5px',color:c.faint}}><${Icon} name="BellOff" size=${13}/> Sem autorização de contato</span>`}
+            </div>
           </div>
-          ${p.tags&&p.tags.length?html`<div style=${{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>${p.tags.map(t=>html`<span key=${t} style=${{fontSize:'12px',padding:'3px 9px',borderRadius:'4px',background:c.surface2,color:c.muted,border:'1px solid '+c.bs}}>${t}</span>`)}</div>`:null}
-          <div style=${{padding:'16px',borderRadius:'10px',border:'1px solid '+c.bs,background:c.surface}}>
-            ${sl('Identificação',true)}
-            <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px'}}>
-              ${info('Nascimento',p.nasc||'—',true)}${info('Idade',idade!==''?idade+' anos':'—',true)}
-              ${info('Gênero',p.genero||'—')}${info('Estado civil',p.estadoCivil||'—')}
-              ${info('RG',p.rg||'—',true)}${info('Responsável',p.resp||'—')}
-            </div>
-            ${sl('Contato')}
-            ${info('Telefone',p.tel||'—',true)}
-            ${info('E-mail',p.email||'—')}
-            ${info('Endereço',[p.endereco,p.numero&&('nº '+p.numero),p.complemento].filter(Boolean).join(', ')||'—')}
-            <div style=${{display:'grid',gridTemplateColumns:'1.3fr 1.3fr 1fr',gap:'4px'}}>
-              ${info('Bairro',p.bairro||'—')}${info('Cidade/UF',[p.cidade,p.uf].filter(Boolean).join(' / ')||'—')}${info('CEP',p.cep||'—',true)}
-            </div>
-            ${sl('Contato de emergência')}
-            <div style=${{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'4px'}}>
-              ${info('Nome',p.emNome||'—')}${info('Parentesco',p.emParentesco||'—')}
-            </div>
-            ${info('Telefone',p.emTel||'—',true)}
-            ${sl('Profissional & convênio')}
-            <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px'}}>
-              ${info('Profissão',p.profissao||'—')}${info('Empresa',p.empresa||'—')}
-              ${info('Atendimento',this.convLabel(p))}${info('Convênio',p.convenio||'—')}
-            </div>
-            ${p.convenio?html`<div style=${{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'4px'}}>${info('Carteirinha',p.carteirinha||'—',true)}${info('Validade',p.validade||'—',true)}</div>`:null}
-            <div style=${{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'4px'}}>
-              ${info('Médico solicitante',p.medico||'—')}${info('CRM',p.crm||'—',true)}
-            </div>
-            ${info('Profissional preferido',pn.length?pn.join(', '):'—')}
-            ${info('Como conheceu',p.comoConheceu||'—')}
-            ${info('Faltas',String(p.faltas),true)}
-            <div style=${{marginTop:'8px',padding:'8px 10px',borderRadius:'8px',background:c.teal.subtle,display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',color:c.teal.text}}><${Icon} name="ShieldCheck" size=${15}/> Consentimento LGPD registrado</div>
-            <div style=${{marginTop:'6px',padding:'8px 10px',borderRadius:'8px',background:c.surface2,display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',color:c.muted}}><${Icon} name=${p.comunicacao?'BellRing':'BellOff'} size=${15} color=${p.comunicacao?c.success:c.faint}/> Comunicação ${p.comunicacao?'autorizada':'não autorizada'}</div>
-            <button onClick=${()=>this.openModal('novoPaciente',{...p})} style=${{marginTop:'12px',width:'100%',padding:'9px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontWeight:600,cursor:'pointer',fontSize:'13px'}}>Editar dados</button>
+          <div style=${{display:'flex',gap:'9px',flexShrink:0}}>
+            <button onClick=${()=>this.openModal('novoAgendamento',{patientId:p.id,date:this.state.date})} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'9px 14px',borderRadius:'9px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="CalendarPlus" size=${15}/> Agendar</button>
+            <button onClick=${()=>this.openPacForm({...p})} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'9px 14px',borderRadius:'9px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="Pencil" size=${14}/> Editar dados</button>
           </div>
         </div>
-        <div style=${{flex:'2 1 420px',minWidth:'320px'}}>
-          ${p.pkg?html`<div style=${{padding:'14px 16px',borderRadius:'10px',border:'1px solid '+c.bs,background:c.surface,marginBottom:'16px'}}>
-            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}><div style=${{fontWeight:600,fontSize:'13.5px'}}>Pacote · ${p.pkg.tipo}</div><div style=${{fontFamily:"'Martian Mono', monospace",fontSize:'12.5px',fontWeight:600}}>${p.pkg.usadas}/${p.pkg.total}</div></div>
-            <div style=${{height:'8px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:(p.pkg.usadas/p.pkg.total*100)+'%',height:'100%',background:c.teal.solid}}></div></div>
-            <div style=${{fontSize:'11.5px',color:c.muted,marginTop:'6px'}}>${p.pkg.total-p.pkg.usadas} sessões restantes</div>
-          </div>`:null}
-          <div style=${{fontSize:'12px',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:c.faint,marginBottom:'8px'}}>Histórico de atendimentos</div>
-          <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',overflow:'hidden',background:c.surface}}>
-            ${hist.length?hist.map(a=>{const m=this.statusMeta(a.status); const tp=this.type(a.typeId); const pr=this.state.profs.find(x=>x.id===a.profId); const dd=new Date(a.date+'T00:00');
-            return html`<div key=${a.id} style=${{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderBottom:'1px solid '+c.bs}}>
-              <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted,width:'82px'}}>${String(dd.getDate()).padStart(2,'0')}/${String(dd.getMonth()+1).padStart(2,'0')} ${this.m2t(a.start)}</span>
-              <div style=${{flex:1}}><div style=${{fontSize:'13px',fontWeight:500}}>${tp.nome}</div><div style=${{fontSize:'11.5px',color:c.faint}}>${pr.nome}</div></div>
-              ${this.statusPill(a.status,true)}
-            </div>`;}):html`<div style=${{padding:'20px',textAlign:'center',color:c.faint,fontSize:'13px'}}>Sem atendimentos registrados.</div>`}
-          </div>
-          ${this.anexosSection(p)}
+        ${p.tags&&p.tags.length?html`<div style=${{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'14px'}}>${p.tags.map(t=>html`<span key=${t} style=${{fontSize:'12px',padding:'3px 10px',borderRadius:'999px',background:c.surface2,color:c.muted,border:'1px solid '+c.bs}}>${t}</span>`)}</div>`:null}
+        <div style=${{display:'grid',gridTemplateColumns:mobile?'1fr 1fr':'repeat(4,1fr)',gap:'10px',marginTop:'16px'}}>
+          ${stat('Idade',idade!==''?idade+' anos':'—')}
+          ${stat('Faltas',String(p.faltas),p.faltas>0?c.danger:c.text)}
+          ${(()=>{const pk=this.pkgActive(p);return pk?stat('Pacote',pk.usadas+'/'+pk.total,this.pkgEnding(pk)?c.warning:c.teal.text):stat('Pacote','—');})()}
+          ${stat('Consentimento LGPD','OK',c.success)}
+        </div>
+      </div>
+
+      <div style=${{display:'flex',gap:'16px',flexWrap:'wrap',alignItems:'flex-start'}}>
+        <div style=${{flex:'1.5 1 340px',minWidth:mobile?'0':'320px',display:'flex',flexDirection:'column',gap:'16px'}}>
+          ${cardBox(html`<div>
+            ${cardHead('Phone','Contato')}
+            ${kvGrid(html`${kv('Telefone / WhatsApp',p.tel,true)}${kv('E-mail',p.email)}`)}
+            <div style=${{marginTop:'14px'}}>${kv('Endereço',endereco)}</div>
+            <div style=${{marginTop:'14px'}}>${kvGrid(html`${kv('Bairro',p.bairro)}${kv('Cidade / UF',cidadeUf)}`)}</div>
+            <div style=${{marginTop:'14px'}}>${kv('CEP',p.cep,true)}</div>
+          </div>`)}
+
+          ${cardBox(html`<div>
+            ${cardHead('User','Identificação')}
+            ${kvGrid(html`${kv('Nascimento',p.nasc,true)}${kv('Idade',idade!==''?idade+' anos':'—',true)}${kv('Gênero',p.genero)}${kv('Estado civil',p.estadoCivil)}${kv('RG',p.rg,true)}${kv('Responsável legal',p.resp)}`)}
+          </div>`)}
+
+          ${cardBox(html`<div>
+            ${cardHead('Siren','Contato de emergência')}
+            ${kvGrid(html`${kv('Nome',p.emNome)}${kv('Parentesco',p.emParentesco)}`)}
+            <div style=${{marginTop:'14px'}}>${kv('Telefone',p.emTel,true)}</div>
+          </div>`)}
+
+          ${cardBox(html`<div>
+            ${cardHead('Stethoscope','Atendimento & convênio')}
+            ${kvGrid(html`${kv('Tipo de atendimento',this.convLabel(p))}${kv('Convênio',p.convenio)}${kv('Carteirinha',p.carteirinha,true)}${kv('Validade',p.validade,true)}${kv('Médico solicitante',p.medico)}${kv('CRM',p.crm,true)}${kv('Profissional preferido',pn.length?pn.join(', '):'—')}${kv('Como conheceu',p.comoConheceu)}${kv('Profissão',p.profissao)}${kv('Empresa',p.empresa)}`)}
+          </div>`)}
+
+          ${cardBox(html`<div>
+            ${cardHead('ShieldCheck','Consentimentos')}
+            <div style=${{display:'flex',flexDirection:'column',gap:'9px'}}>
+              <div style=${{display:'flex',alignItems:'center',gap:'10px',padding:'11px 13px',borderRadius:'10px',background:c.teal.subtle}}>
+                <${Icon} name="ShieldCheck" size=${17} color=${c.teal.text}/>
+                <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13px',fontWeight:600,color:c.text}}>Tratamento de dados (LGPD)</div><div style=${{fontSize:'11.5px',color:c.muted}}>Prontuário, documentos e assistência</div></div>
+                <span style=${{fontSize:'11.5px',fontWeight:700,color:c.teal.text}}>Autorizado</span>
+              </div>
+              <div style=${{display:'flex',alignItems:'center',gap:'10px',padding:'11px 13px',borderRadius:'10px',background:p.comunicacao?this.tint(c.success,.1):c.surface2,border:'1px solid '+(p.comunicacao?'transparent':c.bs)}}>
+                <${Icon} name=${p.comunicacao?'BellRing':'BellOff'} size=${17} color=${p.comunicacao?c.success:c.faint}/>
+                <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13px',fontWeight:600,color:c.text}}>Comunicação e marketing</div><div style=${{fontSize:'11.5px',color:c.muted}}>WhatsApp, ligação e e-mail — lembretes e campanhas</div></div>
+                <span style=${{fontSize:'11.5px',fontWeight:700,color:p.comunicacao?c.success:c.faint}}>${p.comunicacao?'Autorizado':'Não autorizado'}</span>
+              </div>
+            </div>
+          </div>`)}
+        </div>
+
+        <div style=${{flex:'1 1 300px',minWidth:mobile?'0':'300px',display:'flex',flexDirection:'column',gap:'16px'}}>
+          ${this.pacotesCard(p)}
+
+          ${cardBox(html`<div>
+            ${cardHead('History','Histórico de atendimentos',hist.length?html`<span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.faint}}>${hist.length}</span>`:null)}
+            <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',overflow:'hidden'}}>
+              ${hist.length?hist.map((a,i)=>{const tp=this.type(a.typeId); const pr=this.state.profs.find(x=>x.id===a.profId); const dd=new Date(a.date+'T00:00');
+              return html`<div key=${a.id} style=${{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',borderBottom:i<hist.length-1?'1px solid '+c.bs:'none'}}>
+                <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted,width:'78px',flexShrink:0}}>${String(dd.getDate()).padStart(2,'0')}/${String(dd.getMonth()+1).padStart(2,'0')} ${this.m2t(a.start)}</span>
+                <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13px',fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${tp.nome}</div><div style=${{fontSize:'11.5px',color:c.faint}}>${pr.nome}</div></div>
+                ${this.statusPill(a.status,true)}
+              </div>`;}):html`<div style=${{padding:'20px',textAlign:'center',color:c.faint,fontSize:'13px'}}>Sem atendimentos registrados.</div>`}
+            </div>
+          </div>`)}
+
+          ${cardBox(this.anexosSection(p))}
         </div>
       </div>
     </div>`;
@@ -1607,18 +1986,47 @@ class Component extends DCLogic {
   // ================= FILA =================
   renderFila(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const narrow=this.state.w<640;
+    const mobile=this.state.w<860;
     const order={urgente:0,alta:1,normal:2,baixa:3};
     const fp=this.state.filaPrio||'todas';
     const list=this.state.fila.filter(x=>fp==='todas'||x.prio===fp).slice().sort((a,b)=>order[a.prio]-order[b.prio]);
     const gcols='minmax(180px,1.7fr) 108px minmax(200px,2fr) minmax(96px,0.85fr) 60px 176px';
     const hcell=(t,alignEnd)=>html`<div style=${{fontSize:'12px',fontWeight:500,color:c.faint,textAlign:alignEnd?'right':'left'}}>${t}</div>`;
     const chip=(label,exp,mono)=>html`<span style=${{fontSize:'10.5px',fontWeight:500,padding:'2px 7px',borderRadius:'5px',lineHeight:1.5,whiteSpace:'nowrap',background:'transparent',border:'1px '+(exp?'dashed':'solid')+' '+(exp?c.bs:c.bd),color:exp?c.faint:c.text,textDecoration:exp?'line-through':'none',fontFamily:mono?"'Martian Mono', monospace":'inherit'}}>${label}</span>`;
-    return html`<div style=${{padding:'22px 24px'}}>
-      <div style=${{display:'flex',alignItems:'center',marginBottom:'16px'}}>
+    return html`<div style=${{padding:narrow?'16px':'22px 24px'}}>
+      ${mobile?null:html`<div style=${{display:'flex',alignItems:'center',marginBottom:'16px'}}>
         <div style=${{flex:1}}></div>
         <button onClick=${()=>this.openModal('addFila',{})} style=${{display:'flex',alignItems:'center',gap:'7px',padding:'9px 14px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="Plus" size=${15}/> Adicionar à fila</button>
-      </div>
-      ${list.length?html`<div style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'12px',overflow:'auto'}}>
+      </div>`}
+      ${!list.length?html`<div style=${{padding:'52px 20px',textAlign:'center',color:c.faint,borderTop:'2px solid '+c.bd}}>
+        <${Icon} name="Clock4" size=${26}/>
+        <div style=${{fontSize:'13.5px',fontWeight:600,color:c.muted,marginTop:'10px'}}>Nenhum paciente na fila${fp!=='todas'?' com esta prioridade':''}</div>
+        <div style=${{fontSize:'12.5px',marginTop:'2px'}}>Adicione um paciente que aguarda vaga para encaixe.</div>
+      </div>`
+      :narrow?html`<div style=${{display:'flex',flexDirection:'column',gap:'10px'}}>${list.map(f=>{const p=this.patient(f.patientId); const pm=this.prioMeta(f.prio); const profIds=this.filaProfIds(f); const firstProf=this.state.profs.find(x=>x.id===profIds[0]); const profNomes=profIds.length?profIds.map(id=>{const pr=this.state.profs.find(x=>x.id===id); return pr?pr.nome.replace(/^Dra?\.\s*/,''):null;}).filter(Boolean).join(', '):'Qualquer'; const regras=f.regras||[]; const jan=f.janela&&f.janela!=='qualquer'?f.janela:null;
+        return html`<div key=${f.id} style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'12px',padding:'13px 14px'}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'10px'}}>
+            ${this.avatar(p.nome,this.profColor(firstProf||'p1'),34)}
+            <div style=${{flex:1,minWidth:0}}>
+              <div style=${{fontWeight:600,fontSize:'14px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}</div>
+              <div style=${{fontSize:'11px',color:c.faint}}><span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:600,color:f.dias>=7?c.warning:c.muted}}>${f.dias}</span> dia${f.dias===1?'':'s'} na fila</div>
+            </div>
+            <span style=${{flexShrink:0,fontSize:'10px',fontWeight:700,color:'#fff',background:pm.color,padding:'2px 9px',borderRadius:'999px'}}>${pm.label}</span>
+          </div>
+          ${f.obs?html`<div style=${{fontSize:'12px',color:c.muted,marginTop:'8px'}}>${f.obs}</div>`:''}
+          <div style=${{display:'flex',flexWrap:'wrap',gap:'5px',alignItems:'center',marginTop:'9px'}}>
+            ${jan?chip(jan==='manhã'?'Manhã':'Tarde',false,false):(regras.length?'':chip('Qualquer horário',false,false))}
+            ${regras.map((r)=>{const exp=this.filaRegraExpirada(r); const pre=this.filaRegraPrefix(r); return this.filaRegraPeriodos(r).map((pp,pi)=>chip(pre+' · '+pp[0]+'–'+pp[1],exp,true));})}
+          </div>
+          <div style=${{display:'flex',alignItems:'center',gap:'6px',marginTop:'9px',fontSize:'12px',color:c.muted}}><${Icon} name="Stethoscope" size=${13}/> <span style=${{minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>${profNomes}</span></div>
+          <div style=${{display:'flex',gap:'8px',marginTop:'12px'}}>
+            <button onClick=${()=>{this.openModal('novoAgendamento',{patientId:f.patientId,profId:profIds[0]||undefined,date:this.state.date}); }} style=${{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+c.teal.border,background:'transparent',color:c.teal.text,fontWeight:600,cursor:'pointer',fontSize:'13px'}}>Oferecer vaga</button>
+            <button onClick=${()=>this.openModal('addFila',{...f})} title="Editar" style=${{width:'40px',height:'40px',display:'grid',placeItems:'center',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.muted,cursor:'pointer'}}><${Icon} name="Pencil" size=${15}/></button>
+            <button onClick=${()=>this.resolveFila(f.id)} title="Excluir da fila" style=${{width:'40px',height:'40px',display:'grid',placeItems:'center',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,cursor:'pointer'}}><${Icon} name="Trash2" size=${15} color=${c.danger}/></button>
+          </div>
+        </div>`;})}</div>`
+      :html`<div style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'12px',overflow:'auto'}}>
         <div style=${{minWidth:'760px'}}>
           <div style=${{display:'grid',gridTemplateColumns:gcols,gap:'16px',padding:'12px 16px 9px 16px',borderBottom:'1px solid '+c.bs}}>
             ${hcell('Paciente')}${hcell('Prioridade')}${hcell('Disponibilidade')}${hcell('Profissional')}${hcell('Espera',true)}${hcell('',true)}
@@ -1646,10 +2054,6 @@ class Component extends DCLogic {
             </div>
           </div>`;})}
         </div>
-      </div>`:html`<div style=${{padding:'52px 20px',textAlign:'center',color:c.faint,borderTop:'2px solid '+c.bd}}>
-        <${Icon} name="Clock4" size=${26}/>
-        <div style=${{fontSize:'13.5px',fontWeight:600,color:c.muted,marginTop:'10px'}}>Nenhum paciente na fila${fp!=='todas'?' com esta prioridade':''}</div>
-        <div style=${{fontSize:'12.5px',marginTop:'2px'}}>Adicione um paciente que aguarda vaga para encaixe.</div>
       </div>`}
     </div>`;
   }
@@ -1657,22 +2061,255 @@ class Component extends DCLogic {
   // ================= PROFISSIONAIS =================
   renderProfissionais(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const narrow=this.state.w<640;
+    const mobile=this.state.w<860;
     const wds=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    return html`<div style=${{padding:'16px 18px',maxWidth:'860px'}}>
-      <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>
-        ${this.state.profs.filter(p=>{const f=this.state.profFiltro||'todos';return f==='todos'||(f==='ativos'&&p.ativo)||(f==='inativos'&&!p.ativo);}).map(p=>{const dias=[1,2,3,4,5].filter(d=>{const w=this.profWeek(p,d); return w&&w.length;}); const cont=dias.length===5?'Seg–Sex':(dias.length?dias.map(d=>wds[d]).join(', '):'—');
-        const w1=this.profWeek(p,1); const hr=w1&&w1.length?w1.map(x=>x[0]+'–'+x[1]).join(', '):'';
-        return html`<div key=${p.id} style=${{display:'flex',alignItems:'center',gap:'13px',padding:'14px 16px',borderRadius:'10px',border:'1px solid '+c.bs,background:c.surface,opacity:p.ativo?1:.55}}>
-          ${this.avatar(p.nome,this.profColor(p),38)}
-          <div style=${{flex:1,minWidth:0}}>
-            <div style=${{fontWeight:600,fontSize:'14px'}}>${p.nome} ${!p.ativo?html`<span style=${{fontSize:'11px',color:c.faint,fontWeight:500}}>(inativo)</span>`:''}</div>
-            <div style=${{fontSize:'12px',color:c.muted}}>${p.sub} · <span style=${{fontFamily:"'Martian Mono', monospace"}}>${p.crefito}</span></div>
-          </div>
-          <div style=${{fontSize:'12px',color:c.muted,textAlign:'right'}}><div style=${{display:'flex',alignItems:'center',gap:'5px',justifyContent:'flex-end'}}><${Icon} name="CalendarClock" size=${13}/> ${cont}</div><div style=${{fontFamily:"'Martian Mono', monospace",color:c.text}}>${hr}</div>${p.followClinic!==false?html`<div style=${{fontSize:'10.5px',color:c.teal.text,fontWeight:600,marginTop:'1px'}}>Segue a clínica</div>`:''}</div>
-          <button onClick=${()=>this.openModal('profEdit',{...p})} style=${this.iconBtn(c)}><${Icon} name="Pencil" size=${14}/></button>
-        </div>`;})}
+    const q=(this.state.profQuery||'').toLowerCase();
+    const f=this.state.profFiltro||'todos';
+    const list=this.state.profs.filter(p=>{
+      if(f==='ativos'&&!p.ativo) return false;
+      if(f==='inativos'&&p.ativo) return false;
+      if(q){ const esp=(p.esp||[]).join(' ').toLowerCase(); if(!(p.nome.toLowerCase().includes(q)||(p.crefito||'').toLowerCase().includes(q)||(p.sub||'').toLowerCase().includes(q)||esp.includes(q))) return false; }
+      return true;
+    });
+    const espLabel=(p)=>{const e=p.esp||[]; return e.length?(e[0]+(e.length>1?' +'+(e.length-1):'')):(p.sub||'—');};
+    const cols='2.05fr 1.35fr 1.15fr 0.9fr 1.25fr';
+    return html`<div style=${{padding:'16px 18px'}}>
+      <div style=${{display:'flex',gap:'10px',marginBottom:'14px',alignItems:'center'}}>
+        <div style=${{flex:1,maxWidth:mobile?'none':'380px',position:'relative'}}>
+          <${Icon} name="Search" size=${15} color=${c.faint} style=${{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)'}}/>
+          <input value=${this.state.profQuery||''} onInput=${e=>this.setState({profQuery:e.target.value})} placeholder="Buscar profissional" style=${{width:'100%',height:'36px',padding:'0 12px 0 32px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontSize:'13px'}}/>
+        </div>
+        ${mobile?null:html`<div style=${{flex:1}}></div>`}
+        ${mobile?null:html`<button onClick=${()=>this.openProfForm({ativo:true,ci:6})} style=${{display:'flex',alignItems:'center',gap:'7px',padding:'9px 14px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px',flexShrink:0}}><${Icon} name="Plus" size=${15}/> Novo profissional</button>`}
       </div>
-      <div style=${{marginTop:'10px',fontSize:'12px',color:c.faint}}>Disponibilidade editável por dia da semana no formulário de edição.</div>
+      <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',overflow:'hidden',background:c.surface}}>
+        ${narrow?null:html`<div style=${{display:'grid',gridTemplateColumns:cols,padding:'12px 14px 9px',borderBottom:'1px solid '+c.bs,fontSize:'12px',fontWeight:500,color:c.faint,gap:'8px'}}>
+          <span>Profissional</span><span>Especialidade</span><span>Contato</span><span>Vínculo</span><span>Atendimento</span>
+        </div>`}
+        ${list.length?list.map(p=>{const dias=[1,2,3,4,5].filter(d=>{const w=this.profWeek(p,d); return w&&w.length;}); const cont=dias.length===5?'Seg–Sex':(dias.length?dias.map(d=>wds[d]).join(', '):'—');
+        const w1=this.profWeek(p,1); const hr=w1&&w1.length?w1.map(x=>x[0]+'–'+x[1]).join(', '):'';
+        return narrow?html`<button key=${p.id} onClick=${()=>this.openProfForm({...p})} style=${{width:'100%',display:'flex',flexDirection:'column',gap:'8px',padding:'12px 14px',background:'transparent',border:'none',borderBottom:'1px solid '+c.bs,cursor:'pointer',textAlign:'left',opacity:p.ativo?1:.55}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'10px',width:'100%'}}>
+            ${this.avatar(p.nome,this.profColor(p),34)}
+            <div style=${{flex:1,minWidth:0}}>
+              <div style=${{fontWeight:600,fontSize:'14px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}${!p.ativo?html` <span style=${{fontSize:'10px',color:c.faint,fontWeight:500}}>(inativo)</span>`:''}</div>
+              <div style=${{fontSize:'10.5px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${p.crefito||'—'}</div>
+            </div>
+            ${p.vinculo?html`<span style=${{flexShrink:0,fontSize:'10.5px',fontWeight:600,padding:'2px 8px',borderRadius:'999px',background:c.teal.subtle,color:c.teal.text}}>${p.vinculo}</span>`:null}
+          </div>
+          <div style=${{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',fontSize:'12px',color:c.muted}}>
+            <span style=${{display:'inline-flex',alignItems:'center',gap:'5px',minWidth:0}}><${Icon} name="Stethoscope" size=${12}/> ${espLabel(p)}</span>
+            ${p.tel?html`<span style=${{display:'inline-flex',alignItems:'center',gap:'5px',fontFamily:"'Martian Mono', monospace"}}><${Icon} name="Phone" size=${12}/> ${p.tel}</span>`:null}
+          </div>
+          <div style=${{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:c.muted}}><${Icon} name="CalendarClock" size=${12}/> ${cont}${hr?html` <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.faint}}>${hr}</span>`:(p.followClinic!==false?html` <span style=${{fontSize:'11px',color:c.teal.text,fontWeight:600}}>· Segue a clínica</span>`:'')}</div>
+        </button>`:html`<button key=${p.id} onClick=${()=>this.openProfForm({...p})} style=${{width:'100%',display:'grid',gridTemplateColumns:cols,alignItems:'center',padding:'9px 14px',background:'transparent',border:'none',borderBottom:'1px solid '+c.bs,cursor:'pointer',textAlign:'left',gap:'8px',opacity:p.ativo?1:.55}}>
+          <span style=${{display:'flex',alignItems:'center',gap:'9px',minWidth:0}}>${this.avatar(p.nome,this.profColor(p),28)}<span style=${{minWidth:0}}><span style=${{display:'block',fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${p.nome}${!p.ativo?html` <span style=${{fontSize:'10px',color:c.faint,fontWeight:500}}>(inativo)</span>`:''}</span><span style=${{fontSize:'10px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${p.crefito||'—'}</span></span></span>
+          <span style=${{fontSize:'12.5px',color:c.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${espLabel(p)}</span>
+          <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted}}>${p.tel||'—'}</span>
+          <span>${p.vinculo?html`<span style=${{fontSize:'10.5px',fontWeight:600,padding:'2px 8px',borderRadius:'999px',background:c.teal.subtle,color:c.teal.text}}>${p.vinculo}</span>`:html`<span style=${{fontSize:'11px',color:c.faint}}>—</span>`}</span>
+          <span style=${{fontSize:'12px',color:c.muted,minWidth:0}}><span style=${{display:'flex',alignItems:'center',gap:'5px'}}><${Icon} name="CalendarClock" size=${12}/> ${cont}</span>${hr?html`<span style=${{display:'block',fontFamily:"'Martian Mono', monospace",fontSize:'10.5px',color:c.faint}}>${hr}</span>`:(p.followClinic!==false?html`<span style=${{display:'block',fontSize:'10px',color:c.teal.text,fontWeight:600}}>Segue a clínica</span>`:'')}</span>
+        </button>`;}):html`<div style=${{padding:'28px',textAlign:'center',fontSize:'13px',color:c.faint}}>Nenhum profissional encontrado.</div>`}
+      </div>
+    </div>`;
+  }
+  renderProfForm(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
+    const mobile=this.state.w<860;
+    const sel=this.inputStyle(c);
+    const gg=(cols)=>({display:'grid',gridTemplateColumns:mobile?'1fr':cols,gap:'10px'});
+    const dup=this.state.profs.find(p=> p.id!==d.id && ((d.cpf&&p.cpf===d.cpf) || (d.crefito&&p.crefito===d.crefito)));
+    const ci=d.ci||1;
+    const esp=d.esp||[];
+    const togEsp=(t)=>{ const has=esp.includes(t); this.setMD({esp:has?esp.filter(x=>x!==t):[...esp,t]}); };
+    const especialidades=['Traumato-Ortopedia','Neurologia','Pilates','Osteopatia','Desportiva','RPG','Respiratória','Gerontologia','Pélvica','Aquática'];
+    const vinculo=d.vinculo||'';
+    const contaTipo=d.contaTipo||'Corrente';
+
+    // Horário de atendimento (mesmo motor da agenda)
+    const follow=d.followClinic!==false;
+    const av=d.avail||{};
+    const clinic=this.state.hours;
+    const setAvail=m=>this.setMD({avail:m});
+    const updDay=(dow,fn)=>{ const m={...av}; const cur=Array.isArray(m[dow])?m[dow].map(p=>p.slice()):[]; m[dow]=fn(cur); setAvail(m); };
+    const setP=(dow,pi,idx,v)=>updDay(dow,day=>{day[pi][idx]=v; return day;});
+    const addP=(dow)=>updDay(dow,day=>{const cl=this.state.hours[dow]||[]; const last=day.length?day[day.length-1][1]:(cl[0]?cl[0][0]:'13:00'); const end=cl.length?cl[cl.length-1][1]:'18:00'; day.push([last,end]); return day;});
+    const rmP=(dow,pi)=>updDay(dow,day=>{day.splice(pi,1); return day;});
+    const fmt=ps=>(ps||[]).map(p=>p[0]+'–'+p[1]).join(', ');
+    const dayValid=(dow)=>{ const day=av[dow]; if(!Array.isArray(day)||!day.length) return true; const cl=clinic[dow]; if(!cl||!cl.length) return false; return day.every(p=>this.t2m(p[0])<this.t2m(p[1]) && cl.some(cp=>this.t2m(cp[0])<=this.t2m(p[0]) && this.t2m(p[1])<=this.t2m(cp[1]))); };
+    const invalidDays=follow?[]:[1,2,3,4,5,6,0].filter(dow=>Array.isArray(av[dow])&&av[dow].length&&!dayValid(dow));
+    const hasInvalid=invalidDays.length>0;
+    const toggleOwn=(dow,on)=>{ const m={...av}; if(on){ const cl=clinic[dow]; if(!cl||!cl.length) return; m[dow]=(Array.isArray(av[dow])&&av[dow].length?av[dow]:cl.map(p=>p.slice())); } else delete m[dow]; setAvail(m); };
+    const wds2=[['Segunda',1],['Terça',2],['Quarta',3],['Quinta',4],['Sexta',5],['Sábado',6],['Domingo',0]];
+    const dayRow=([lbl,dow])=>{
+      const cl=clinic[dow]; const clinicOpen=!!(cl&&cl.length);
+      const day=Array.isArray(av[dow])?av[dow]:null; const on=!!(day&&day.length);
+      const bad=on&&!dayValid(dow);
+      const minT=clinicOpen?cl[0][0]:undefined; const maxT=clinicOpen?cl[cl.length-1][1]:undefined;
+      return html`<div key=${dow} style=${{display:'flex',alignItems:'flex-start',gap:'10px',padding:'9px 10px',borderTop:'1px solid '+c.bs,background:on?'transparent':c.surface2}}>
+        <div style=${{display:'flex',alignItems:'center',gap:'8px',width:'120px',flexShrink:0,paddingTop:'3px'}}>${this.switchToggle(c,on,()=>toggleOwn(dow,!on),!clinicOpen)}<span style=${{fontSize:'12.5px',fontWeight:600,color:clinicOpen?c.text:c.faint}}>${lbl}</span></div>
+        <div style=${{flex:1,minWidth:0}}>
+          ${!clinicOpen?html`<span style=${{fontSize:'12px',color:c.faint,lineHeight:'30px'}}>Clínica fechada</span>`
+            :on?html`${this.periodEditor(c,day,{set:(pi,idx,v)=>setP(dow,pi,idx,v),add:()=>addP(dow),rm:pi=>rmP(dow,pi),min:minT,max:maxT})}<div style=${{fontSize:'10.5px',marginTop:'4px',fontFamily:"'Martian Mono', monospace",color:bad?c.danger:c.faint}}>${bad?'Deve ficar dentro do horário da clínica ('+fmt(cl)+')':'Clínica: '+fmt(cl)}</div>`
+            :html`<span style=${{fontSize:'12px',color:c.faint,lineHeight:'30px'}}>Não atende</span>`}
+        </div>
+      </div>`;
+    };
+
+    const SECTIONS=[
+      {id:'ident',icon:'User',t:'Identificação pessoal',sub:'Dados básicos para o contrato',keys:['nome','nomeExib','nasc','cpf','rg','estadoCivil']},
+      {id:'contato',icon:'MapPin',t:'Contato & localização',sub:'Comunicação e acesso ao sistema',keys:['tel','email','cep','endereco','numero','complemento','bairro','cidade','uf','emNome','emTel']},
+      {id:'tecnicos',icon:'Stethoscope',t:'Dados profissionais e técnicos',sub:'Registro e aptidão técnica',keys:['profissao','crefito','registroUF','anoConclusao','esp']},
+      {id:'contrato',icon:'FileText',t:'Contratuais & financeiros',sub:'Vínculo, empresa e repasse',keys:['vinculo','razaoSocial','cnpj','banco','agencia','conta','pix','remuneracao']},
+      {id:'horario',icon:'CalendarClock',t:'Horário de atendimento',sub:'Disponibilidade na agenda',keys:['followClinic']},
+      {id:'sistema',icon:'Palette',t:'Cor & status',sub:'Aparência na agenda e situação',keys:['ci','ativo']},
+    ];
+    const filled=(k)=>{ if(k==='followClinic') return !follow?true:false; const v=d[k]; if(Array.isArray(v)) return v.length>0; if(typeof v==='boolean') return v; return v!==undefined&&v!==null&&String(v).trim()!==''; };
+    const secCount=(s)=>s.keys.filter(filled).length;
+    const totalKeys=SECTIONS.reduce((a,s)=>a+s.keys.length,0);
+    const totalFilled=SECTIONS.reduce((a,s)=>a+secCount(s),0);
+    const active=this.state.formSec||'ident';
+    const secTop=(el,sc)=>el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+    const scrollableAncestor=(el)=>{ let n=el&&el.parentElement; while(n){ const s=getComputedStyle(n); if(/(auto|scroll)/.test(s.overflowY) && n.scrollHeight-n.clientHeight>4) return n; n=n.parentElement; } return null; };
+    const secEl=(id)=>document.querySelector('[data-fsec="'+id+'"]');
+    const goSec=(id)=>{ const el=secEl(id); const sc=el&&scrollableAncestor(el); this._navLock=true; if(sc){ sc.scrollTop=Math.max(0,secTop(el,sc)-14); } this.setState({formSec:id}); clearTimeout(this._navT); this._navT=setTimeout(()=>{ this._navLock=false; },150); };
+    const onScroll=(e)=>{ if(this._navLock) return; const sc=e.currentTarget; let cur=SECTIONS[0].id; for(const s of SECTIONS){ const el=secEl(s.id); if(el && secTop(el,sc)-56<=sc.scrollTop) cur=s.id; } if(cur!==this.state.formSec) this.setState({formSec:cur}); };
+
+    const card=(s,inner)=>html`<section key=${s.id} data-fsec=${s.id} style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'14px',padding:mobile?'16px':'20px 22px',marginBottom:'14px'}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'11px',marginBottom:'16px'}}>
+        <span style=${{width:'34px',height:'34px',borderRadius:'9px',display:'grid',placeItems:'center',background:c.teal.subtle,color:c.teal.text,flexShrink:0}}><${Icon} name=${s.icon} size=${17}/></span>
+        <div style=${{flex:1,minWidth:0}}><div style=${{fontWeight:700,fontSize:'15px'}}>${s.t}</div><div style=${{fontSize:'11.5px',color:c.faint}}>${s.sub}</div></div>
+        <span style=${{fontSize:'10.5px',fontFamily:"'Martian Mono', monospace",color:secCount(s)?c.teal.text:c.faint,whiteSpace:'nowrap'}}>${secCount(s)}/${s.keys.length}</span>
+      </div>
+      ${inner}
+    </section>`;
+    const navItem=(s)=>{ const on=active===s.id; const cnt=secCount(s); return html`<button key=${s.id} onClick=${()=>goSec(s.id)} style=${{display:'flex',alignItems:'center',gap:'10px',width:'100%',padding:'9px 11px',borderRadius:'9px',border:'none',cursor:'pointer',textAlign:'left',background:on?c.teal.subtle:'transparent',color:on?c.teal.text:c.muted,fontWeight:on?700:500,fontSize:'13px'}}>
+      <${Icon} name=${s.icon} size=${16}/>
+      <span style=${{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${s.t}</span>
+      ${cnt?html`<span style=${{width:'7px',height:'7px',borderRadius:'50%',background:c.teal.solid,flexShrink:0}}></span>`:null}
+    </button>`; };
+    const navChip=(s)=>{ const on=active===s.id; return html`<button key=${s.id} onClick=${()=>goSec(s.id)} style=${{display:'inline-flex',alignItems:'center',gap:'6px',padding:'7px 12px',borderRadius:'999px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.muted,fontWeight:on?700:500,fontSize:'12.5px',whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}><${Icon} name=${s.icon} size=${14}/> ${s.t}</button>`; };
+    const vinBtn=(v)=>{const on=vinculo===v; return html`<button key=${v} onClick=${()=>this.setMD({vinculo:v})} style=${{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.primary:c.surface,color:on?c.onPrimary:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${v}</button>`;};
+
+    const nm=(d.nome||'').trim();
+    const header=html`<div style=${{flexShrink:0,padding:mobile?'12px 16px':'14px 24px',borderBottom:'1px solid '+c.bs,background:c.surface,display:'flex',alignItems:'center',gap:'14px'}}>
+      <button onClick=${()=>this.closeProfForm()} title="Voltar" style=${{width:'34px',height:'34px',display:'grid',placeItems:'center',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.muted,cursor:'pointer',flexShrink:0}}><${Icon} name="ChevronLeft" size=${18}/></button>
+      ${this.avatar(nm||'?',this.profColor(d),42)}
+      <div style=${{flex:1,minWidth:0}}>
+        <div style=${{fontWeight:700,fontSize:mobile?'16px':'18px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${nm||(d.id?'Editar profissional':'Novo profissional')}</div>
+        <div style=${{fontSize:'12px',color:c.faint}}>${d.id?'Editando cadastro profissional':'Cadastro de novo profissional'}${esp.length?' · '+esp[0]:''}</div>
+      </div>
+      ${mobile?null:html`<div style=${{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+        <div style=${{width:'120px',height:'6px',borderRadius:'4px',background:c.surface2,overflow:'hidden'}}><div style=${{width:(totalFilled/totalKeys*100)+'%',height:'100%',background:c.teal.solid,transition:'width .2s'}}></div></div>
+        <span style=${{fontSize:'11px',color:c.faint,fontFamily:"'Martian Mono', monospace"}}>${totalFilled}/${totalKeys}</span>
+      </div>`}
+    </div>`;
+
+    const savePayload=()=>{const p={...d,ci,followClinic:follow,avail:av,ativo:d.ativo!==false,vinculo,contaTipo}; p.sub=(d.esp&&d.esp[0])||d.sub||''; return p;};
+    const footer=html`<div style=${{flexShrink:0,padding:mobile?'11px 16px':'12px 24px',borderTop:'1px solid '+c.bs,background:c.surface,display:'flex',alignItems:'center',gap:'12px'}}>
+      <span style=${{fontSize:'12px',color:hasInvalid?c.danger:c.faint,flex:1,display:mobile?'none':'flex',alignItems:'center',gap:'6px'}}>${hasInvalid?html`<${Icon} name="TriangleAlert" size=${14}/> Há horários fora do funcionamento da clínica.`:'Apenas o nome é obrigatório — salve e complete depois.'}</span>
+      ${mobile?html`<div style=${{flex:1}}></div>`:null}
+      ${this.btnS('Cancelar',()=>this.closeProfForm())}
+      ${this.btnP('Salvar',()=>this.saveProf(savePayload()),!nm||hasInvalid)}
+    </div>`;
+
+    return html`<div style=${{height:'100%',display:'flex',flexDirection:'column',background:c.canvas,minHeight:0}}>
+      ${header}
+      ${mobile?html`<div style=${{flexShrink:0,display:'flex',gap:'8px',padding:'11px 16px',overflowX:'auto',borderBottom:'1px solid '+c.bs,background:c.surface}}>${SECTIONS.map(navChip)}</div>`:null}
+      <div style=${{flex:1,minHeight:0,display:'flex'}}>
+        ${mobile?null:html`<div style=${{width:'236px',flexShrink:0,borderRight:'1px solid '+c.bs,padding:'16px 12px',overflowY:'auto',background:c.surface}}>
+          <div style=${{fontSize:'10.5px',fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:c.faint,padding:'0 8px 8px'}}>Seções</div>
+          <div style=${{display:'flex',flexDirection:'column',gap:'2px'}}>${SECTIONS.map(navItem)}</div>
+        </div>`}
+        <div ref=${el=>{ this._formScrollEl=el; }} onScroll=${onScroll} style=${{flex:1,minHeight:0,overflowY:'auto',padding:mobile?'14px':'20px 24px'}}>
+          <div style=${{maxWidth:'720px',margin:'0 auto',paddingBottom:'8px'}}>
+
+            ${card(SECTIONS[0],html`<div>
+              ${this.fld('Nome completo',html`<input value=${d.nome||''} onChange=${e=>this.setMD({nome:e.target.value})} placeholder="Nome do profissional" style=${sel}/>`)}
+              ${this.fld('Nome de exibição / tratamento (opcional)',html`<input value=${d.nomeExib||''} onChange=${e=>this.setMD({nomeExib:e.target.value})} placeholder="Como aparece na agenda — ex.: Dra. Marina" style=${sel}/>`)}
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('Data de nascimento',html`<input value=${d.nasc||''} onChange=${e=>this.setMD({nasc:this.maskDate(e.target.value)})} inputMode="numeric" placeholder="DD/MM/AAAA" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('CPF',html`<input value=${d.cpf||''} onChange=${e=>this.setMD({cpf:this.maskCPF(e.target.value)})} inputMode="numeric" placeholder="000.000.000-00" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              ${dup?html`<div style=${{marginBottom:'12px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.warning,.12),color:'#9a6a05',fontSize:'12.5px',display:'flex',gap:'8px'}}><${Icon} name="UserSearch" size=${16}/><span><b>Possível duplicado:</b> ${dup.nome} já tem este ${d.cpf&&dup.cpf===d.cpf?'CPF':'registro'}.</span></div>`:null}
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('RG',html`<input value=${d.rg||''} onChange=${e=>this.setMD({rg:e.target.value})} placeholder="Órgão emissor incl." style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('Estado civil',html`<select value=${d.estadoCivil||''} onChange=${e=>this.setMD({estadoCivil:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select>`)}
+              </div>
+            </div>`)}
+
+            ${card(SECTIONS[1],html`<div>
+              <div style=${gg('1fr 1.4fr')}>
+                ${this.fld('Celular / WhatsApp',html`<input value=${d.tel||''} onChange=${e=>this.setMD({tel:this.maskTel(e.target.value)})} inputMode="tel" placeholder="(11) 90000-0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('E-mail (usuário do sistema)',html`<input value=${d.email||''} onChange=${e=>this.setMD({email:e.target.value})} placeholder="email@exemplo.com" style=${sel}/>`)}
+              </div>
+              <div style=${gg('0.9fr 2.3fr')}>
+                ${this.fld('CEP',html`<input value=${d.cep||''} onChange=${e=>{const v=this.maskCEP(e.target.value); const dig=v.replace(/\\D/g,'').length; this.setMD(dig===8?{cep:v}:{cep:v,cepStatus:null}); if(dig===8) this.lookupCep(v);}} onBlur=${e=>this.lookupCep(e.target.value)} inputMode="numeric" placeholder="00000-000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('Endereço',html`<input value=${d.endereco||''} onChange=${e=>this.setMD({endereco:e.target.value})} placeholder="Preenchido automaticamente pelo CEP" style=${sel}/>`)}
+              </div>
+              ${d.cepStatus?html`<div style=${{marginTop:'-4px',marginBottom:'12px',fontSize:'11.5px',display:'flex',alignItems:'center',gap:'6px',color:d.cepStatus==='ok'?c.success:(d.cepStatus==='loading'?c.muted:c.danger)}}><${Icon} name=${d.cepStatus==='ok'?'CheckCircle2':d.cepStatus==='loading'?'Loader':'CircleAlert'} size=${13}/> ${d.cepStatus==='loading'?'Buscando endereço…':d.cepStatus==='ok'?'Endereço preenchido pelo CEP':d.cepStatus==='notfound'?'CEP não encontrado — preencha manualmente':'Não foi possível consultar o CEP agora'}</div>`:null}
+              <div style=${gg('1.5fr 1.6fr 0.5fr 0.7fr')}>
+                ${this.fld('Bairro',html`<input value=${d.bairro||''} onChange=${e=>this.setMD({bairro:e.target.value})} style=${sel}/>`)}
+                ${this.fld('Cidade',html`<input value=${d.cidade||''} onChange=${e=>this.setMD({cidade:e.target.value})} style=${sel}/>`)}
+                ${this.fld('UF',html`<input value=${d.uf||''} maxLength=${2} onChange=${e=>this.setMD({uf:(e.target.value||'').toUpperCase()})} placeholder="SP" style=${{...sel,textTransform:'uppercase'}}/>`)}
+                ${this.fld('Nº',html`<input value=${d.numero||''} onChange=${e=>this.setMD({numero:e.target.value})} placeholder="000" style=${sel}/>`)}
+              </div>
+              ${this.fld('Complemento',html`<input value=${d.complemento||''} onChange=${e=>this.setMD({complemento:e.target.value})} placeholder="Apto / bloco (opcional)" style=${sel}/>`)}
+              <div style=${gg('1.6fr 1fr')}>
+                ${this.fld('Contato de emergência',html`<input value=${d.emNome||''} onChange=${e=>this.setMD({emNome:e.target.value})} placeholder="Nome e parentesco" style=${sel}/>`)}
+                ${this.fld('Telefone de emergência',html`<input value=${d.emTel||''} onChange=${e=>this.setMD({emTel:this.maskTel(e.target.value)})} inputMode="tel" placeholder="(11) 90000-0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+            </div>`)}
+
+            ${card(SECTIONS[2],html`<div>
+              <div style=${{fontSize:'12.5px',color:c.muted,marginBottom:'12px',lineHeight:1.45}}>Campos que comprovam a aptidão legal e técnica perante o conselho e a Vigilância Sanitária.</div>
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('Profissão / formação',html`<select value=${d.profissao||''} onChange=${e=>this.setMD({profissao:e.target.value})} style=${sel}><option value="">Selecione…</option><option>Fisioterapia</option><option>Educação Física</option><option>Terapia Ocupacional</option><option>Fonoaudiologia</option><option>Outra</option></select>`)}
+                ${this.fld('Nº de registro (CREFITO / CRM)',html`<input value=${d.crefito||''} onChange=${e=>this.setMD({crefito:e.target.value})} placeholder="CREFITO 3/000000-F" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              <div style=${gg('1fr 1fr')}>
+                ${this.fld('Estado emissor (UF do conselho)',html`<input value=${d.registroUF||''} maxLength=${2} onChange=${e=>this.setMD({registroUF:(e.target.value||'').toUpperCase()})} placeholder="SP" style=${{...sel,textTransform:'uppercase'}}/>`)}
+                ${this.fld('Ano de conclusão do curso',html`<input value=${d.anoConclusao||''} onChange=${e=>this.setMD({anoConclusao:(e.target.value||'').replace(/\\D/g,'').slice(0,4)})} inputMode="numeric" placeholder="AAAA" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              ${this.fld('Especialidades / áreas de atuação',html`<div style=${{display:'flex',flexWrap:'wrap',gap:'7px'}}>${especialidades.map(t=>{const on=esp.includes(t); return html`<button key=${t} onClick=${()=>togEsp(t)} style=${{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 11px',borderRadius:'999px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${t}${on?html` <${Icon} name="Check" size=${13}/>`:''}</button>`;})}</div>`)}
+            </div>`)}
+
+            ${card(SECTIONS[3],html`<div>
+              ${this.fld('Tipo de vínculo / contrato',html`<div style=${{display:'flex',gap:'8px'}}>${['Autônomo','PJ','CLT'].map(vinBtn)}</div>`)}
+              ${vinculo==='PJ'?html`<div style=${gg('1.6fr 1fr')}>
+                ${this.fld('Razão social',html`<input value=${d.razaoSocial||''} onChange=${e=>this.setMD({razaoSocial:e.target.value})} placeholder="Empresa LTDA" style=${sel}/>`)}
+                ${this.fld('CNPJ',html`<input value=${d.cnpj||''} onChange=${e=>this.setMD({cnpj:this.maskCNPJ(e.target.value)})} inputMode="numeric" placeholder="00.000.000/0000-00" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>`:null}
+              <div style=${{fontSize:'11px',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:c.faint,margin:'6px 0 10px'}}>Dados bancários para repasse</div>
+              <div style=${gg('1.4fr 0.8fr 1fr')}>
+                ${this.fld('Banco',html`<input value=${d.banco||''} onChange=${e=>this.setMD({banco:e.target.value})} placeholder="Nome do banco" style=${sel}/>`)}
+                ${this.fld('Agência',html`<input value=${d.agencia||''} onChange=${e=>this.setMD({agencia:e.target.value})} placeholder="0000" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+                ${this.fld('Conta',html`<input value=${d.conta||''} onChange=${e=>this.setMD({conta:e.target.value})} placeholder="00000-0" style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+              </div>
+              <div style=${gg('1fr 2fr')}>
+                ${this.fld('Tipo de conta',html`<div style=${{display:'flex',gap:'8px'}}>${['Corrente','Poupança'].map(v=>{const on=contaTipo===v; return html`<button key=${v} onClick=${()=>this.setMD({contaTipo:v})} style=${{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+(on?'transparent':c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}>${v}</button>`;})}</div>`)}
+                ${this.fld('Chave PIX',html`<input value=${d.pix||''} onChange=${e=>this.setMD({pix:e.target.value})} placeholder="CPF, e-mail, telefone ou aleatória" style=${sel}/>`)}
+              </div>
+              ${this.fld('Regras de remuneração acordadas',html`<input value=${d.remuneracao||''} onChange=${e=>this.setMD({remuneracao:e.target.value})} placeholder="Ex.: 60/40 por sessão, valor fixo/hora, salário base" style=${sel}/>`)}
+            </div>`)}
+
+            ${card(SECTIONS[4],html`<div>
+              <div style=${{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',borderRadius:'9px',border:'1px solid '+(follow?c.teal.solid:c.bd),background:follow?c.teal.subtle:c.surface,marginBottom:'8px'}}>
+                ${this.switchToggle(c,follow,()=>this.setMD({followClinic:!follow}))}
+                <div><div style=${{fontSize:'13px',fontWeight:600}}>Seguir o horário da clínica</div><div style=${{fontSize:'11.5px',color:c.muted}}>${follow?'O profissional atende exatamente no horário da clínica.':'Defina o horário do profissional — sempre dentro do funcionamento da clínica.'}</div></div>
+              </div>
+              ${follow?'':html`<div style=${{border:'1px solid '+c.bs,borderRadius:'8px',overflow:'hidden'}}>${wds2.map(dayRow)}</div>${hasInvalid?html`<div style=${{marginTop:'8px',padding:'8px 11px',borderRadius:'8px',background:this.tint(c.danger,.1),color:c.danger,fontSize:'11.5px',fontWeight:600,display:'flex',alignItems:'center',gap:'7px'}}><${Icon} name="TriangleAlert" size=${14}/> Há horários fora do funcionamento da clínica. Ajuste antes de salvar.</div>`:''}`}
+            </div>`)}
+
+            ${card(SECTIONS[5],html`<div>
+              ${this.fld('Cor na agenda',html`<div style=${{display:'flex',gap:'8px'}}>${this.cat.map((col,i)=>html`<button key=${i} onClick=${()=>this.setMD({ci:i+1})} style=${{width:'34px',height:'34px',borderRadius:'8px',background:col,border:ci===i+1?'3px solid '+c.text:'3px solid transparent',cursor:'pointer'}}></button>`)}</div>`)}
+              ${this.fld('Status',html`<select value=${d.ativo===false?'inativo':'ativo'} onChange=${e=>this.setMD({ativo:e.target.value==='ativo'})} style=${sel}><option value="ativo">Ativo — aparece na agenda</option><option value="inativo">Inativo — oculto da agenda</option></select>`)}
+            </div>`)}
+
+          </div>
+        </div>
+      </div>
+      ${footer}
     </div>`;
   }
 
@@ -1690,7 +2327,7 @@ class Component extends DCLogic {
   // Editor reutilizável de períodos (lista de [início,fim]); permite mais de um período no mesmo dia. h.min/h.max limitam os horários.
   periodEditor(c,periods,h){
     const html=this.html; const Icon=this.Icon;
-    const t={width:'104px',height:'30px',padding:'0 6px',borderRadius:'7px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontFamily:"'Martian Mono', monospace",fontSize:'11.5px'};
+    const t={flex:'1 1 0',minWidth:0,width:'auto',maxWidth:'112px',height:'30px',padding:'0 6px',borderRadius:'7px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontFamily:"'Martian Mono', monospace",fontSize:'11.5px'};
     return html`<div style=${{display:'flex',flexDirection:'column',gap:'6px'}}>
       ${(periods||[]).map((p,pi)=>html`<div key=${pi} style=${{display:'flex',alignItems:'center',gap:'6px'}}>
         <input type="time" step=${900} min=${h.min} max=${h.max} value=${p[0]} onChange=${e=>h.set(pi,0,e.target.value)} style=${t}/>
@@ -1791,6 +2428,7 @@ class Component extends DCLogic {
   // ================= RELATÓRIOS =================
   renderRelatorios(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const narrow=this.state.w<640;
     const r=this.reports(this.state.date);
     const kpi=(label,val,sub,color,icon)=>html`<div style=${{flex:'1 1 160px',padding:'15px 16px',borderRadius:'12px',border:'1px solid '+c.bs,background:c.surface}}>
       <div style=${{display:'flex',alignItems:'center',gap:'7px',color:c.muted,fontSize:'12px',marginBottom:'8px'}}><${Icon} name=${icon} size=${15} color=${color}/> ${label}</div>
@@ -1807,17 +2445,17 @@ class Component extends DCLogic {
       </div>
       <div style=${{border:'1px solid '+c.bs,borderRadius:'12px',overflow:'hidden',background:c.surface}}>
         <div style=${{padding:'12px 16px',borderBottom:'1px solid '+c.bs,fontWeight:600,fontSize:'14px'}}>Desempenho por profissional</div>
-        ${r.porProf.map(pp=>html`<div key=${pp.prof.id} style=${{display:'flex',alignItems:'center',gap:'14px',padding:'12px 16px',borderBottom:'1px solid '+c.bs}}>
+        ${r.porProf.map(pp=>html`<div key=${pp.prof.id} style=${{display:'flex',alignItems:'center',flexWrap:narrow?'wrap':'nowrap',gap:narrow?'8px 12px':'14px',padding:'12px 16px',borderBottom:'1px solid '+c.bs}}>
           ${this.avatar(pp.prof.nome,this.profColor(pp.prof),30)}
-          <div style=${{width:'150px',minWidth:0}}><div style=${{fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pp.prof.nome}</div><div style=${{fontSize:'11px',color:c.faint}}>${pp.prof.sub}</div></div>
-          <div style=${{flex:1}}>
+          <div style=${{flex:narrow?'1 1 auto':'0 0 150px',width:narrow?'auto':'150px',minWidth:0}}><div style=${{fontWeight:600,fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pp.prof.nome}</div><div style=${{fontSize:'11px',color:c.faint}}>${pp.prof.sub}</div></div>
+          <div style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted,textAlign:'right',order:narrow?0:3,width:narrow?'auto':'90px',flexShrink:0}}>${pp.concl}✓ · ${pp.falt}✕</div>
+          <div style=${{flex:narrow?'1 1 100%':'1',order:narrow?4:2}}>
             <div style=${{display:'flex',justifyContent:'space-between',fontSize:'11px',color:c.muted,marginBottom:'3px'}}><span>Volume · ${pp.total}</span><span>Falta ${pp.taxa}%</span></div>
             <div style=${{display:'flex',gap:'6px',alignItems:'center'}}>
               <div style=${{flex:1,height:'8px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:Math.min(100,pp.total/12*100)+'%',height:'100%',background:this.profColor(pp.prof),opacity:.85}}></div></div>
               <div style=${{width:'56px',height:'8px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:pp.taxa+'%',height:'100%',background:pp.taxa>20?c.danger:c.warning}}></div></div>
             </div>
           </div>
-          <div style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.muted,width:'90px',textAlign:'right'}}>${pp.concl}✓ · ${pp.falt}✕</div>
         </div>`)}
       </div>
     </div>`;
@@ -1826,7 +2464,7 @@ class Component extends DCLogic {
   // ================= LOGIN =================
   renderLogin(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
-    return html`<div style=${{height:'100vh',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:c.canvas,fontFamily:"'Hanken Grotesk', sans-serif",color:c.text,position:'relative',overflow:'hidden'}}>
+    return html`<div style=${{height:'100dvh',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:c.canvas,fontFamily:"'Hanken Grotesk', sans-serif",color:c.text,position:'relative',overflow:'hidden'}}>
       <div style=${{position:'absolute',top:0,left:0,right:0,height:'3px',background:c.teal.solid}}></div>
       <div style=${{width:'380px',maxWidth:'92vw',padding:'34px 30px',borderRadius:'14px',border:'1px solid '+c.bs,background:c.surface,boxShadow:c.d?'none':'0 12px 40px rgba(20,24,30,.08)',animation:'mvScale .25s ease-out'}}>
         <div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'24px'}}>
