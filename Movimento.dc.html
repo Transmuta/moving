@@ -619,10 +619,12 @@ class Component extends DCLogic {
       } else {
         appts.push({id:'a'+Date.now(),profId:d.profId,typeId:d.typeId,start,dur:tp.dur,date,status:'agendado',patientId:d.patientId,encaixe:!!d.encaixe});
       }
-      return {appts};
+      let fila=st.fila;
+      if(d._fromFila) fila=st.fila.filter(x=>x.id!==d._fromFila);
+      return {appts,fila};
     });
     this.closeModal();
-    this.toast(tp.grupo?'Turma agendada':'Agendamento criado');
+    this.toast(d._fromFila?('Agendado — '+this.patient(d.patientId).nome.split(' ')[0]+' saiu da fila'):(tp.grupo?'Turma agendada':'Agendamento criado'));
   }
   moveAppt(id,profId,start){
     this.setState(st=>({appts:st.appts.map(a=>a.id===id?{...a,profId,start}:a)}));
@@ -1108,7 +1110,7 @@ class Component extends DCLogic {
         ${hours.map(h=>html`<div key=${h} style=${{position:'absolute',left:0,right:0,top:(PAD+(h*60-480)*ppm)+'px',borderTop:'1px solid '+c.bs}}></div>`)}
         ${hours.map(h=>html`<div key=${'q'+h} style=${{position:'absolute',left:0,right:0,top:(PAD+(h*60-480+30)*ppm)+'px',borderTop:'1px dashed '+this.tint(c.muted,c.d?.12:.08)}}></div>`)}
         <div style=${{position:'absolute',left:0,right:0,top:(PAD+(720-480)*ppm)+'px',height:(60*ppm)+'px',background:'repeating-linear-gradient(135deg,'+this.tint(c.muted,.07)+' 0 7px,transparent 7px 14px)',borderTop:'1px solid '+c.bs,borderBottom:'1px solid '+c.bs,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}><span style=${{fontSize:'10px',color:c.faint,fontWeight:600,letterSpacing:'.04em'}}>ALMOÇO</span></div>
-        ${ghost?html`<div style=${{position:'absolute',left:'4px',right:'4px',top:(PAD+(ghost.start-480)*ppm)+'px',height:((this.state.appts.find(a=>a.id===dragId)||{dur:50}).dur*ppm)+'px',background:c.teal.subtle,border:'2px dashed '+c.teal.solid,borderRadius:'8px',zIndex:9,pointerEvents:'none',display:'flex',alignItems:'flex-start',padding:'4px 6px'}}><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10px',color:c.teal.text,fontWeight:600}}>${this.m2t(ghost.start)}</span></div>`:null}
+        ${ghost?html`<div style=${{position:'absolute',left:'4px',right:'24px',top:(PAD+(ghost.start-480)*ppm)+'px',height:((this.state.appts.find(a=>a.id===dragId)||{dur:50}).dur*ppm)+'px',background:c.teal.subtle,border:'2px dashed '+c.teal.solid,borderRadius:'8px',zIndex:9,pointerEvents:'none',display:'flex',alignItems:'flex-start',padding:'4px 6px'}}><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10px',color:c.teal.text,fontWeight:600}}>${this.m2t(ghost.start)}</span></div>`:null}
         ${appts.map(a=>this.renderBlock(a,ppm,dragId===a.id,PAD,lay.byId[a.id]))}
       </div>
     </div>`;
@@ -1135,8 +1137,9 @@ class Component extends DCLogic {
     const fill=na?this.tint(c.warning,c.d?0.22:0.16):(m.base?this.tint(m.base,c.d?0.18:0.1):(c.d?c.surface2:c.surface));
     const border=conf?c.danger:(na?c.warning:(m.base?this.tint(m.base,c.d?.5:.4):c.bd));
     const lanes=(slot&&slot.lanes)||1; const lane=(slot&&slot.lane)||0;
-    const g=3, pd=3;
-    const wCalc=lanes>1?'calc((100% - '+(pd*2)+'px - '+((lanes-1)*g)+'px) / '+lanes+')':'calc(100% - 8px)';
+    const g=3, pd=3, RGUT=24; // faixa clicável à direita da coluna
+    const avail='(100% - '+RGUT+'px)';
+    const wCalc=lanes>1?'calc(('+avail+' - '+(pd*2)+'px - '+((lanes-1)*g)+'px) / '+lanes+')':'calc('+avail+' - 4px)';
     const leftCalc=lanes>1?'calc('+pd+'px + ('+wCalc+' + '+g+'px) * '+lane+')':'4px';
     const profDot=this.profColor(a.profId);
     return html`<div key=${a.id} data-appt onPointerDown=${(e)=>{if(e.target.closest('button'))return; this.startDrag(e,a);}} onClick=${(e)=>{e.stopPropagation(); if(this._afterDrag&&Date.now()-this._afterDrag<300) return; if(!this.state.drag) this.setState({drawer:a.id});}} style=${{position:'absolute',top:top+'px',left:leftCalc,width:wCalc,height:Math.max(h-2,18)+'px',background:fill,border:(conf||na?'1.5px':'1px')+' solid '+border,borderRadius:'8px',padding:'4px '+(lanes>1?'6px':'7px'),overflow:'hidden',cursor:'grab',opacity:dragging?0.4:(m.dim?0.72:1),zIndex:conf?3:(na?2:2),boxShadow:c.d?'none':'0 1px 1px rgba(20,24,30,.03)',transition:'opacity .15s',display:'flex',flexDirection:'column',gap:'2px'}}>
@@ -1333,6 +1336,7 @@ class Component extends DCLogic {
       case 'agendarPacote': return this.modalPacote();
       case 'addFila': return this.modalAddFila();
       case 'quemCabe': return this.modalQuemCabe();
+      case 'oferecer': return this.modalOferecer();
       case 'profEdit': return this.modalProf();
       case 'tipoEdit': return this.modalTipo();
       case 'membroEdit': return this.modalMembro();
@@ -1935,6 +1939,127 @@ class Component extends DCLogic {
     [1,2,3,4,5,6].forEach(dow=>{ const ps=this.profWeek(prof,dow)||[]; if(!ps.length) return; const sig=ps.map(p=>p[0]+'-'+p[1]).join('|'); if(!groups[sig]) groups[sig]={dows:[],periodos:ps.map(p=>p.slice())}; groups[sig].dows.push(dow); });
     return Object.keys(groups).map(sig=>({tipo:'semana',dows:groups[sig].dows,periodos:groups[sig].periodos}));
   }
+  // Motor de match: vagas reais e livres na agenda compatíveis com um item da fila (profissional preferido + janela + regras).
+  filaVagas(f){
+    if(!f) return [];
+    const TODAY='2026-06-25', NOW=702, DUR=50, DAYS=14, STEP=30, CAP=50;
+    const anchor=new Date(TODAY+'T00:00');
+    const prefIds=this.filaProfIds(f);
+    const profs=(prefIds.length?prefIds.map(id=>this.state.profs.find(p=>p.id===id)):this.state.profs.filter(p=>p.ativo)).filter(p=>p&&p.ativo!==false);
+    if(!profs.length) return [];
+    const janela=f.janela||'qualquer';
+    const regras=(f.regras||[]).filter(r=>!this.filaRegraExpirada(r) && this.filaRegraPeriodos(r).length);
+    const out=[];
+    for(let dOff=0; dOff<DAYS; dOff++){
+      const dd=new Date(anchor); dd.setDate(dd.getDate()+dOff);
+      const date=this.dstr(dd); const dow=dd.getDay();
+      const dayA=this.dayAppts(date);
+      const busyAll=dayA.filter(a=>a.status!=='cancelado'&&a.status!=='faltou');
+      const freeAll=dayA.filter(a=>a.status==='cancelado'||a.status==='faltou');
+      for(const prof of profs){
+        const periods=this.dayPeriods(prof,date);
+        if(!periods||!periods.length) continue;
+        const busy=busyAll.filter(a=>a.profId===prof.id).map(a=>[a.start,a.start+a.dur]);
+        const freed=freeAll.filter(a=>a.profId===prof.id).map(a=>[a.start,a.start+a.dur]);
+        for(const per of periods){
+          const ps=this.t2m(per[0]), pe=this.t2m(per[1]);
+          for(let s=ps; s+DUR<=pe; s+=STEP){
+            const start=s, end=s+DUR;
+            if(dOff===0 && start<NOW) continue;
+            if(janela==='manhã' && start>=720) continue;
+            if(janela==='tarde' && start<720) continue;
+            let ruleIdx=-1;
+            if(regras.length){
+              ruleIdx=(f.regras||[]).findIndex(r=>{
+                if(this.filaRegraExpirada(r)) return false;
+                if(r.tipo==='data'){ if(r.data!==date) return false; }
+                else if(!((r.dows||[]).includes(dow))) return false;
+                return this.filaRegraPeriodos(r).some(pp=>start>=this.t2m(pp[0])&&end<=this.t2m(pp[1]));
+              });
+              if(ruleIdx<0) continue;
+            }
+            if(busy.some(b=>start<b[1]&&b[0]<end)) continue;
+            out.push({date,start,dur:DUR,profId:prof.id,dow,ruleIdx,freed:freed.some(b=>start<b[1]&&b[0]<end)});
+            break; // primeira vaga livre deste período/profissional/dia
+          }
+        }
+      }
+      if(out.length>=CAP) break;
+    }
+    out.sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.start-b.start) || (a.profId<b.profId?-1:a.profId>b.profId?1:0));
+    return out;
+  }
+  vagaLabel(v){ const dd=new Date(v.date+'T00:00'); const wd=['dom','seg','ter','qua','qui','sex','sáb'][dd.getDay()]; return wd+' '+String(dd.getDate()).padStart(2,'0')+'/'+String(dd.getMonth()+1).padStart(2,'0'); }
+  offerVaga(f,slot){ this.openModal('novoAgendamento',{patientId:f.patientId,profId:slot.profId,date:slot.date,hora:this.m2t(slot.start),typeId:'t2',encaixe:false,_fromFila:f.id}); }
+  // Célula de disponibilidade da fila: chips ficam teal + clicáveis quando aquela janela tem vaga livre casada.
+  filaDispCell(f,vagas){
+    const c=this.theme(); const html=this.html;
+    const jan=f.janela&&f.janela!=='qualquer'?f.janela:null;
+    const regras=f.regras||[];
+    const base={fontSize:'10.5px',fontWeight:500,padding:'2px 7px',borderRadius:'5px',lineHeight:1.5,whiteSpace:'nowrap'};
+    const neutral=(label,exp,mono,key)=>html`<span key=${key} style=${{...base,background:'transparent',border:'1px '+(exp?'dashed':'solid')+' '+(exp?c.bs:c.bd),color:exp?c.faint:c.text,textDecoration:exp?'line-through':'none',fontFamily:mono?"'Martian Mono', monospace":'inherit'}}>${label}</span>`;
+    const match=(label,slot,key)=>html`<button key=${key} onClick=${()=>this.offerVaga(f,slot)} title=${'Oferecer '+this.vagaLabel(slot)+' às '+this.m2t(slot.start)+(slot.freed?' · vaga que abriu':'')} style=${{...base,fontWeight:600,display:'inline-flex',alignItems:'center',gap:'5px',cursor:'pointer',background:c.teal.subtle,border:'1px solid '+c.teal.border,color:c.teal.text}}><span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.teal.solid,flexShrink:0}}></span>${label} <span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700}}>${this.vagaLabel(slot)} ${this.m2t(slot.start)}</span></button>`;
+    const items=[];
+    if(regras.length){
+      if(jan) items.push(neutral(jan==='manhã'?'Manhã':'Tarde',false,false,'jan'));
+      regras.forEach((r,i)=>{ const exp=this.filaRegraExpirada(r); const slot=exp?null:vagas.find(v=>v.ruleIdx===i);
+        if(slot) items.push(match(this.filaRegraPrefix(r),slot,'r'+i));
+        else items.push(neutral(this.filaRegraLabel(r),exp,true,'r'+i));
+      });
+    } else {
+      const label=jan?(jan==='manhã'?'Manhã':'Tarde'):'Qualquer horário';
+      const slot=vagas[0];
+      if(slot) items.push(match(label,slot,'m')); else items.push(neutral(label,false,false,'m'));
+    }
+    if(!vagas.length) items.push(html`<span key="no" style=${{fontSize:'10.5px',color:c.faint,fontStyle:'italic'}}>· sem vaga compatível</span>`);
+    return html`<div style=${{display:'flex',flexWrap:'wrap',gap:'5px',alignItems:'center'}}>${items}</div>`;
+  }
+  modalOferecer(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
+    const f=this.state.fila.find(x=>x.id===d.filaId);
+    if(!f) return this.modalShell('Oferecer vaga',html`<div style=${{color:c.faint,padding:'12px'}}>Item não encontrado na fila.</div>`,html`${this.btnS('Fechar',()=>this.closeModal())}`);
+    const p=this.patient(f.patientId); const pm=this.prioMeta(f.prio);
+    const profIds=this.filaProfIds(f);
+    const profName=(id)=>{ const pr=this.state.profs.find(x=>x.id===id); return pr?pr.nome.replace(/^Dra?\.\s*/,''):''; };
+    const vagas=this.filaVagas(f);
+    const byDate={}; vagas.forEach(v=>{ (byDate[v.date]=byDate[v.date]||[]).push(v); });
+    const dates=Object.keys(byDate).sort().slice(0,6);
+    const janLabel=f.janela&&f.janela!=='qualquer'?(f.janela==='manhã'?'Manhã':'Tarde'):'Qualquer horário';
+    const rulesTxt=(f.regras||[]).filter(r=>!this.filaRegraExpirada(r)).map(r=>this.filaRegraLabel(r)).join('  ·  ');
+    const body=html`<div>
+      <div style=${{display:'flex',alignItems:'center',gap:'11px',paddingBottom:'12px',marginBottom:'14px',borderBottom:'1px solid '+c.bs}}>
+        ${this.avatar(p.nome,this.profColor(profIds[0]||'p1'),38)}
+        <div style=${{flex:1,minWidth:0}}>
+          <div style=${{fontWeight:600,fontSize:'14px'}}>${p.nome}</div>
+          <div style=${{fontSize:'11.5px',color:c.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${janLabel}${rulesTxt?'  ·  '+rulesTxt:''}  ·  ${profIds.length?profIds.map(profName).join(', '):'Qualquer profissional'}</div>
+        </div>
+        <span style=${{flexShrink:0,fontSize:'10.5px',fontWeight:700,color:'#fff',background:pm.color,padding:'2px 9px',borderRadius:'999px'}}>${pm.label}</span>
+      </div>
+      ${dates.length?html`<div style=${{fontSize:'12.5px',color:c.muted,marginBottom:'12px',display:'flex',alignItems:'center',gap:'7px'}}><${Icon} name="Sparkles" size=${15} color=${c.teal.text}/> <span>Horários livres que batem com a disponibilidade — clique para pré-preencher o agendamento.</span></div>
+      <div style=${{display:'flex',flexDirection:'column',gap:'12px',maxHeight:'320px',overflow:'auto',margin:'0 -2px',padding:'0 2px'}}>
+        ${dates.map(dt=>{ const dd=new Date(dt+'T00:00'); const head=dd.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'}); const slots=byDate[dt].slice(0,8);
+          return html`<div key=${dt}>
+            <div style=${{fontSize:'11px',fontWeight:600,color:c.faint,textTransform:'capitalize',marginBottom:'7px',letterSpacing:'.02em'}}>${head}</div>
+            <div style=${{display:'flex',flexWrap:'wrap',gap:'7px'}}>
+              ${slots.map(v=>html`<button key=${v.profId+'-'+v.start} onClick=${()=>this.offerVaga(f,v)} style=${{display:'inline-flex',alignItems:'center',gap:'8px',padding:'8px 12px',borderRadius:'9px',border:'1px solid '+c.teal.border,background:c.teal.subtle,color:c.teal.text,cursor:'pointer',fontSize:'12.5px'}}>
+                <span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700,fontSize:'13px'}}>${this.m2t(v.start)}</span>
+                <span style=${{fontWeight:500,color:c.muted,display:'inline-flex',alignItems:'center',gap:'4px'}}>${this.avatar(profName(v.profId),this.profColor(v.profId),16)} ${profName(v.profId)}</span>
+                ${v.freed?html`<span style=${{fontSize:'9px',fontWeight:700,letterSpacing:'.04em',color:c.teal.text,background:c.surface,border:'1px solid '+c.teal.border,borderRadius:'4px',padding:'1px 5px'}}>ABRIU</span>`:''}
+              </button>`)}
+            </div>
+          </div>`;})}
+      </div>`
+      :html`<div style=${{textAlign:'center',padding:'28px 16px',color:c.faint}}>
+        <${Icon} name="CalendarClock" size=${26}/>
+        <div style=${{fontSize:'13.5px',fontWeight:600,color:c.muted,marginTop:'10px'}}>Nenhuma vaga compatível nos próximos 14 dias</div>
+        <div style=${{fontSize:'12.5px',marginTop:'3px',maxWidth:'340px',margin:'3px auto 0'}}>A disponibilidade do paciente não coincide com horários livres. Reveja a disponibilidade ou agende manualmente.</div>
+      </div>`}
+    </div>`;
+    const footer=vagas.length
+      ? html`<div style=${{display:'flex',gap:'9px',width:'100%',justifyContent:'space-between',alignItems:'center'}}><span style=${{fontSize:'12px',color:c.faint}}>${vagas.length} horário${vagas.length>1?'s':''} livre${vagas.length>1?'s':''}</span><div style=${{display:'flex',gap:'9px'}}>${this.btnS('Fechar',()=>this.closeModal())}<button onClick=${()=>this.openModal('novoAgendamento',{patientId:f.patientId,profId:profIds[0]||undefined,date:this.state.date,_fromFila:f.id})} style=${{padding:'9px 14px',borderRadius:'8px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontWeight:600,cursor:'pointer',fontSize:'13.5px'}}>Outro horário</button></div></div>`
+      : html`${this.btnS('Fechar',()=>this.closeModal())}${this.btnP('Agendar manualmente',()=>this.openModal('novoAgendamento',{patientId:f.patientId,profId:profIds[0]||undefined,date:this.state.date,_fromFila:f.id}))}`;
+    return this.modalShell('Oferecer vaga — '+p.nome.split(' ')[0],body,footer,'560px');
+  }
 
   // ================= PACIENTES =================
   renderPacientes(){
@@ -2122,8 +2247,8 @@ class Component extends DCLogic {
         <div style=${{fontSize:'13.5px',fontWeight:600,color:c.muted,marginTop:'10px'}}>Nenhum paciente na fila${fp!=='todas'?' com esta prioridade':''}</div>
         <div style=${{fontSize:'12.5px',marginTop:'2px'}}>Adicione um paciente que aguarda vaga para encaixe.</div>
       </div>`
-      :narrow?html`<div style=${{display:'flex',flexDirection:'column',gap:'10px'}}>${list.map(f=>{const p=this.patient(f.patientId); const pm=this.prioMeta(f.prio); const profIds=this.filaProfIds(f); const firstProf=this.state.profs.find(x=>x.id===profIds[0]); const profNomes=profIds.length?profIds.map(id=>{const pr=this.state.profs.find(x=>x.id===id); return pr?pr.nome.replace(/^Dra?\.\s*/,''):null;}).filter(Boolean).join(', '):'Qualquer'; const regras=f.regras||[]; const jan=f.janela&&f.janela!=='qualquer'?f.janela:null;
-        return html`<div key=${f.id} style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'12px',padding:'13px 14px'}}>
+      :narrow?html`<div style=${{display:'flex',flexDirection:'column',gap:'10px'}}>${list.map(f=>{const p=this.patient(f.patientId); const pm=this.prioMeta(f.prio); const profIds=this.filaProfIds(f); const firstProf=this.state.profs.find(x=>x.id===profIds[0]); const profNomes=profIds.length?profIds.map(id=>{const pr=this.state.profs.find(x=>x.id===id); return pr?pr.nome.replace(/^Dra?\.\s*/,''):null;}).filter(Boolean).join(', '):'Qualquer'; const regras=f.regras||[]; const jan=f.janela&&f.janela!=='qualquer'?f.janela:null; const vagas=this.filaVagas(f); const hasVaga=vagas.length>0;
+        return html`<div key=${f.id} style=${{background:c.surface,border:'1px solid '+c.bs,borderRadius:'12px',padding:'13px 14px',boxShadow:hasVaga?('inset 3px 0 0 '+c.teal.solid):'none'}}>
           <div style=${{display:'flex',alignItems:'center',gap:'10px'}}>
             ${this.avatar(p.nome,this.profColor(firstProf||'p1'),34)}
             <div style=${{flex:1,minWidth:0}}>
@@ -2133,13 +2258,10 @@ class Component extends DCLogic {
             <span style=${{flexShrink:0,fontSize:'10px',fontWeight:700,color:'#fff',background:pm.color,padding:'2px 9px',borderRadius:'999px'}}>${pm.label}</span>
           </div>
           ${f.obs?html`<div style=${{fontSize:'12px',color:c.muted,marginTop:'8px'}}>${f.obs}</div>`:''}
-          <div style=${{display:'flex',flexWrap:'wrap',gap:'5px',alignItems:'center',marginTop:'9px'}}>
-            ${jan?chip(jan==='manhã'?'Manhã':'Tarde',false,false):(regras.length?'':chip('Qualquer horário',false,false))}
-            ${regras.map((r)=>{const exp=this.filaRegraExpirada(r); const pre=this.filaRegraPrefix(r); return this.filaRegraPeriodos(r).map((pp,pi)=>chip(pre+' · '+pp[0]+'–'+pp[1],exp,true));})}
-          </div>
+          <div style=${{marginTop:'9px'}}>${this.filaDispCell(f,vagas)}</div>
           <div style=${{display:'flex',alignItems:'center',gap:'6px',marginTop:'9px',fontSize:'12px',color:c.muted}}><${Icon} name="Stethoscope" size=${13}/> <span style=${{minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>${profNomes}</span></div>
           <div style=${{display:'flex',gap:'8px',marginTop:'12px'}}>
-            <button onClick=${()=>{this.openModal('novoAgendamento',{patientId:f.patientId,profId:profIds[0]||undefined,date:this.state.date}); }} style=${{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+c.teal.border,background:'transparent',color:c.teal.text,fontWeight:600,cursor:'pointer',fontSize:'13px'}}>Oferecer vaga</button>
+            <button onClick=${()=>this.openModal('oferecer',{filaId:f.id})} style=${{flex:1,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'9px',borderRadius:'8px',border:'1px solid '+(hasVaga?c.teal.border:c.bd),background:hasVaga?c.teal.subtle:'transparent',color:hasVaga?c.teal.text:c.muted,fontWeight:600,cursor:'pointer',fontSize:'13px'}}>${hasVaga?html`<span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.teal.solid}}></span>`:''}Oferecer vaga</button>
             <button onClick=${()=>this.openModal('addFila',{...f})} title="Editar" style=${{width:'40px',height:'40px',display:'grid',placeItems:'center',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.muted,cursor:'pointer'}}><${Icon} name="Pencil" size=${15}/></button>
             <button onClick=${()=>this.resolveFila(f.id)} title="Excluir da fila" style=${{width:'40px',height:'40px',display:'grid',placeItems:'center',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,cursor:'pointer'}}><${Icon} name="Trash2" size=${15} color=${c.danger}/></button>
           </div>
@@ -2149,8 +2271,8 @@ class Component extends DCLogic {
           <div style=${{display:'grid',gridTemplateColumns:gcols,gap:'16px',padding:'12px 16px 9px 16px',borderBottom:'1px solid '+c.bs}}>
             ${hcell('Paciente')}${hcell('Prioridade')}${hcell('Disponibilidade')}${hcell('Profissional')}${hcell('Espera',true)}${hcell('',true)}
           </div>
-          ${list.map((f,ri)=>{const p=this.patient(f.patientId); const pm=this.prioMeta(f.prio); const profIds=this.filaProfIds(f); const firstProf=this.state.profs.find(x=>x.id===profIds[0]); const profNomes=profIds.length?profIds.map(id=>{const pr=this.state.profs.find(x=>x.id===id); return pr?pr.nome.replace(/^Dra?\.\s*/,''):null;}).filter(Boolean).join(', '):'Qualquer'; const regras=f.regras||[]; const jan=f.janela&&f.janela!=='qualquer'?f.janela:null;
-          return html`<div key=${f.id} style=${{display:'grid',gridTemplateColumns:gcols,gap:'16px',padding:'11px 16px',borderBottom:'1px solid '+c.bs,alignItems:'center'}}>
+          ${list.map((f,ri)=>{const p=this.patient(f.patientId); const pm=this.prioMeta(f.prio); const profIds=this.filaProfIds(f); const firstProf=this.state.profs.find(x=>x.id===profIds[0]); const profNomes=profIds.length?profIds.map(id=>{const pr=this.state.profs.find(x=>x.id===id); return pr?pr.nome.replace(/^Dra?\.\s*/,''):null;}).filter(Boolean).join(', '):'Qualquer'; const regras=f.regras||[]; const jan=f.janela&&f.janela!=='qualquer'?f.janela:null; const vagas=this.filaVagas(f); const hasVaga=vagas.length>0;
+          return html`<div key=${f.id} style=${{display:'grid',gridTemplateColumns:gcols,gap:'16px',padding:'11px 16px',borderBottom:'1px solid '+c.bs,alignItems:'center',boxShadow:hasVaga?('inset 3px 0 0 '+c.teal.solid):'none'}}>
             <div style=${{display:'flex',alignItems:'center',gap:'10px',minWidth:0}}>
               ${this.avatar(p.nome,this.profColor(firstProf||'p1'),30)}
               <div style=${{minWidth:0}}>
@@ -2159,14 +2281,11 @@ class Component extends DCLogic {
               </div>
             </div>
             <div><span style=${{display:'inline-block',fontSize:'10px',fontWeight:700,color:'#fff',background:pm.color,padding:'2px 9px',borderRadius:'999px'}}>${pm.label}</span></div>
-            <div style=${{display:'flex',flexWrap:'wrap',gap:'5px',alignItems:'center'}}>
-              ${jan?chip(jan==='manhã'?'Manhã':'Tarde',false,false):(regras.length?'':chip('Qualquer horário',false,false))}
-              ${regras.map((r)=>{const exp=this.filaRegraExpirada(r); const pre=this.filaRegraPrefix(r); return this.filaRegraPeriodos(r).map((pp,pi)=>chip(pre+' · '+pp[0]+'–'+pp[1],exp,true));})}
-            </div>
+            <div>${this.filaDispCell(f,vagas)}</div>
             <div style=${{fontSize:'12px',color:c.muted,minWidth:0}}>${profNomes}</div>
             <div style=${{textAlign:'right'}}><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'14px',fontWeight:600,fontVariantNumeric:'tabular-nums',color:f.dias>=7?c.warning:c.text}}>${f.dias}</span><div style=${{fontSize:'10px',color:c.faint,letterSpacing:'.03em'}}>dia${f.dias===1?'':'s'}</div></div>
             <div style=${{display:'flex',alignItems:'center',gap:'6px',justifyContent:'flex-end'}}>
-              <button onClick=${()=>{this.openModal('novoAgendamento',{patientId:f.patientId,profId:profIds[0]||undefined,date:this.state.date}); }} title="Oferecer vaga" style=${{padding:'7px 12px',borderRadius:'7px',border:'1px solid '+c.teal.border,background:'transparent',color:c.teal.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px',whiteSpace:'nowrap'}}>Oferecer</button>
+              <button onClick=${()=>this.openModal('oferecer',{filaId:f.id})} title=${hasVaga?('Próxima vaga: '+this.vagaLabel(vagas[0])+' '+this.m2t(vagas[0].start)):'Sem vaga compatível — oferecer manualmente'} style=${{display:'inline-flex',alignItems:'center',gap:'6px',padding:'7px 12px',borderRadius:'7px',border:'1px solid '+(hasVaga?c.teal.border:c.bd),background:hasVaga?c.teal.subtle:'transparent',color:hasVaga?c.teal.text:c.muted,fontWeight:600,cursor:'pointer',fontSize:'12.5px',whiteSpace:'nowrap'}}>${hasVaga?html`<span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.teal.solid}}></span>`:''}Oferecer</button>
               <button onClick=${()=>this.openModal('addFila',{...f})} title="Editar" style=${this.iconBtn(c)}><${Icon} name="Pencil" size=${14}/></button>
               <button onClick=${()=>this.resolveFila(f.id)} title="Excluir da fila" style=${this.iconBtn(c)}><${Icon} name="Trash2" size=${14} color=${c.danger}/></button>
             </div>
