@@ -23,6 +23,7 @@
   @keyframes mvScale{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:none}}
   @keyframes mvSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
   @keyframes mvSlideL{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+  @keyframes mvRing{0%{transform:scale(.9);opacity:.5}70%{opacity:0}100%{transform:scale(2.3);opacity:0}}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:rgba(140,150,160,.32);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
   ::-webkit-scrollbar-thumb:hover{background:rgba(140,150,160,.5)}
@@ -57,17 +58,20 @@ class Component extends DCLogic {
     ];
     const wd=['dom','seg','ter','qua','qui','sex','sáb'];
     // Profissionais seguem o horário da clínica por padrão (followClinic). avail guarda apenas exceções por dia da semana.
-    profs.forEach(p=>{p.followClinic=true; p.avail={};});
+    profs.forEach(p=>{p.followClinic=true; p.avail={}; p.exc=[];});
     // Ex.: Dra. Beatriz segue integralmente o horário da clínica.
     // Ex.: Dr. Thiago tem horário próprio (personalizado), sempre dentro do horário da clínica: quarta só de manhã e não atende aos sábados.
     profs[3].followClinic=false;
     profs[3].avail={1:[['08:00','12:00'],['13:00','18:00']],2:[['08:00','12:00'],['13:00','18:00']],3:[['08:00','12:00']],4:[['08:00','12:00'],['13:00','18:00']],5:[['08:00','12:00'],['13:00','18:00']]};
+    // Exceções de data por profissional: folgas, férias, congressos ou um horário pontual — valem sobre o horário semanal, sempre dentro do funcionamento da clínica.
+    profs[0].exc=[{id:'pe1',data:'2026-07-13',nome:'Congresso Brasileiro de Ortopedia',tipo:'fechado'}];
+    profs[1].exc=[{id:'pe2',data:'2026-07-16',nome:'Chega mais tarde — compromisso pessoal',tipo:'horario',periods:[['13:00','18:00']]}];
     const types=[
-      {id:'t1',nome:'Avaliação',dur:50,cor:'#0072B2',icon:'ClipboardList',grupo:false},
-      {id:'t2',nome:'Sessão',dur:50,cor:'#0FB5A6',icon:'Activity',grupo:false},
-      {id:'t3',nome:'RPG',dur:50,cor:'#009E73',icon:'StretchHorizontal',grupo:false},
-      {id:'t4',nome:'Pilates',dur:50,cor:'#CC79A7',icon:'Users',grupo:true,cap:4},
-      {id:'t5',nome:'Reavaliação',dur:30,cor:'#7A52CC',icon:'RefreshCw',grupo:false},
+      {id:'t1',nome:'Avaliação',dur:50,cor:'#0072B2',icon:'ClipboardList',grupo:false,sigla:'AVA'},
+      {id:'t2',nome:'Sessão',dur:50,cor:'#0FB5A6',icon:'Activity',grupo:false,sigla:'SES'},
+      {id:'t3',nome:'RPG',dur:50,cor:'#009E73',icon:'StretchHorizontal',grupo:false,sigla:'RPG'},
+      {id:'t4',nome:'Pilates',dur:50,cor:'#CC79A7',icon:'Users',grupo:true,cap:4,sigla:'PIL'},
+      {id:'t5',nome:'Reavaliação',dur:30,cor:'#7A52CC',icon:'RefreshCw',grupo:false,sigla:'REA'},
     ];
     const tagPool=['lombalgia','pós-op joelho','cervicalgia','tendinite','escoliose','pós-op ombro','LER/DORT','hérnia de disco','entorse tornozelo','fortalecimento','reabilitação esportiva','gestante'];
     const nomes=['Ana Beatriz Ferreira','Carlos Eduardo Ramos','Juliana Martins','Pedro Henrique Souza','Mariana Costa','Lucas Almeida','Fernanda Oliveira','Rafael Mendes','Camila Rocha','Bruno Carvalho','Larissa Pereira','Gustavo Lima','Patrícia Gomes','Rodrigo Barbosa','Vanessa Ribeiro','Felipe Cardoso','Aline Teixeira','Marcelo Pinto','Tatiane Araújo','Diego Nascimento','Sônia Castro','Eduardo Moraes','Beatriz Cunha','Henrique Dias'];
@@ -107,6 +111,18 @@ class Component extends DCLogic {
     });
     patients[4].faltas=2; patients[11].faltas=3; patients[18].faltas=1;
     [3,12].forEach(ix=>{ const pk=(patients[ix].pacotes||[]).find(x=>x.status==='ativo'); if(pk) pk.usadas=pk.total-1; });
+    // ---------- Showcase: Mariana Alves — "trilha do pacote" com múltiplos pacotes ----------
+    patients[0].nome='Mariana Alves'; patients[0].faltas=1; patients[0].email='mariana.alves@email.com'; patients[0].tags=['pós-op joelho','reabilitação esportiva'];
+    patients[0].pacotes=[
+      {id:'pkM1',typeId:'t2',nome:'Fisioterapia Ortopédica',cor:'#0072B2',total:10,usadas:9,status:'ativo',faltaPunitiva:false,renovadoDe:null,criado:'2026-06-01',grade:{dows:[1,3],horarios:{1:'08:00',3:'08:00'},profId:'p2'},sessoes:[
+        {data:'2026-06-01',estado:'concluida',hora:'08:00'},{data:'2026-06-03',estado:'concluida',hora:'08:00'},{data:'2026-06-08',estado:'concluida',hora:'08:00'},{data:'2026-06-10',estado:'feriado',hora:'08:00'},{data:'2026-06-15',estado:'concluida',hora:'08:00'},{data:'2026-06-17',estado:'concluida',hora:'08:00'},{data:'2026-06-22',estado:'falta',hora:'08:00'},{data:'2026-06-24',estado:'concluida',hora:'08:00'},{data:'2026-06-29',estado:'concluida',hora:'08:00'},{data:'2026-07-01',estado:'concluida',hora:'08:00'},{data:'2026-07-06',estado:'concluida',hora:'08:00'},{data:'2026-07-08',estado:'proxima',hora:'08:00'}
+      ]},
+      {id:'pkM2',typeId:'t4',nome:'Pilates Clínico',cor:'#CC79A7',total:8,usadas:3,status:'pausado',retomaEm:'2026-07-15',faltaPunitiva:false,renovadoDe:null,criado:'2026-06-02',grade:{dows:[2,4],horarios:{2:'14:00',4:'14:00'},profId:'p5'},sessoes:[
+        {data:'2026-06-02',estado:'concluida',hora:'14:00'},{data:'2026-06-04',estado:'concluida',hora:'14:00'},{data:'2026-06-09',estado:'concluida',hora:'14:00'},{data:'2026-06-11',estado:'segurada',hora:'14:00'},{data:'2026-06-16',estado:'segurada',hora:'14:00'},{data:'2026-06-18',estado:'segurada',hora:'14:00'},{data:'2026-06-23',estado:'segurada',hora:'14:00'},{data:'2026-06-25',estado:'segurada',hora:'14:00'}
+      ]},
+      {id:'pkM0',typeId:'t2',nome:'Fisioterapia Ortopédica',cor:'#0072B2',total:10,usadas:10,status:'concluido',renovadoDe:null,criado:'2026-01-08',periodo:'jan–fev',grade:{dows:[1,3],horarios:{1:'08:00',3:'08:00'},profId:'p2'}},
+      {id:'pkMr',typeId:'t3',nome:'RPG',cor:'#009E73',total:6,usadas:6,status:'concluido',renovadoDe:null,criado:'2026-03-04',periodo:'mar',grade:{dows:[3],horarios:{3:'09:00'},profId:'p3'}}
+    ];
 
     // ---------- appointments for today ----------
     const today=new Date(2026,5,25); // Thu Jun 25 2026
@@ -156,6 +172,31 @@ class Component extends DCLogic {
     // Horário da clínica: cada dia é uma lista de períodos (permite mais de um período no mesmo dia). null = fechado.
     const hours={1:[['08:00','12:00'],['13:00','18:00']],2:[['08:00','12:00'],['13:00','18:00']],3:[['08:00','12:00'],['13:00','18:00']],4:[['08:00','12:00'],['13:00','18:00']],5:[['08:00','12:00'],['13:00','18:00']],6:[['08:00','12:00']],0:null};
 
+    // ---------- agendamentos futuros (próximas semanas) ----------
+    // Populam a agenda dos próximos dias e dão base real às validações de mudança de horário/exceção.
+    (function(){
+      const ds2=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      const tm=(s)=>{const[h,m]=s.split(':').map(Number);return h*60+m;};
+      const pw=(pr,dow)=>{const av=pr.avail||{}; if(pr.followClinic!==false) return Object.prototype.hasOwnProperty.call(av,dow)?av[dow]:hours[dow]; return av[dow]||null;};
+      const periodsOn=(pr,d)=>{const k=ds2(d); const h=holidays.find(x=>x.data===k); if(h) return h.tipo==='horario'?(h.periods||[]):null; const pe=(pr.exc||[]).find(x=>x.data===k); if(pe) return pe.tipo==='horario'?(pe.periods||[]):null; return pw(pr,d.getDay());};
+      const pats=[[540,660,900],[480,780,1020],[600,840],[480,960,1020],[540,660,900],[600,780,1020]];
+      let fa=100000, dc=0;
+      for(let d=new Date(2026,5,26); d<=new Date(2026,6,18); d.setDate(d.getDate()+1), dc++){
+        const k=ds2(d);
+        profs.forEach((pr,pi)=>{
+          const per=periodsOn(pr,d); if(!per||!per.length) return;
+          const pat=pats[(pi+dc)%pats.length];
+          pat.forEach((st,si)=>{
+            const tlist=profType[pr.id]; const tid=tlist[(pi+si+dc)%tlist.length]; const tp=types.find(t=>t.id===tid);
+            if(!per.some(p=>st>=tm(p[0]) && st+tp.dur<=tm(p[1]))) return;
+            const status=(si+dc)%2===0?'confirmado':'agendado';
+            if(tp.grupo){const ppl=[]; const m=2+((pi+dc)%3); for(let z=0;z<m;z++) ppl.push('pac'+(((pi*3+si*5+z+dc)%24)+1)); appts.push({id:'af'+(fa++),profId:pr.id,typeId:tid,start:st,dur:tp.dur,date:k,status,patientIds:ppl,encaixe:false});}
+            else appts.push({id:'af'+(fa++),profId:pr.id,typeId:tid,start:st,dur:tp.dur,date:k,status,patientId:'pac'+(((pi*4+si*7+dc)%24)+1),encaixe:false});
+          });
+        });
+      }
+    })();
+
     // Membros da organização (acesso/login). Distinto de "profissionais": o vínculo é opcional (profId) e único.
     // Repare: Thiago Alves (p4) e Carla Reis (p5) são profissionais SEM acesso ao sistema.
     const membros=[
@@ -166,10 +207,65 @@ class Component extends DCLogic {
       {id:'u5',nome:'João Pereira',email:'recepcao@movimento.com.br',papel:'membro',profId:null,status:'ativo',acesso:'Há 20 min'},
     ];
 
+    // ---------- Pacotes: gerar agendamentos reais (fonte única de verdade) ----------
+    // Cada sessão de pacote vira um agendamento real na agenda (pkgId). A trilha, o contador
+    // "usadas", o histórico do paciente e a agenda passam a derivar desses agendamentos.
+    (function(self){
+      const isHol=(ds)=>holidays.some(h=>h.data===ds && h.tipo!=='horario');
+      const nextGrade=(fromDs,dows,inclusive)=>{ let cur=new Date(fromDs+'T00:00'); if(!inclusive) cur.setDate(cur.getDate()+1); let g=0; while(g<800){ if(dows.includes(cur.getDay())) return self.dstr(cur); cur.setDate(cur.getDate()+1); g++; } return fromDs; };
+      let sid=900000;
+      const mk=(p,pk,tp,ds,status,extra)=>{ const g=pk.grade||{}; const hor=g.horarios||{}; const dw=new Date(ds+'T00:00').getDay(); const hh=hor[dw]||Object.values(hor)[0]||'08:00'; return Object.assign({id:'pa'+(sid++),profId:g.profId||(p.prefs&&p.prefs[0])||'p1',typeId:pk.typeId,start:self.t2m(hh),dur:tp.dur,date:ds,status,patientId:p.id,pkgId:pk.id,encaixe:false},extra||{}); };
+      patients.forEach(p=>{ (p.pacotes||[]).forEach(pk=>{
+        const tp=types.find(t=>t.id===pk.typeId)||types[1];
+        if(Array.isArray(pk.sessoes)&&pk.sessoes.length){
+          const map={concluida:'concluido',falta:'faltou',proxima:'agendado',agendada:'agendado',segurada:'agendado'};
+          pk.sessoes.forEach(s=>{ if(s.estado==='feriado') return; const st=map[s.estado]||'agendado'; const extra=s.estado==='segurada'?{pkgHold:true}:{}; appts.push(mk(p,pk,tp,s.data,st,extra)); });
+        } else {
+          const total=pk.total||10; const usadas=Math.min(total,pk.usadas!=null?pk.usadas:0);
+          const dows=((pk.grade||{}).dows)||[1,3]; const paused=pk.status==='pausado'; const canceled=pk.status==='cancelado';
+          let cur=pk.criado||self.hoje(); let inclusive=true; let n=0; let guard=0;
+          while(n<total && guard<800){ guard++; const ds=nextGrade(cur,dows,inclusive); inclusive=false; cur=ds; if(isHol(ds)) continue;
+            let status='agendado', extra={};
+            if(n<usadas) status='concluido'; else if(canceled) status='cancelado'; else if(paused){ status='agendado'; extra={pkgHold:true}; }
+            appts.push(mk(p,pk,tp,ds,status,extra)); n++;
+          }
+        }
+      }); });
+    })(this);
+
+    // ---------- Showcase: pacotes visíveis na agenda de hoje (múltiplos pacotes, cores distintas) ----------
+    // Converte alguns agendamentos de hoje em sessões de pacote reais (pkgId + pacote no paciente),
+    // para demonstrar a identificação na agenda e a coexistência de vários pacotes.
+    (function(self){
+      const todayDs=ds; const dw=new Date(todayDs+'T00:00').getDay();
+      const defs=[
+        {nome:'Fisioterapia Ortopédica',cor:'#0072B2',typeId:'t2'},
+        {nome:'RPG Cervical',cor:'#009E73',typeId:'t3'},
+        {nome:'Pilates Clínico',cor:'#CC79A7',typeId:'t2'},
+        {nome:'Reabilitação Esportiva',cor:'#D55E00',typeId:'t2'},
+      ];
+      const seen=new Set(); const picks=[];
+      appts.filter(a=>a.date===todayDs && !a.patientIds && !a.pkgId && a.patientId!=='pac1' && ['confirmado','agendado','concluido','em_atendimento'].includes(a.status))
+        .sort((a,b)=>a.start-b.start)
+        .forEach(a=>{ if(picks.length>=4||seen.has(a.profId)) return; seen.add(a.profId); picks.push(a); });
+      let scid=960000;
+      picks.forEach((a,i)=>{
+        const def=defs[i%defs.length]; const p=patients.find(x=>x.id===a.patientId); if(!p) return;
+        const tp=types.find(t=>t.id===def.typeId)||types[1]; const pkId='pkSC'+(i+1);
+        const pk={id:pkId,typeId:def.typeId,nome:def.nome,cor:def.cor,total:8,usadas:4,status:'ativo',faltaPunitiva:false,renovadoDe:null,criado:'2026-05-28',grade:{dows:[dw],horarios:{[dw]:self.m2t(a.start)},profId:a.profId}};
+        p.pacotes=[...(p.pacotes||[]),pk];
+        a.pkgId=pkId; a.typeId=def.typeId; a.dur=tp.dur;
+        const sib=(date,status)=>appts.push({id:'pa'+(scid++),profId:a.profId,typeId:def.typeId,start:a.start,dur:tp.dur,date,status,patientId:p.id,pkgId:pkId,encaixe:false});
+        let cur=new Date(todayDs+'T00:00'); const past=[]; for(let k=0;k<4;k++){ cur.setDate(cur.getDate()-7); past.push(self.dstr(cur)); }
+        past.forEach(dsx=>sib(dsx,'concluido'));
+        cur=new Date(todayDs+'T00:00'); for(let k=0;k<3;k++){ cur.setDate(cur.getDate()+7); sib(self.dstr(cur),'agendado'); }
+      });
+    })(this);
+
     this.cat=cat; this.wd=wd;
     this.state={
-      ready:false, screen:'agenda', dark:false, density:'espacoso',
-      view:'dia', date:ds, drawer:null, modal:null, modalData:{}, selPaciente:null,
+      ready:false, screen:'pacientes', dark:false, density:'espacoso',
+      view:'dia', date:ds, drawer:null, modal:null, modalData:{}, conflictData:null, selPaciente:'pac1',
       profs, types, patients, appts, fila, holidays, hours, membros,
       settings:{capPilates:4, noShowConsome:false, slot:15},
       w:1440, toast:null, drag:null, ghost:null, configTab:'tipos', filtroPac:'', pacQuery:'', pacFiltro:'todos', filaPrio:'todas', repPeriodo:'mes', repProf:'todos', profFiltro:'todos',
@@ -226,16 +322,18 @@ class Component extends DCLogic {
   // ---------- pacotes ----------
   pkgList(p){ return (p&&p.pacotes)||[]; }
   pkgActive(p){ return this.pkgList(p).find(pk=>pk.status==='ativo') || null; }
-  pkgRemaining(pk){ return Math.max(0, pk.total - pk.usadas); }
+  // "usadas" derivado: sessões realmente consumidas (concluídas sempre; faltas só quando punitivas e não justificadas).
+  pkgUsadas(pk){ return this.pkgAppts(pk).reduce((n,a)=>n+(this.wouldConsume(a,a.status,pk)?1:0),0); }
+  pkgRemaining(pk){ return Math.max(0, pk.total - this.pkgUsadas(pk)); }
   pkgEnding(pk){ const r=this.pkgRemaining(pk); return pk.status==='ativo' && r>0 && r<=2; }
   pkgDone(pk){ return pk.status==='concluido' || this.pkgRemaining(pk)===0; }
   pkgAppts(pk){ return this.state.appts.filter(a=>a.pkgId===pk.id||(a.pkgOf&&Object.values(a.pkgOf).includes(pk.id))).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start); }
   pkgLastDate(pk){ const ap=this.pkgAppts(pk); return ap.length?ap[ap.length-1].date:this.state.date; }
   dowLabel(i){ return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][i]; }
-  pkgGradeLabel(pk){ const g=pk.grade||{}; const h=g.horarios||{}; const dl=(g.dows||[]).slice().sort((a,b)=>a-b).map(d=>this.dowLabel(d)+(h[d]?' '+h[d]:'')); const pr=this.state.profs.find(x=>x.id===g.profId); return [dl.join(', '),pr?pr.nome:''].filter(Boolean).join(' · '); }
-  pkgStatusMeta(pk){ const c=this.theme(); if(this.pkgDone(pk)) return {label:'Concluído',color:c.faint,bg:c.surface2}; if(this.pkgEnding(pk)) return {label:'Acabando',color:c.warning,bg:this.tint(c.warning,.14)}; return {label:'Ativo',color:c.teal.text,bg:c.teal.subtle}; }
-  openAgendarPacote(patientId){ this.openModal('agendarPacote',{patientId:patientId||'', dows:[1,3], horarios:{1:'09:00',3:'09:00'}, n:10, typeId:'t2', profId:''}); }
-  openRenovar(patientId,pkgId){ const p=this.patient(patientId); const pk=this.pkgList(p).find(x=>x.id===pkgId); if(!pk) return; const g=pk.grade||{}; this.openModal('agendarPacote',{patientId, typeId:pk.typeId, n:pk.total, dows:g.dows||[1,3], horarios:{...(g.horarios||{})}, profId:g.profId||'', renovadoDe:pk.id, fromDate:this.pkgLastDate(pk)}); }
+  pkgGradeLabel(pk){ const g=pk.grade||{}; const h=g.horarios||{}; const dl=(g.dows||[]).slice().sort((a,b)=>a-b).map(d=>this.dowLabel(d)+(h[d]?' '+h[d]:'')); const pr=this.state.profs.find(x=>x.id===g.profId); return [dl.join(', '),g.profNome||(pr?pr.nome:'')].filter(Boolean).join(' · '); }
+  pkgStatusMeta(pk){ const c=this.theme(); if(pk.status==='pausado') return {label:'Pausado',color:c.muted,bg:c.surface2,icon:'Pause'}; if(pk.status==='renovado') return {label:'Renovado',color:c.teal.text,bg:c.teal.subtle,icon:'RefreshCw'}; if(pk.status==='cancelado') return {label:'Cancelado',color:c.danger,bg:this.tint(c.danger,.1),icon:'CalendarX2'}; if(this.pkgDone(pk)) return {label:'Concluído',color:c.faint,bg:c.surface2,icon:'CircleCheck'}; if(this.pkgEnding(pk)) return {label:'Acabando',color:c.warning,bg:this.tint(c.warning,.14),icon:'TriangleAlert'}; return {label:'Ativo',color:c.teal.text,bg:c.teal.subtle,icon:''}; }
+  openAgendarPacote(patientId){ this.openModal('agendarPacote',{patientId:patientId||'', dows:[1,3], horarios:{1:'09:00',3:'09:00'}, n:10, typeId:'t2', profId:'', inicio:this.hoje(), faltaPunitiva:!!this.state.settings.noShowConsome}); }
+  openRenovar(patientId,pkgId){ const p=this.patient(patientId); const pk=this.pkgList(p).find(x=>x.id===pkgId); if(!pk) return; this.setState({pkgMenu:null}); this.openModal('renovarPacote',{patientId, pkgId, n:pk.total}); }
   createPacote(d){
     const tp=this.type(d.typeId);
     const occ=this.computeSerie(d);
@@ -257,11 +355,11 @@ class Component extends DCLogic {
           appts.push({id:'a'+Date.now()+'-'+i,profId:d.profId,typeId:d.typeId,start:stt,dur:tp.dur,date:o.data,status:'agendado',patientId:d.patientId,encaixe:bad,pkgId:pkId}); created++;
         }
       });
-      const pk={id:pkId,typeId:d.typeId,total:d.n,usadas:0,grade:{dows:d.dows,horarios:{...(d.horarios||{})},profId:d.profId},criado:d.fromDate||this.state.date,status:'ativo',renovadoDe:d.renovadoDe||null,grupo:isGroup};
+      const pk={id:pkId,typeId:d.typeId,total:d.n,usadas:0,grade:{dows:d.dows,horarios:{...(d.horarios||{})},profId:d.profId,profNome:d.profNome},criado:(nonHol[0]?nonHol[0].data:(d.fromDate||this.state.date)),status:'ativo',renovadoDe:d.renovadoDe||null,grupo:isGroup,faltaPunitiva:!!d.faltaPunitiva,nome:d.nome,cor:d.cor};
       const patients=st.patients.map(p=>{
         if(p.id!==d.patientId) return p;
         let pacotes=p.pacotes||[];
-        if(d.renovadoDe) pacotes=pacotes.map(x=>x.id===d.renovadoDe?{...x,status:'concluido'}:x);
+        if(d.renovadoDe) pacotes=pacotes.map(x=>x.id===d.renovadoDe?{...x,status:'renovado'}:x);
         return {...p,pacotes:[...pacotes,pk]};
       });
       return {appts,patients};
@@ -272,53 +370,333 @@ class Component extends DCLogic {
     const detail=isGroup&&joined?(' ('+joined+' em turma'+(created?', '+created+' nova'+(created>1?'s':''):'')+')'):'';
     this.toast((d.renovadoDe?'Pacote renovado — ':'Pacote criado — ')+total+' sessões'+detail+(skip?' · '+skip+' feriado pulado'+(skip>1?'s':''):''));
   }
+  // ---------- pacotes: tipo/cor/sessões (trilha) ----------
+  pkgTypeColor(pk){ return (pk&&pk.cor) || ((this.type(pk.typeId)||{}).cor) || this.theme().teal.solid; }
+  pkgTypeName(pk){ return (pk&&pk.nome) || ((this.type(pk.typeId)||{}).nome) || 'Pacote'; }
+  // ---- identificador do pacote: SIGLA-AAMM (derivado do tipo + data de criação) ----
+  pkgOwner(pk){ return this.state.patients.find(p=>(p.pacotes||[]).some(x=>x.id===pk.id)); }
+  pkgSigla(pk){ const tp=this.type(pk.typeId)||{}; return tp.sigla||((tp.nome||'PKG').replace(/[^A-Za-zÀ-ÿ]/g,'').slice(0,3).toUpperCase())||'PKG'; }
+  pkgBaseCode(pk){ const d=new Date((pk.criado||this.hoje())+'T00:00'); return this.pkgSigla(pk)+'-'+String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0'); }
+  pkgCode(pk){ const base=this.pkgBaseCode(pk); const owner=this.pkgOwner(pk); if(owner){ const same=(owner.pacotes||[]).filter(x=>this.pkgBaseCode(x)===base).sort((a,b)=>((a.criado||'').localeCompare(b.criado||''))||String(a.id).localeCompare(String(b.id))); if(same.length>1){ const idx=same.findIndex(x=>x.id===pk.id); if(idx>0) return base+'·'+(idx+1); } } return base; }
+  pkgTipoLabel(pk){ const tp=this.type(pk.typeId)||{}; return (tp.nome||'—')+(tp.dur?(' · '+tp.dur+'min'):''); }
+  pkgFmtLong(ds){ if(!ds) return ''; const d=new Date(ds+'T00:00'); const m=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][d.getMonth()]; return String(d.getDate()).padStart(2,'0')+'/'+m; }
+  pkgIsCurrent(pk){ return pk.status==='ativo' || pk.status==='pausado'; }
+  pkgFmt(ds){ if(!ds) return ''; const dd=new Date(ds+'T00:00'); return String(dd.getDate()).padStart(2,'0')+'/'+String(dd.getMonth()+1).padStart(2,'0'); }
+  pkgEstadoLabel(e){ return {concluida:'Concluída',proxima:'Próxima',agendada:'Agendada',segurada:'Segurada',falta:'Falta',feriado:'Feriado'}[e]||e; }
+  pkgSessions(pk){
+    const list=this.pkgAppts(pk).filter(a=>a.status!=='cancelado');
+    const hoje=this.hoje();
+    const upcoming=list.filter(a=>!a.pkgHold && ['agendado','confirmado','em_atendimento'].includes(a.status) && a.date>=hoje).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start);
+    const nextId=upcoming.length?upcoming[0].id:null;
+    return list.map(a=>{ let estado; if(a.pkgHold) estado='segurada'; else if(a.status==='concluido') estado='concluida'; else if(a.status==='faltou') estado='falta'; else if(a.id===nextId) estado='proxima'; else estado='agendada'; return {data:a.date,estado,hora:this.m2t(a.start),dow:new Date(a.date+'T00:00').getDay(),apptId:a.id}; });
+  }
+  pkgNext(pk){ const s=this.pkgSessions(pk); return s.find(x=>x.estado==='proxima')||s.find(x=>x.estado==='agendada')||null; }
+  pkgDot(s,col,size,key,opts){
+    const c=this.theme(); const html=this.html; const sz=(size||14)+'px'; opts=opts||{};
+    const title=this.dowLabel(s.dow)+' '+this.pkgFmt(s.data)+(s.hora?(' '+s.hora):'')+' · '+this.pkgEstadoLabel(s.estado);
+    let sty={width:sz,height:sz,borderRadius:'50%',flexShrink:0,boxSizing:'border-box',display:'grid',placeItems:'center',position:'relative'}; let inner=null;
+    if(s.estado==='concluida'){ sty.background=col; }
+    else if(s.estado==='proxima'){ sty.background=col; sty.boxShadow='0 0 0 3px '+this.tint(col,.25); inner=html`<span style=${{position:'absolute',inset:'-2px',borderRadius:'50%',border:'2px solid '+col,animation:'mvRing 1.7s ease-out infinite',pointerEvents:'none'}}></span>`; }
+    else if(s.estado==='agendada'){ sty.background='transparent'; sty.border='2px solid '+this.tint(col,.5); }
+    else if(s.estado==='segurada'){ sty.background='transparent'; sty.border='2px dashed '+this.tint(col,.55); sty.opacity=.5; }
+    else if(s.estado==='falta'){ sty.background=c.danger; inner=html`<span style=${{color:'#fff',fontSize:Math.round((size||14)*0.72)+'px',fontWeight:700,lineHeight:1,marginTop:'-1px'}}>×</span>`; }
+    else if(s.estado==='feriado'){ sty.background=c.surface2; sty.border='1.5px dashed '+c.bd; sty.opacity=.75; }
+    if(opts.noClick) return html`<span key=${key} title=${title} style=${sty}>${inner}</span>`;
+    const dk=(opts.pkId?opts.pkId+'-':'')+(s.apptId||(key+'-'+s.data));
+    const open=this.state.dotPop===dk; sty.cursor='pointer';
+    const bg=c.d?'#e8eaed':'#1b1f24'; const fg=c.d?'#1b1f24':'#fff';
+    const pop=open?html`<span>
+      <span onClick=${e=>{e.stopPropagation(); this.setState({dotPop:null});}} style=${{position:'fixed',inset:0,zIndex:60}}></span>
+      <span style=${{position:'absolute',bottom:'calc(100% + 8px)',left:'50%',transform:'translateX(-50%)',zIndex:61,background:bg,color:fg,padding:'5px 9px',borderRadius:'7px',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 8px 22px rgba(0,0,0,.3)',pointerEvents:'none'}}>${this.dowLabel(s.dow)}, ${this.pkgFmtLong(s.data)}${s.hora?(' · '+s.hora):''} · ${this.pkgEstadoLabel(s.estado)}<span style=${{position:'absolute',top:'100%',left:'50%',transform:'translateX(-50%)',width:0,height:0,borderLeft:'5px solid transparent',borderRight:'5px solid transparent',borderTop:'5px solid '+bg}}></span></span>
+    </span>`:null;
+    return html`<span key=${key} title=${title} onClick=${e=>{e.stopPropagation(); this.setState(st=>({dotPop:st.dotPop===dk?null:dk}));}} style=${sty}>${inner}${pop}</span>`;
+  }
+  pkgTrail(pk){ const html=this.html; const col=this.pkgTypeColor(pk); const ses=this.pkgSessions(pk); return html`<div style=${{display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center'}}>${ses.map((s,i)=>this.pkgDot(s,col,14,'d'+i,{pkId:pk.id}))}</div>`; }
+
   pacotesCard(p){
     const c=this.theme(); const html=this.html; const Icon=this.Icon;
     const list=this.pkgList(p);
-    const active=this.pkgActive(p);
-    const ending=active?this.pkgEnding(active):false;
-    const hist=list.filter(pk=>pk!==active).slice().reverse();
-    const head=html`<div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'15px'}}><span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:c.teal.subtle,color:c.teal.text,flexShrink:0}}><${Icon} name="Package" size=${15}/></span><div style=${{fontWeight:700,fontSize:'14px',flex:1}}>Pacotes</div>${active?html`<button onClick=${()=>this.openAgendarPacote(p.id)} style=${{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',fontWeight:600,color:c.teal.text,background:'none',border:'none',cursor:'pointer',padding:0}}><${Icon} name="Plus" size=${14}/> Novo</button>`:null}</div>`;
-    let inner;
-    if(active){
-      const tp=this.type(active.typeId); const rem=this.pkgRemaining(active); const sm=this.pkgStatusMeta(active); const pct=Math.round(active.usadas/active.total*100);
-      inner=html`<div>
-        <div style=${{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'5px'}}>
-          <div style=${{display:'flex',alignItems:'center',gap:'8px'}}><span style=${{width:'9px',height:'9px',borderRadius:'3px',background:tp.cor}}></span><span style=${{fontWeight:700,fontSize:'14px'}}>${tp.nome}</span></div>
-          <span style=${{fontSize:'11px',fontWeight:700,padding:'2px 9px',borderRadius:'999px',background:sm.bg,color:sm.color}}>${sm.label}</span>
-        </div>
-        <div style=${{fontSize:'12px',color:c.muted,marginBottom:'13px',display:'flex',alignItems:'center',gap:'6px'}}><${Icon} name="CalendarClock" size=${13}/> ${this.pkgGradeLabel(active)}</div>
-        <div style=${{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:'6px'}}><span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'21px',fontWeight:700}}>${active.usadas}<span style=${{color:c.faint,fontSize:'14px'}}>/${active.total}</span></span><span style=${{fontSize:'12px',color:ending?c.warning:c.muted,fontWeight:ending?700:500}}>${rem} restante${rem===1?'':'s'}</span></div>
-        <div style=${{height:'9px',borderRadius:'5px',background:c.surface2,overflow:'hidden'}}><div style=${{width:pct+'%',height:'100%',background:ending?c.warning:c.teal.solid,transition:'width .3s'}}></div></div>
-        ${ending?html`<div style=${{marginTop:'12px',padding:'10px 12px',borderRadius:'10px',background:this.tint(c.warning,.12),display:'flex',gap:'9px',alignItems:'flex-start'}}><${Icon} name="TriangleAlert" size=${16} color=${c.warning} style=${{flexShrink:0,marginTop:'1px'}}/><div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'12.5px',fontWeight:600,color:c.text}}>Pacote acabando</div><div style=${{fontSize:'11.5px',color:c.muted,marginTop:'1px'}}>Renove para manter a grade fixa sem interrupção.</div></div></div>`:null}
-        <button onClick=${()=>this.openRenovar(p.id,active.id)} style=${{marginTop:'12px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'10px',borderRadius:'9px',border:'none',background:ending?c.warning:c.primary,color:ending?'#fff':c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="RefreshCw" size=${14}/> Renovar pacote</button>
-      </div>`;
-    } else {
-      inner=html`<div style=${{textAlign:'center',padding:'12px 8px'}}>
+    const current=list.filter(pk=>this.pkgIsCurrent(pk));
+    const hist=list.filter(pk=>!this.pkgIsCurrent(pk)).slice().reverse();
+    const anyRenew=current.some(pk=>(this.pkgEnding(pk)||this.pkgDone(pk))&&pk.status!=='pausado');
+    const histOpen=!!this.state.pkgHistOpen;
+    const addBtn=html`<button onClick=${()=>this.openAgendarPacote(p.id)} style=${{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',fontWeight:600,color:c.teal.text,background:'none',border:'none',cursor:'pointer',padding:'4px 7px',borderRadius:'7px'}} onMouseEnter=${e=>e.currentTarget.style.background=c.teal.subtle} onMouseLeave=${e=>e.currentTarget.style.background='none'}><${Icon} name="Plus" size=${14}/> Novo pacote</button>`;
+    const head=html`<div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:current.length?'16px':'6px'}}>
+      <span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:c.teal.subtle,color:c.teal.text,flexShrink:0}}><${Icon} name="Package" size=${15}/></span>
+      <div style=${{fontWeight:700,fontSize:'14px',flex:1}}>Pacotes${current.length>1?html` <span style=${{color:c.faint,fontWeight:600}}>· ${current.length} ativos</span>`:''}</div>
+      ${(current.length||hist.length)?addBtn:null}
+    </div>`;
+
+    let body;
+    if(!current.length && !hist.length){
+      body=html`<div style=${{textAlign:'center',padding:'14px 8px 6px'}}>
         <div style=${{width:'44px',height:'44px',borderRadius:'12px',display:'grid',placeItems:'center',background:c.surface2,margin:'0 auto 10px'}}><${Icon} name="Package" size=${20} color=${c.faint}/></div>
         <div style=${{fontSize:'13px',fontWeight:600,color:c.muted}}>Sem pacote ativo</div>
-        <div style=${{fontSize:'12px',color:c.faint,marginTop:'2px',marginBottom:'13px'}}>Agende um pacote e distribua a grade fixa da semana.</div>
+        <div style=${{fontSize:'12px',color:c.faint,margin:'2px auto 14px',maxWidth:'230px'}}>Agende um pacote e distribua a grade fixa da semana.</div>
         <button onClick=${()=>this.openAgendarPacote(p.id)} style=${{display:'inline-flex',alignItems:'center',gap:'7px',padding:'9px 16px',borderRadius:'9px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px'}}><${Icon} name="Plus" size=${15}/> Agendar pacote</button>
       </div>`;
+    } else if(!current.length){
+      body=html`<div style=${{textAlign:'center',padding:'8px 8px 4px'}}>
+        <div style=${{fontSize:'13px',fontWeight:600,color:c.muted}}>Sem pacote ativo</div>
+        <div style=${{fontSize:'12px',color:c.faint,margin:'2px 0 12px'}}>Pacotes anteriores estão no histórico abaixo.</div>
+        <button onClick=${()=>this.openAgendarPacote(p.id)} style=${{display:'inline-flex',alignItems:'center',gap:'7px',padding:'8px 15px',borderRadius:'9px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}><${Icon} name="Plus" size=${14}/> Agendar pacote</button>
+      </div>`;
+    } else {
+      body=html`<div style=${{display:'flex',flexDirection:'column'}}>${current.map((pk,i)=>this.pkgBlock(p,pk,i>0))}</div>`;
     }
-    const histBlock=hist.length?html`<div style=${{marginTop:'16px',borderTop:'1px solid '+c.bs,paddingTop:'13px'}}>
-      <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'9px'}}>Histórico de pacotes</div>
-      <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>${hist.map(pk=>{const tp=this.type(pk.typeId); return html`<div key=${pk.id} style=${{display:'flex',alignItems:'center',gap:'10px',fontSize:'12.5px'}}>
-        <span style=${{width:'8px',height:'8px',borderRadius:'2px',background:tp.cor,flexShrink:0}}></span>
-        <span style=${{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${tp.nome}</span>
-        <span style=${{fontFamily:"'Martian Mono', monospace",color:c.muted}}>${pk.usadas}/${pk.total}</span>
-        <span style=${{fontSize:'10.5px',fontWeight:700,color:c.faint,background:c.surface2,padding:'2px 8px',borderRadius:'999px'}}>Concluído</span>
-      </div>`;})}</div>
+
+    const histBlock=hist.length?html`<div style=${{marginTop:current.length?'8px':'12px',borderTop:'1px solid '+c.bs,paddingTop:'5px'}}>
+      <button onClick=${()=>this.setState({pkgHistOpen:!histOpen})} style=${{display:'flex',alignItems:'center',gap:'8px',width:'100%',padding:'8px 2px',background:'none',border:'none',cursor:'pointer',color:c.muted}}>
+        <${Icon} name="ChevronDown" size=${16} color=${c.faint} style=${{transform:histOpen?'none':'rotate(-90deg)',transition:'transform .15s'}}/>
+        <span style=${{fontSize:'12.5px',fontWeight:700,flex:1,textAlign:'left'}}>Histórico</span>
+        <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',color:c.faint}}>${hist.length}</span>
+      </button>
+      ${histOpen?html`<div style=${{padding:'8px 2px 2px'}}>${hist.map((pk,i)=>this.pkgBlock(p,pk,i>0,true))}</div>`:null}
     </div>`:null;
-    return html`<div style=${{background:c.surface,border:'1px solid '+(ending?this.tint(c.warning,.5):c.bs),borderRadius:'14px',padding:'18px 20px'}}>${head}${inner}${histBlock}</div>`;
+
+    const overlay=this.state.pkgMenu?html`<div onClick=${()=>this.setState({pkgMenu:null})} style=${{position:'fixed',inset:0,zIndex:35}}></div>`:null;
+    return html`<div style=${{background:c.surface,border:'1px solid '+(anyRenew?this.tint(c.warning,.5):c.bs),borderRadius:'14px',padding:'18px 20px',position:'relative'}}>${overlay}${head}${body}${histBlock}</div>`;
+  }
+
+  pkgBlock(p,pk,divider,readonly){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const col=this.pkgTypeColor(pk); const sm=this.pkgStatusMeta(pk);
+    const rem=this.pkgRemaining(pk); const ending=this.pkgEnding(pk); const done=this.pkgDone(pk); const paused=pk.status==='pausado';
+    const menuOpen=this.state.pkgMenu&&this.state.pkgMenu.pkgId===pk.id;
+    return html`<div key=${pk.id} style=${{position:'relative',paddingTop:divider?'15px':'0',marginTop:divider?'15px':'0',borderTop:divider?'1px solid '+c.bs:'none'}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
+        <span style=${{width:'10px',height:'10px',borderRadius:'3px',background:col,flexShrink:0}}></span>
+        <div style=${{flex:1,minWidth:0,display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
+          <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11px',fontWeight:700,letterSpacing:'.02em',color:col,background:this.tint(col,.13),padding:'2px 8px',borderRadius:'6px',flexShrink:0}}>${this.pkgCode(pk)}</span>
+          <span style=${{fontSize:'13.5px',fontWeight:700,color:c.text,display:'inline-flex',alignItems:'center',gap:'6px'}}><${Icon} name=${(this.type(pk.typeId)||{}).icon||'Package'} size=${14} color=${col}/> ${(this.type(pk.typeId)||{}).nome||'Pacote'}</span>
+          <span style=${{fontSize:'11.5px',color:c.faint}}>${(this.type(pk.typeId)||{}).dur?('· '+(this.type(pk.typeId)||{}).dur+'min'):''}${pk.criado?(' · início '+this.pkgFmt(pk.criado)):''}</span>
+        </div>
+        <span style=${{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'11px',fontWeight:700,padding:'2px 9px',borderRadius:'999px',background:sm.bg,color:sm.color,flexShrink:0}}>${sm.icon?html`<${Icon} name=${sm.icon} size=${11}/>`:''}${sm.label}</span>
+        <button onClick=${(e)=>{e.stopPropagation(); this.setState(st=>({pkgMenu:menuOpen?null:{pkgId:pk.id,patientId:p.id}}));}} title="Gerir pacote" style=${{display:readonly?'none':'grid',width:'28px',height:'28px',placeItems:'center',borderRadius:'7px',border:'1px solid '+(menuOpen?c.bd:'transparent'),background:menuOpen?c.surface2:'none',color:c.muted,cursor:'pointer',flexShrink:0}}><${Icon} name="Ellipsis" size=${17}/></button>
+      </div>
+      <div style=${{fontSize:'12px',color:c.muted,marginBottom:'12px',display:'flex',alignItems:'center',gap:'6px'}}><${Icon} name="CalendarClock" size=${13} style=${{flexShrink:0}}/> <span style=${{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>${this.pkgGradeLabel(pk)}</span></div>
+      ${this.pkgTrail(pk)}
+      <div style=${{display:'flex',alignItems:'baseline',gap:'8px',marginTop:'11px'}}>
+        <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'19px',fontWeight:700,lineHeight:1}}>${this.pkgUsadas(pk)}<span style=${{color:c.faint,fontSize:'13px'}}>/${pk.total}</span></span>
+        <span style=${{fontSize:'12px',color:(ending&&!paused)?c.warning:c.muted,fontWeight:(ending&&!paused)?700:500}}>${done?'pacote completo':(readonly?'':(rem+' restante'+(rem===1?'':'s')))}</span>
+      </div>
+      ${readonly?null:this.pkgContext(p,pk)}
+      ${(!readonly&&menuOpen)?this.pkgMenuPop(p,pk):null}
+    </div>`;
+  }
+
+  pkgContext(p,pk){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const ending=this.pkgEnding(pk); const done=this.pkgDone(pk); const paused=pk.status==='pausado'; const next=this.pkgNext(pk);
+    if(paused){
+      return html`<div style=${{marginTop:'11px',padding:'11px 12px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
+        <div style=${{display:'flex',alignItems:'flex-start',gap:'9px'}}><${Icon} name="Pause" size=${15} color=${c.muted} style=${{flexShrink:0,marginTop:'1px'}}/>
+          <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'12.5px',fontWeight:600,color:c.text}}>Pausado${pk.retomaEm?html` · retoma ${this.pkgFmt(pk.retomaEm)}`:''}</div><div style=${{fontSize:'11.5px',color:c.muted,marginTop:'2px'}}>Validade estendida enquanto pausado. As ${this.pkgRemaining(pk)} sessões seguradas voltam à agenda ao retomar.</div></div>
+        </div>
+        <button onClick=${()=>this.pkgResume(p.id,pk.id)} style=${{marginTop:'10px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'8px',borderRadius:'8px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}><${Icon} name="Play" size=${14}/> Retomar pacote</button>
+      </div>`;
+    }
+    if(ending||done){
+      return html`<div>
+        <div style=${{marginTop:'11px',padding:'10px 12px',borderRadius:'10px',background:this.tint(c.warning,.12),display:'flex',gap:'9px',alignItems:'flex-start'}}><${Icon} name=${done?'CircleCheck':'TriangleAlert'} size=${16} color=${c.warning} style=${{flexShrink:0,marginTop:'1px'}}/>
+          <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'12.5px',fontWeight:600,color:c.text}}>${done?'Pacote concluído':'Pacote acabando'}</div><div style=${{fontSize:'11.5px',color:c.muted,marginTop:'1px'}}>${done?'Todas as sessões foram concluídas.':'Faltam poucas sessões para concluir.'}</div></div>
+        </div>
+      </div>`;
+    }
+    return html`<div style=${{marginTop:'9px',fontSize:'12px',color:c.muted,display:'flex',alignItems:'center',gap:'6px'}}>${next?html`<${Icon} name="CalendarClock" size=${13} color=${c.faint} style=${{flexShrink:0}}/> <span>Próxima: <b style=${{color:c.text,fontWeight:600}}>${this.dowLabel(next.dow)} ${this.pkgFmt(next.data)}${next.hora?(' · '+next.hora):''}</b></span>`:html`<span style=${{color:c.faint}}>Sem próxima sessão agendada.</span>`}</div>`;
+  }
+
+  pkgMenuPop(p,pk){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const paused=pk.status==='pausado'; const rem=this.pkgRemaining(pk);
+    const item=(icon,label,onClick,danger)=>html`<button onClick=${onClick} style=${{display:'flex',alignItems:'center',gap:'10px',width:'100%',padding:'8px 10px',borderRadius:'8px',border:'none',background:'transparent',color:danger?c.danger:c.text,cursor:'pointer',fontSize:'12.5px',textAlign:'left'}} onMouseEnter=${e=>e.currentTarget.style.background=danger?this.tint(c.danger,.09):c.surface2} onMouseLeave=${e=>e.currentTarget.style.background='transparent'}><${Icon} name=${icon} size=${15} color=${danger?c.danger:c.faint} style=${{flexShrink:0}}/> <span style=${{flex:1}}>${label}</span></button>`;
+    const stepBtn=(icon,onClick,disabled)=>html`<button onClick=${onClick} disabled=${disabled} style=${{width:'26px',height:'26px',display:'grid',placeItems:'center',borderRadius:'7px',border:'1px solid '+c.bd,background:c.surface,color:disabled?c.faint:c.text,cursor:disabled?'not-allowed':'pointer',opacity:disabled?.5:1}}><${Icon} name=${icon} size=${14}/></button>`;
+    return html`<div style=${{position:'absolute',top:'32px',right:0,zIndex:40,width:'236px',background:c.surface,border:'1px solid '+c.bd,borderRadius:'11px',boxShadow:'0 16px 38px rgba(8,10,12,'+(c.d?.6:.16)+')',padding:'5px',animation:'mvScale .13s ease-out'}}>
+      ${item('CalendarClock','Ver todas as sessões',()=>{this.setState({pkgMenu:null}); this.openModal('pkgSessoes',{patientId:p.id,pkgId:pk.id});})}
+      ${item('Pencil','Ajustar grade / horário',()=>this.openPkgGrade(p.id,pk.id))}
+      <div style=${{display:'flex',alignItems:'center',gap:'10px',padding:'6px 10px'}}>
+        <${Icon} name="Hash" size=${15} color=${c.faint} style=${{flexShrink:0}}/>
+        <span style=${{flex:1,fontSize:'12.5px'}}>Sessões</span>
+        ${stepBtn('Minus',()=>this.pkgRemoveSession(p.id,pk.id),rem<=0)}
+        <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'12.5px',fontWeight:700,minWidth:'22px',textAlign:'center'}}>${pk.total}</span>
+        ${stepBtn('Plus',()=>this.pkgAddSession(p.id,pk.id),false)}
+      </div>
+      <div style=${{height:'1px',background:c.bs,margin:'4px 6px'}}></div>
+      ${paused?item('Play','Retomar pacote',()=>this.pkgResume(p.id,pk.id)):item('Pause','Pausar pacote',()=>this.pkgPause(p.id,pk.id))}
+      ${this.pkgDone(pk)?item('Archive','Arquivar no histórico',()=>this.archivePkg(p.id,pk.id)):null}
+      ${item('CalendarX2','Cancelar pacote',()=>{this.setState({pkgMenu:null}); this.openModal('pkgCancelar',{patientId:p.id,pkgId:pk.id});},true)}
+    </div>`;
+  }
+
+  // ---------- pacotes: ações de gestão ----------
+  pkgAddSession(pid,pkgId){
+    const p=this.patient(pid); const pk=(p&&p.pacotes||[]).find(x=>x.id===pkgId); if(!pk) return;
+    const g=pk.grade||{}; const dows=(g.dows||[1,3]); const hor=g.horarios||{}; const tp=this.type(pk.typeId);
+    const linked=this.pkgAppts(pk); const lastDs=linked.length?linked[linked.length-1].date:this.hoje();
+    let cur=new Date(lastDs+'T00:00'); let ds=null; let guard=0;
+    while(guard<800){ guard++; cur.setDate(cur.getDate()+1); const c=this.dstr(cur); if(dows.includes(cur.getDay()) && !this.state.holidays.some(h=>h.data===c&&h.tipo!=='horario')){ ds=c; break; } }
+    if(!ds){ this.toast('Não foi possível encontrar uma data livre'); return; }
+    const dw=new Date(ds+'T00:00').getDay(); const hh=hor[dw]||Object.values(hor)[0]||'08:00'; const paused=pk.status==='pausado';
+    const na={id:'a'+Date.now(),profId:g.profId,typeId:pk.typeId,start:this.t2m(hh),dur:tp.dur,date:ds,status:'agendado',patientId:pid,pkgId:pkgId,encaixe:false,...(paused?{pkgHold:true}:{})};
+    this.setState(st=>({appts:[...st.appts,na],patients:st.patients.map(pp=>pp.id!==pid?pp:{...pp,pacotes:(pp.pacotes||[]).map(x=>x.id===pkgId?{...x,total:x.total+1,status:x.status==='concluido'?'ativo':x.status}:x)})}));
+    this.toast('1 sessão adicionada — agendada '+this.pkgFmt(ds));
+  }
+  pkgRemoveSession(pid,pkgId){
+    const p=this.patient(pid); const pk=(p&&p.pacotes||[]).find(x=>x.id===pkgId); if(!pk) return;
+    const linked=this.pkgAppts(pk);
+    const future=linked.filter(a=>['agendado','confirmado'].includes(a.status));
+    const removable=(future.length?future:linked.filter(a=>a.pkgHold)).slice(-1)[0];
+    if(!removable){ this.toast('Não há sessão futura para remover'); return; }
+    this.setState(st=>({appts:st.appts.filter(a=>a.id!==removable.id),patients:st.patients.map(pp=>pp.id!==pid?pp:{...pp,pacotes:(pp.pacotes||[]).map(x=>x.id===pkgId?{...x,total:Math.max(this.pkgUsadas(x),x.total-1)}:x)})}));
+    this.toast('1 sessão removida do pacote');
+  }
+  pkgPause(pid,pkgId){
+    const rd=new Date(this.hoje()+'T00:00'); rd.setDate(rd.getDate()+21); const retomaEm=this.dstr(rd); const hoje=this.hoje();
+    this.setState(st=>({pkgMenu:null,
+      appts:st.appts.map(a=>{ if(a.pkgId!==pkgId) return a; if(a.date>=hoje && ['agendado','confirmado'].includes(a.status)) return {...a,pkgHold:true}; return a; }),
+      patients:st.patients.map(p=> p.id!==pid?p:{...p,pacotes:(p.pacotes||[]).map(pk=>pk.id===pkgId?{...pk,status:'pausado',retomaEm}:pk)})
+    }));
+    this.toast('Pacote pausado — sessões futuras retiradas da agenda.');
+  }
+  pkgResume(pid,pkgId){
+    this.setState(st=>({pkgMenu:null,
+      appts:st.appts.map(a=> a.pkgId===pkgId && a.pkgHold?{...a,pkgHold:false}:a),
+      patients:st.patients.map(p=> p.id!==pid?p:{...p,pacotes:(p.pacotes||[]).map(pk=>{ if(pk.id!==pkgId) return pk; const np={...pk,status:'ativo'}; delete np.retomaEm; return np; })})
+    }));
+    this.toast('Pacote retomado — sessões voltam à agenda.');
+  }
+  cancelarPkg(pid,pkgId){
+    const hoje=this.hoje();
+    this.setState(st=>({modal:null,modalData:{},pkgMenu:null,
+      appts:st.appts.map(a=>{ if(a.pkgId!==pkgId) return a; if(a.date>=hoje && (['agendado','confirmado'].includes(a.status)||a.pkgHold)) return {...a,status:'cancelado',pkgHold:false}; return a; }),
+      patients:st.patients.map(p=> p.id!==pid?p:{...p,pacotes:(p.pacotes||[]).map(pk=>pk.id===pkgId?{...pk,status:'cancelado'}:pk)})
+    }));
+    this.toast('Pacote cancelado — sessões futuras liberadas da agenda.');
+  }
+  archivePkg(pid,pkgId){ this.setState(st=>({pkgMenu:null,patients:st.patients.map(p=>p.id!==pid?p:{...p,pacotes:(p.pacotes||[]).map(pk=>pk.id===pkgId?{...pk,status:'concluido'}:pk)})})); this.toast('Pacote arquivado no histórico'); }
+  openPkgGrade(pid,pkgId){ const p=this.patient(pid); const pk=(p&&p.pacotes||[]).find(x=>x.id===pkgId); if(!pk) return; const g=pk.grade||{}; this.setState({pkgMenu:null}); this.openModal('pkgGrade',{patientId:pid,pkgId,dows:(g.dows||[]).slice(),horarios:{...(g.horarios||{})},profId:g.profId||'',profNome:g.profNome}); }
+  pkgSaveGrade(d){
+    const p=this.patient(d.patientId); const pk=(p&&p.pacotes||[]).find(x=>x.id===d.pkgId); if(!pk){ this.closeModal(); return; }
+    const dows=d.dows||[]; const hor=d.horarios||{}; const profId=d.profId; const tp=this.type(pk.typeId); const hoje=this.hoje();
+    const linked=this.pkgAppts(pk);
+    const toReplace=linked.filter(a=>a.date>=hoje && (['agendado','confirmado'].includes(a.status)||a.pkgHold));
+    const nCount=toReplace.length; const anyHold=toReplace.some(a=>a.pkgHold);
+    const gen=[]; let cur=new Date(hoje+'T00:00'); cur.setDate(cur.getDate()-1); let guard=0;
+    while(gen.length<nCount && guard<900){ guard++; cur.setDate(cur.getDate()+1); const ds=this.dstr(cur); if(!dows.includes(cur.getDay())) continue; if(this.state.holidays.some(h=>h.data===ds&&h.tipo!=='horario')) continue; const dw=cur.getDay(); const hh=hor[dw]||Object.values(hor)[0]||'08:00'; gen.push({id:'a'+Date.now()+'-'+gen.length,profId,typeId:pk.typeId,start:this.t2m(hh),dur:tp.dur,date:ds,status:'agendado',patientId:d.patientId,pkgId:pk.id,encaixe:false,...(anyHold?{pkgHold:true}:{})}); }
+    const removeIds=new Set(toReplace.map(a=>a.id));
+    this.setState(st=>({modal:null,modalData:{},appts:[...st.appts.filter(a=>!removeIds.has(a.id)),...gen],patients:st.patients.map(pp=>pp.id!==d.patientId?pp:{...pp,pacotes:(pp.pacotes||[]).map(x=>x.id===d.pkgId?{...x,grade:{...x.grade,dows,horarios:hor,profId}}:x)})}));
+    this.toast(nCount?('Grade atualizada — '+nCount+' '+(nCount===1?'sessão remarcada':'sessões remarcadas')+' na agenda.'):'Grade atualizada.');
+  }
+  confirmRenovar(d){
+    const p=this.patient(d.patientId); const pk=(this.pkgList(p)).find(x=>x.id===d.pkgId); if(!pk) return;
+    const g=pk.grade||{}; const dows=(g.dows||[1,3]); const hor=g.horarios||{}; const tp=this.type(pk.typeId); const n=Math.max(1,d.n||pk.total);
+    const linked=this.pkgAppts(pk); let lastDs=linked.length?linked[linked.length-1].date:this.hoje();
+    const gen=[]; const now=Date.now();
+    for(let k=0;k<n;k++){ let cur=new Date(lastDs+'T00:00'); let ds=null; let guard=0;
+      while(guard<800){ guard++; cur.setDate(cur.getDate()+1); const cds=this.dstr(cur); if(dows.includes(cur.getDay()) && !this.state.holidays.some(h=>h.data===cds&&h.tipo!=='horario')){ ds=cds; break; } }
+      if(!ds) break; const dw=new Date(ds+'T00:00').getDay(); const hh=hor[dw]||Object.values(hor)[0]||'08:00';
+      gen.push({id:'a'+now+'-r'+k,profId:g.profId,typeId:pk.typeId,start:this.t2m(hh),dur:tp.dur,date:ds,status:'agendado',patientId:d.patientId,pkgId:pk.id,encaixe:false}); lastDs=ds;
+    }
+    this.setState(st=>({modal:null,modalData:{},appts:[...st.appts,...gen],patients:st.patients.map(pp=>pp.id!==d.patientId?pp:{...pp,pacotes:(pp.pacotes||[]).map(x=>x.id===pk.id?{...x,total:x.total+gen.length,status:'ativo'}:x)})}));
+    this.toast('Pacote renovado — '+gen.length+' '+(gen.length===1?'sessão adicionada':'sessões adicionadas')+', mesma grade.');
+  }
+  openNovoPacoteAjuste(d){ const p=this.patient(d.patientId); const pk=(this.pkgList(p)).find(x=>x.id===d.pkgId); if(!pk) return; const g=pk.grade||{}; this.openModal('agendarPacote',{patientId:d.patientId,typeId:pk.typeId,n:d.n||pk.total,dows:(g.dows||[]).slice(),horarios:{...(g.horarios||{})},profId:g.profId||'',inicio:this.hoje(),faltaPunitiva:this.pkgPunitivo(pk)}); }
+
+  // ---------- pacotes: modais ----------
+  modalRenovar(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
+    const p=this.patient(d.patientId); const pk=p&&(this.pkgList(p)).find(x=>x.id===d.pkgId); if(!pk) return null;
+    const g=pk.grade||{}; const col=this.pkgTypeColor(pk); const n=d.n||pk.total;
+    const ses=this.pkgSessions(pk); const lastDs=ses.length?ses[ses.length-1].data:this.hoje();
+    const preview=this.computeSerie({n,dows:(g.dows||[]).slice(),typeId:pk.typeId,fromDate:lastDs,inclusive:false});
+    const nonHol=preview.filter(o=>!o.feriado); const startDs=nonHol.length?nonHol[0].data:null; const endDs=nonHol.length?nonHol[nonHol.length-1].data:null;
+    const dow=ds=>this.dowLabel(new Date(ds+'T00:00').getDay());
+    const row=(icon,label,valEl,last)=>html`<div style=${{display:'flex',alignItems:'center',gap:'11px',padding:'11px 13px',borderBottom:last?'none':'1px solid '+c.bs}}><${Icon} name=${icon} size=${15} color=${c.faint} style=${{flexShrink:0}}/><span style=${{fontSize:'12px',color:c.muted,width:'62px',flexShrink:0}}>${label}</span><div style=${{flex:1,minWidth:0,display:'flex',justifyContent:'flex-end'}}>${valEl}</div></div>`;
+    const txt=t=>html`<span style=${{fontSize:'12.5px',fontWeight:600,textAlign:'right'}}>${t}</span>`;
+    const body=html`<div>
+      <div style=${{display:'flex',alignItems:'center',gap:'11px',marginBottom:'15px'}}>
+        <span style=${{width:'36px',height:'36px',borderRadius:'10px',display:'grid',placeItems:'center',background:this.tint(col,.16),color:col,flexShrink:0}}><${Icon} name="RefreshCw" size=${18}/></span>
+        <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'14.5px',fontWeight:700}}>Continuar a mesma grade</div><div style=${{fontSize:'12px',color:c.muted}}><span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700,color:col}}>${this.pkgCode(pk)}</span> · ${this.pkgTypeName(pk)}</div></div>
+      </div>
+      <div style=${{borderRadius:'12px',border:'1px solid '+c.bs,overflow:'hidden',marginBottom:'15px'}}>
+        ${row('CalendarClock','Grade',txt(this.pkgGradeLabel(pk)))}
+        ${row('Hash','Sessões',html`<div style=${{display:'flex',alignItems:'center',gap:'9px'}}><button onClick=${()=>this.setMD({n:Math.max(1,n-1)})} style=${{width:'27px',height:'27px',display:'grid',placeItems:'center',borderRadius:'7px',border:'1px solid '+c.bd,background:c.surface,color:c.text,cursor:'pointer'}}><${Icon} name="Minus" size=${14}/></button><span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700,fontSize:'14px',minWidth:'44px',textAlign:'center'}}>+${n}</span><button onClick=${()=>this.setMD({n:Math.min(40,n+1)})} style=${{width:'27px',height:'27px',display:'grid',placeItems:'center',borderRadius:'7px',border:'1px solid '+c.bd,background:c.surface,color:c.text,cursor:'pointer'}}><${Icon} name="Plus" size=${14}/></button></div>`)}
+        ${row('CalendarPlus','Começa',txt(startDs?(dow(startDs)+' '+this.pkgFmt(startDs)):'—'),!endDs)}
+        ${endDs?row('Flag','Termina',txt(dow(endDs)+' '+this.pkgFmt(endDs)),true):null}
+      </div>
+      <div style=${{display:'flex',flexDirection:'column',gap:'9px',fontSize:'12px',color:c.muted}}>
+        <div style=${{display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="Clock" size=${15} color=${c.teal.text} style=${{flexShrink:0,marginTop:'1px'}}/> Começa logo após a última sessão (${lastDs?this.pkgFmt(lastDs):'—'}), sem intervalo — mantém o horário do paciente na agenda.</div>
+        <div style=${{display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="Package" size=${15} color=${c.faint} style=${{flexShrink:0,marginTop:'1px'}}/> As sessões entram no <b style=${{color:c.text}}>mesmo pacote</b> — ele continua ativo, sem ir para o histórico.</div>
+      </div>
+    </div>`;
+    const footer=html`<div style=${{display:'flex',gap:'9px',width:'100%',justifyContent:'space-between',alignItems:'center'}}>
+      <button onClick=${()=>this.openNovoPacoteAjuste(d)} style=${{display:'inline-flex',alignItems:'center',gap:'6px',background:'none',border:'none',color:c.teal.text,fontWeight:600,cursor:'pointer',fontSize:'13px',padding:'6px 2px'}}><${Icon} name="SlidersHorizontal" size=${15}/> Ajustar grade</button>
+      <div style=${{display:'flex',gap:'9px'}}>${this.btnS('Cancelar',()=>this.closeModal())}<button onClick=${()=>this.confirmRenovar({...d,n})} style=${{padding:'9px 16px',borderRadius:'8px',border:'none',cursor:'pointer',background:c.primary,color:c.onPrimary,fontWeight:700,fontSize:'13.5px',display:'inline-flex',alignItems:'center',gap:'7px'}}><${Icon} name="Check" size=${15}/> Confirmar renovação</button></div>
+    </div>`;
+    return this.modalShell('Renovar pacote',body,footer,'480px');
+  }
+  modalSessoes(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
+    const p=this.patient(d.patientId); const pk=p&&(this.pkgList(p)).find(x=>x.id===d.pkgId); if(!pk) return null;
+    const col=this.pkgTypeColor(pk); const ses=this.pkgSessions(pk);
+    const leg=[['concluida','Concluída'],['proxima','Próxima'],['agendada','Agendada'],['segurada','Segurada'],['falta','Falta'],['feriado','Feriado']];
+    const present=leg.filter(([e])=>ses.some(s=>s.estado===e));
+    const stCol={concluida:c.text,proxima:c.teal.text,agendada:c.muted,segurada:c.faint,falta:c.danger,feriado:c.faint};
+    const body=html`<div>
+      <div style=${{display:'flex',alignItems:'center',gap:'10px',padding:'12px 13px',borderRadius:'11px',background:c.surface2,border:'1px solid '+c.bs,marginBottom:'13px'}}>
+        <span style=${{width:'11px',height:'11px',borderRadius:'3px',background:col,flexShrink:0}}></span>
+        <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13.5px',fontWeight:700,display:'flex',alignItems:'center',gap:'7px',flexWrap:'wrap'}}>${this.pkgTypeName(pk)} <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10.5px',fontWeight:700,color:col,background:this.tint(col,.13),padding:'1px 6px',borderRadius:'5px'}}>${this.pkgCode(pk)}</span></div><div style=${{fontSize:'11.5px',color:c.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${this.pkgTipoLabel(pk)} · ${this.pkgGradeLabel(pk)}</div></div>
+        <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'13px',fontWeight:700}}>${this.pkgUsadas(pk)}/${pk.total}</span>
+      </div>
+      <div style=${{display:'flex',flexWrap:'wrap',gap:'11px',marginBottom:'12px',paddingBottom:'12px',borderBottom:'1px solid '+c.bs}}>${present.map(([e,l])=>html`<div key=${e} style=${{display:'flex',alignItems:'center',gap:'6px',fontSize:'11.5px',color:c.muted}}>${this.pkgDot({estado:e,dow:1,data:this.hoje(),hora:''},col,12,'lg'+e,{noClick:true})} ${l}</div>`)}</div>
+      <div style=${{display:'flex',flexDirection:'column',maxHeight:'320px',overflow:'auto'}}>
+        ${ses.map((s,i)=>html`<div key=${'r'+i} style=${{display:'flex',alignItems:'center',gap:'11px',padding:'8px 2px',borderBottom:i<ses.length-1?'1px solid '+c.bs:'none'}}>
+          <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10px',color:c.faint,width:'18px',textAlign:'right',flexShrink:0}}>${i+1}</span>
+          ${this.pkgDot(s,col,14,'ri'+i,{pkId:pk.id})}
+          <span style=${{flex:1,minWidth:0,fontSize:'12.5px',fontWeight:500}}>${this.dowLabel(s.dow)} ${this.pkgFmt(s.data)}${s.hora?html` <span style=${{color:c.faint,fontFamily:"'Martian Mono', monospace",fontSize:'11px'}}>· ${s.hora}</span>`:''}</span>
+          <span style=${{fontSize:'11.5px',fontWeight:600,color:stCol[s.estado]||c.muted,flexShrink:0}}>${this.pkgEstadoLabel(s.estado)}</span>
+        </div>`)}
+      </div>
+    </div>`;
+    const footer=html`${this.btnS('Fechar',()=>this.closeModal())}`;
+    return this.modalShell('Sessões do pacote',body,footer,'480px');
+  }
+  modalAjustarGrade(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
+    const dows=d.dows||[]; const horarios=d.horarios||{}; const profId=d.profId||''; const dlabels=['D','S','T','Q','Q','S','S'];
+    const body=html`<div>
+      <div style=${{padding:'10px 12px',borderRadius:'10px',background:c.teal.subtle,color:c.teal.text,fontSize:'12px',marginBottom:'15px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="Info" size=${15} style=${{flexShrink:0,marginTop:'1px'}}/><span>As mudanças valem para as <b>próximas</b> sessões deste pacote. As já concluídas não mudam. Trocar dia, horário ou profissional remarca o horário do paciente na agenda.</span></div>
+      ${this.fld('Profissional',html`<select value=${profId} onChange=${e=>this.setMD({profId:e.target.value})} style=${sel}><option value="">Selecione…</option>${this.state.profs.map(pp=>html`<option key=${pp.id} value=${pp.id}>${pp.nome}</option>`)}</select>`)}
+      ${this.fld('Dias da semana',html`<div style=${{display:'flex',gap:'6px'}}>${dlabels.map((l,i)=>html`<button key=${i} onClick=${()=>{const has=dows.includes(i); const nd=has?dows.filter(x=>x!==i):[...dows,i]; const nh={...horarios}; if(has) delete nh[i]; else nh[i]=nh[i]||'09:00'; this.setMD({dows:nd,horarios:nh});}} style=${{width:'40px',height:'40px',borderRadius:'8px',border:'1px solid '+(dows.includes(i)?'transparent':c.bs),background:dows.includes(i)?c.primary:c.surface,color:dows.includes(i)?c.onPrimary:c.muted,fontWeight:600,cursor:'pointer'}}>${l}</button>`)}</div>`)}
+      ${dows.length?html`<div style=${{padding:'11px 13px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
+        <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'9px'}}>Horário de cada dia</div>
+        <div style=${{display:'flex',flexDirection:'column',gap:'8px'}}>${dows.slice().sort((a,b)=>a-b).map(dw=>html`<div key=${dw} style=${{display:'flex',alignItems:'center',gap:'12px'}}><span style=${{flex:1,fontSize:'13px',fontWeight:500}}>${this.dowLabel(dw)}</span><input type="time" step=${900} value=${horarios[dw]||'09:00'} onChange=${e=>this.setMD({horarios:{...horarios,[dw]:e.target.value}})} style=${{...sel,width:'124px',fontFamily:"'Martian Mono', monospace"}}/></div>`)}</div>
+      </div>`:html`<div style=${{fontSize:'12px',color:c.faint,textAlign:'center',padding:'8px'}}>Selecione ao menos um dia.</div>`}
+    </div>`;
+    const can=dows.length>0 && !!profId;
+    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP('Salvar grade',()=>this.pkgSaveGrade({...d,dows,horarios,profId}),!can)}`;
+    return this.modalShell('Ajustar grade do pacote',body,footer,'460px');
+  }
+  modalPkgCancelar(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
+    const p=this.patient(d.patientId); const pk=p&&(this.pkgList(p)).find(x=>x.id===d.pkgId); if(!pk) return null;
+    const rem=this.pkgRemaining(pk);
+    const body=html`<div style=${{display:'flex',gap:'11px',alignItems:'flex-start',padding:'12px 13px',borderRadius:'11px',background:this.tint(c.danger,.09),border:'1px solid '+this.tint(c.danger,.3)}}>
+      <${Icon} name="TriangleAlert" size=${18} color=${c.danger} style=${{flexShrink:0,marginTop:'1px'}}/>
+      <div style=${{fontSize:'13px',color:c.text,lineHeight:1.5}}>Cancelar o pacote <b>${this.pkgTypeName(pk)}</b> <span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700,fontSize:'12px'}}>${this.pkgCode(pk)}</span> de ${p.nome.split(' ').slice(0,2).join(' ')}? As <b>${rem} ${rem===1?'sessão futura será liberada':'sessões futuras serão liberadas'}</b> da agenda e o pacote vai para o histórico como <b>Cancelado</b>. As sessões já concluídas permanecem no histórico do paciente.</div>
+    </div>`;
+    const footer=html`${this.btnS('Voltar',()=>this.closeModal())}<button onClick=${()=>this.cancelarPkg(d.patientId,pk.id)} style=${{padding:'9px 16px',borderRadius:'8px',border:'none',cursor:'pointer',background:c.danger,color:'#fff',fontWeight:700,fontSize:'13.5px'}}>Cancelar pacote</button>`;
+    return this.modalShell('Cancelar pacote',body,footer,'440px');
   }
   modalPacote(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
     const isRenew=!!d.renovadoDe;
     const dows=d.dows||[1,3]; const horarios=d.horarios||{}; const n=d.n||10; const typeId=d.typeId||'t2'; const profId=d.profId||'';
     const oldPk=isRenew?this.pkgList(this.patient(d.patientId)).find(x=>x.id===d.renovadoDe):null;
-    const fromDate=isRenew?d.fromDate:null;
-    const preview=(d.patientId&&profId)?this.computeSerie({n,dows,typeId,fromDate}):[];
+    const inicio=d.inicio||this.hoje();
+    const fromDate=isRenew?d.fromDate:inicio;
+    const inclusive=!isRenew; // pacote novo agenda a partir da data de início (inclusive)
+    const preview=(d.patientId&&profId)?this.computeSerie({n,dows,typeId,fromDate,inclusive}):[];
     const nonHol=preview.filter(o=>!o.feriado);
     const skipped=preview.filter(o=>o.feriado).length;
     const dur=this.type(typeId).dur; const tpSel=this.type(typeId); const isGroup=!!tpSel.grupo; const cap=tpSel.cap||this.state.settings.capPilates||4;
@@ -338,6 +716,16 @@ class Component extends DCLogic {
         ${this.fld('Tipo de sessão',html`<select value=${typeId} onChange=${e=>this.setMD({typeId:e.target.value})} style=${sel}>${this.state.types.map(t=>html`<option key=${t.id} value=${t.id}>${t.nome}</option>`)}</select>`)}
         ${this.fld('Quantas sessões',html`<input type="number" min=${1} max=${40} value=${n} onChange=${e=>this.setMD({n:parseInt(e.target.value)||1})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
       </div>
+      ${!isRenew?this.fld('Início do pacote',html`<input type="date" value=${inicio} min=${this.hoje()} onChange=${e=>this.setMD({inicio:e.target.value||this.hoje()})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`):null}
+      <div onClick=${()=>this.setMD({faltaPunitiva:!d.faltaPunitiva})} style=${{display:'flex',alignItems:'center',gap:'11px',padding:'11px 13px',borderRadius:'10px',background:d.faltaPunitiva?this.tint(c.danger,.08):c.surface2,border:'1px solid '+(d.faltaPunitiva?this.tint(c.danger,.4):c.bs),cursor:'pointer',marginBottom:'12px'}}>
+        <span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:d.faltaPunitiva?this.tint(c.danger,.14):c.surface,color:d.faltaPunitiva?c.danger:c.faint,flexShrink:0}}><${Icon} name=${d.faltaPunitiva?'AlertOctagon':'ShieldCheck'} size=${16}/></span>
+        <div style=${{flex:1,minWidth:0}}>
+          <div style=${{fontSize:'13px',fontWeight:600}}>Falta punitiva</div>
+          <div style=${{fontSize:'11.5px',color:c.muted}}>${d.faltaPunitiva?'Falta debita 1 sessão do pacote automaticamente':'Falta não debita sessão do pacote'}</div>
+        </div>
+        ${this.switchEl(!!d.faltaPunitiva,(e)=>{if(e&&e.stopPropagation)e.stopPropagation(); this.setMD({faltaPunitiva:!d.faltaPunitiva});})}
+      </div>
+      ${d.faltaPunitiva?html`<div style=${{margin:'-6px 0 12px',fontSize:'11.5px',color:c.muted,display:'flex',gap:'7px',alignItems:'flex-start'}}><${Icon} name="RotateCcw" size=${13} style=${{flexShrink:0,marginTop:'1px'}} color=${c.teal.text}/> Após o débito automático você pode reconciliar (devolver a sessão) a cada falta pelo agendamento no drawer.</div>`:null}
       <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,margin:'2px 0 8px'}}>Grade fixa da semana</div>
       ${this.fld('Dias',html`<div style=${{display:'flex',gap:'6px'}}>${dlabels.map((l,i)=>html`<button key=${i} onClick=${()=>{const has=dows.includes(i); const nd=has?dows.filter(x=>x!==i):[...dows,i]; const nh={...horarios}; if(has) delete nh[i]; else nh[i]=nh[i]||'09:00'; this.setMD({dows:nd,horarios:nh});}} style=${{width:'40px',height:'40px',borderRadius:'8px',border:'1px solid '+(dows.includes(i)?'transparent':c.bs),background:dows.includes(i)?c.primary:c.surface,color:dows.includes(i)?c.onPrimary:c.muted,fontWeight:600,cursor:'pointer'}}>${l}</button>`)}</div>`)}
       ${dows.length?html`<div style=${{marginTop:'2px',marginBottom:'8px',padding:'11px 13px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
@@ -364,8 +752,56 @@ class Component extends DCLogic {
       </div>`:html`<div style=${{marginTop:'8px',fontSize:'12.5px',color:c.faint,textAlign:'center',padding:'12px'}}>Selecione paciente, profissional e dias para ver a prévia.</div>`}
     </div>`;
     const can=d.patientId&&profId&&dows.length&&n>0&&(!issues.length||d.forcar);
-    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP(isRenew?'Renovar e agendar':'Agendar pacote',()=>this.createPacote({...d,n,dows,horarios,typeId,profId}),!can)}`;
+    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP(isRenew?'Renovar e agendar':'Agendar pacote',()=>this.createPacote({...d,n,dows,horarios,typeId,profId,fromDate,inclusive,faltaPunitiva:!!d.faltaPunitiva}),!can)}`;
     return this.modalShell(isRenew?'Renovar pacote':'Agendar pacote',body,footer,'560px');
+  }
+  modalPacoteMassa(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
+    const a=this.state.appts.find(x=>x.id===d.apptId); if(!a) return null;
+    const info=this.apptPkg(a); if(!info) return null;
+    const pk=info.pk; const tp=this.type(pk.typeId);
+    const agg=this.massaAffected(a,d); const list=agg.list; const horaList=agg.horaList; const thisDow=agg.thisDow;
+    const mono="'Martian Mono', monospace";
+    const fmt=ds=>{const dd=new Date(ds+'T00:00');return String(dd.getDate()).padStart(2,'0')+'/'+String(dd.getMonth()+1).padStart(2,'0');};
+    const escOpts=[{k:'esta',l:'Somente esta'},{k:'proximas',l:'Esta + próximas'},{k:'todas',l:'Todas futuras'}];
+    const body=html`<div>
+      ${d.fromDrag?html`<div style=${{padding:'10px 12px',borderRadius:'10px',background:this.tint(c.warning,.12),color:'#8a5d00',fontSize:'12px',marginBottom:'13px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name="CalendarClock" size=${15} style=${{flexShrink:0,marginTop:'1px'}}/><span>Este agendamento foi remarcado. Aplicar a mesma mudança às demais sessões do pacote?</span></div>`:null}
+      <div style=${{padding:'11px 13px',borderRadius:'10px',background:c.teal.subtle,marginBottom:'14px',display:'flex',gap:'9px',alignItems:'center'}}>
+        <span style=${{width:'28px',height:'28px',borderRadius:'8px',display:'grid',placeItems:'center',background:c.teal.solid,color:'#fff',flexShrink:0}}><${Icon} name="Package" size=${15}/></span>
+        <div style=${{flex:1,minWidth:0}}>
+          <div style=${{fontSize:'12.5px',fontWeight:700,color:c.teal.text}}>${info.patient.nome.split(' ').slice(0,2).join(' ')} · ${tp.nome}</div>
+          <div style=${{fontSize:'11px',color:c.teal.text,opacity:.85,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${this.pkgGradeLabel(pk)}</div>
+        </div>
+      </div>
+      <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'7px'}}>Aplicar a</div>
+      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px',marginBottom:'14px'}}>
+        ${escOpts.map(o=>{const on=(d.escopo||'proximas')===o.k; return html`<button key=${o.k} onClick=${()=>this.setMD({escopo:o.k})} style=${{padding:'9px 6px',borderRadius:'8px',border:'1px solid '+(on?c.teal.solid:c.bs),background:on?c.teal.subtle:c.surface,color:on?c.teal.text:c.muted,fontWeight:600,cursor:'pointer',fontSize:'11.5px'}}>${o.l}</button>`;})}
+      </div>
+      <div style=${{display:'flex',flexDirection:'column',gap:'10px'}}>
+        <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',padding:'11px 12px'}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:d.aplicarProf?'9px':0}}>
+            <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13px',fontWeight:600}}>Profissional</div><div style=${{fontSize:'11px',color:c.muted}}>Troca em ${this.plSes(list.length)}</div></div>
+            ${this.switchEl(!!d.aplicarProf,(e)=>{if(e&&e.stopPropagation)e.stopPropagation(); this.setMD({aplicarProf:!d.aplicarProf});})}
+          </div>
+          ${d.aplicarProf?html`<select value=${d.profId||''} onChange=${e=>this.setMD({profId:e.target.value})} style=${sel}>${this.state.profs.map(pp=>html`<option key=${pp.id} value=${pp.id}>${pp.nome}</option>`)}</select>`:null}
+        </div>
+        <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',padding:'11px 12px'}}>
+          <div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:d.aplicarHora?'9px':0}}>
+            <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13px',fontWeight:600}}>Horário</div><div style=${{fontSize:'11px',color:c.muted}}>Aplica às ${this.dowLabel(thisDow)}s · ${this.plSes(horaList.length)}</div></div>
+            ${this.switchEl(!!d.aplicarHora,(e)=>{if(e&&e.stopPropagation)e.stopPropagation(); this.setMD({aplicarHora:!d.aplicarHora});})}
+          </div>
+          ${d.aplicarHora?html`<input type="time" step=${900} value=${d.hora||'09:00'} onChange=${e=>this.setMD({hora:e.target.value})} style=${{...sel,width:'140px',fontFamily:mono}}/>`:null}
+        </div>
+      </div>
+      ${list.length?html`<div style=${{marginTop:'13px'}}>
+        <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'7px'}}>${this.plSes(list.length)} no escopo</div>
+        <div style=${{display:'flex',flexWrap:'wrap',gap:'5px'}}>${list.slice(0,24).map((x,i)=>html`<span key=${i} style=${{fontFamily:mono,fontSize:'10px',padding:'2px 7px',borderRadius:'6px',background:x.id===a.id?c.teal.subtle:c.surface2,color:x.id===a.id?c.teal.text:c.muted,border:'1px solid '+(x.id===a.id?c.teal.border:c.bs)}}>${fmt(x.date)}</span>`)}${list.length>24?html`<span style=${{fontSize:'10px',color:c.faint,alignSelf:'center'}}>+${list.length-24}</span>`:null}</div>
+      </div>`:html`<div style=${{marginTop:'13px',fontSize:'12px',color:c.faint,textAlign:'center',padding:'8px'}}>Nenhuma sessão futura neste escopo.</div>`}
+      ${list.length?html`<button onClick=${()=>this.cancelarMassaPacote(d)} style=${{marginTop:'14px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'9px',borderRadius:'8px',border:'1px solid '+this.tint(c.danger,.4),background:'transparent',color:c.danger,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}><${Icon} name="CalendarX2" size=${14}/> Cancelar ${this.plSes(list.length)} deste escopo</button>`:null}
+    </div>`;
+    const can=list.length && (d.aplicarProf||d.aplicarHora);
+    const footer=html`${this.btnS('Fechar',()=>this.closeModal())}${this.btnP('Aplicar mudança',()=>this.applyMassaPacote(d),!can)}`;
+    return this.modalShell('Alterar sessões em massa',body,footer,'520px');
   }
   initials(nome){ const w=nome.replace(/Dra?\.\s*/,'').trim().split(/\s+/); return ((w[0]||'')[0]||'')+((w[w.length-1]||'')[0]||''); }
   m2t(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
@@ -385,7 +821,8 @@ class Component extends DCLogic {
   }
 
   // ---------- computed ----------
-  dayAppts(date){ return this.state.appts.filter(a=>a.date===(date||this.state.date)); }
+  // Sessões "seguradas" (pacote pausado) ficam fora da agenda/contagens, mas continuam no pacote via pkgAppts.
+  dayAppts(date){ return this.state.appts.filter(a=>a.date===(date||this.state.date) && !a.pkgHold); }
   profAppts(pid,date){ return this.dayAppts(date).filter(a=>a.profId===pid).sort((a,b)=>a.start-b.start); }
   apptPatients(a){ return a.patientIds?a.patientIds.map(id=>this.patient(id)):[this.patient(a.patientId)]; }
   needsAction(a){ return this.state.date==='2026-06-25' && (a.start+a.dur)<=702 && (a.status==='agendado'||a.status==='confirmado'); }
@@ -411,14 +848,20 @@ class Component extends DCLogic {
   }
   // Exceção de data específica (fecha o dia inteiro ou define horário específico).
   dateException(date){ return this.state.holidays.find(h=>h.data===date)||null; }
+  // Exceção de data do próprio profissional (folga/férias ou horário pontual). Tem prioridade sobre o horário semanal e sobre o horário especial da clínica.
+  profException(prof,date){ if(!prof) return null; return (prof.exc||[]).find(e=>e.data===date)||null; }
   // Períodos efetivos do profissional numa data (aplica exceção de data por cima do horário semanal).
   dayPeriods(prof,date,hoursOverride){
     const ex=this.dateException(date);
-    if(ex) return ex.tipo==='horario'?(ex.periods||[]):null; // null = fechado
+    if(ex && ex.tipo!=='horario') return null; // clínica fechada — ninguém atende
+    const pex=this.profException(prof,date);
+    if(pex) return pex.tipo==='horario'?(pex.periods||[]):null; // exceção do profissional (folga ou horário pontual)
+    if(ex) return ex.periods||[]; // horário especial da clínica
     return this.profWeek(prof,new Date(date+'T00:00').getDay(),hoursOverride);
   }
-  // Agendamentos futuros que ficariam fora do expediente se o horário da clínica mudar para "draft".
-  hourConflicts(draft){
+  // Genérico: agendamentos futuros (hoje em diante, ativos) que cabem no horário de hoje mas deixariam de caber após uma mudança.
+  // afterFn(appt,prof) => períodos válidos DEPOIS da mudança ([ [ini,fim] … ] ou null=fechado). filterFn opcional restringe quais agendamentos considerar.
+  futureConflicts(afterFn,filterFn){
     const today='2026-06-25';
     const fits=(ps,a)=>!!(ps&&ps.length&&ps.some(p=>a.start>=this.t2m(p[0])&&(a.start+a.dur)<=this.t2m(p[1])));
     const out=[];
@@ -427,20 +870,23 @@ class Component extends DCLogic {
       if(a.date<today) return; // só hoje em diante
       const prof=this.state.profs.find(p=>p.id===a.profId);
       if(!prof) return;
+      if(filterFn && !filterFn(a,prof)) return;
       const before=this.dayPeriods(prof,a.date,this.state.hours);
-      const after=this.dayPeriods(prof,a.date,draft);
+      const after=afterFn(a,prof);
       // conflito apenas quando cabia no horário atual e deixa de caber no novo
       if(fits(before,a)&&!fits(after,a)){
-        out.push({appt:a,prof,reason:(!after||!after.length)?'Dia fechado no novo horário':('Fora do novo expediente ('+(after||[]).map(p=>p[0]+'–'+p[1]).join(', ')+')')});
+        out.push({appt:a,prof,reason:(!after||!after.length)?'Sem atendimento após a mudança':('Fora do novo expediente ('+(after||[]).map(p=>p[0]+'–'+p[1]).join(', ')+')')});
       }
     });
     return out.sort((x,y)=>x.appt.date<y.appt.date?-1:(x.appt.date>y.appt.date?1:x.appt.start-y.appt.start));
   }
+  // Agendamentos futuros que ficariam fora do expediente se o horário da clínica mudar para "draft".
+  hourConflicts(draft){ return this.futureConflicts((a,prof)=>this.dayPeriods(prof,a.date,draft)); }
   saveHours(){
     const draft=this.state.hoursDraft;
     if(!draft){ this.toast('Nenhuma alteração para salvar'); return; }
     const conf=this.hourConflicts(draft);
-    if(conf.length){ this.openModal('horarioConflitos',{conf}); return; }
+    if(conf.length){ this.setState({modal:'horarioConflitos',conflictData:{conf,scope:'clinica'}}); return; }
     this.setState({hours:draft,hoursDraft:null});
     this.toast('Horário da clínica salvo');
   }
@@ -450,23 +896,30 @@ class Component extends DCLogic {
     const end=start+dur;
     const ex=this.dateException(date);
     if(ex && ex.tipo!=='horario') return 'Data de exceção — clínica fechada ('+ex.nome+')';
+    const pex=this.profException(prof,date);
+    if(pex && pex.tipo!=='horario') return 'Profissional indisponível nesta data ('+pex.nome+')';
     const periods=this.dayPeriods(prof,date);
-    if(!periods||!periods.length) return ex?('Data de exceção — sem atendimento ('+ex.nome+')'):'Profissional não atende neste dia da semana';
+    if(!periods||!periods.length) return ex?('Data de exceção — sem atendimento ('+ex.nome+')'):(pex?('Profissional indisponível nesta data ('+pex.nome+')'):'Profissional não atende neste dia da semana');
     const fits=periods.some(p=>start>=this.t2m(p[0]) && end<=this.t2m(p[1]));
     if(!fits) return `Fora do expediente (${periods.map(p=>p[0]+'–'+p[1]).join(', ')})`;
     return null;
   }
+  profDayMinutes(pid,date){ const prof=this.state.profs.find(p=>p.id===pid); const per=this.dayPeriods(prof,date||this.state.date); if(!per||!per.length) return 0; return per.reduce((s,p)=>s+(this.t2m(p[1])-this.t2m(p[0])),0); }
   occupancy(date){
-    const day=this.dayAppts(date).filter(a=>a.status!=='cancelado');
-    const active=this.state.profs.filter(p=>p.ativo).length;
-    const cap=active*(10-1)*60; // 8-18 minus lunch per prof, mins
-    const used=day.reduce((s,a)=>s+a.dur*(a.patientIds?1:1),0);
+    const d=date||this.state.date;
+    const day=this.dayAppts(d).filter(a=>a.status!=='cancelado');
+    const cap=this.state.profs.filter(p=>p.ativo).reduce((s,p)=>s+this.profDayMinutes(p.id,d),0);
+    if(!cap) return 0;
+    const used=day.reduce((s,a)=>s+a.dur,0);
     return Math.min(100,Math.round(used/cap*100));
   }
   profLoad(pid,date){
-    const day=this.profAppts(pid,date).filter(a=>a.status!=='cancelado');
+    const d=date||this.state.date;
+    const day=this.profAppts(pid,d).filter(a=>a.status!=='cancelado');
+    const cap=this.profDayMinutes(pid,d);
+    if(!cap) return 0;
     const used=day.reduce((s,a)=>s+a.dur,0);
-    return Math.min(100,Math.round(used/(9*60)*100));
+    return Math.min(100,Math.round(used/cap*100));
   }
   reports(date){
     const day=this.dayAppts(date);
@@ -578,33 +1031,19 @@ class Component extends DCLogic {
 
   setStatus(id,status){
     this.setState(st=>{
-      const appts=st.appts.map(a=>a.id===id?{...a,status}:a);
+      const a=st.appts.find(x=>x.id===id); if(!a) return {};
+      const appts=st.appts.map(x=>x.id===id?{...x,status,...(status!=='faltou'?{faltaJustificada:false}:{})}:x);
       let patients=st.patients;
-      const a=st.appts.find(x=>x.id===id);
-      if(a){
-        const affected=a.patientIds?a.patientIds:(a.patientId?[a.patientId]:[]);
-        const consumes=s=>s==='concluido'||(s==='faltou'&&st.settings.noShowConsome);
-        const faltaDelta=(status==='faltou'?1:0)-(a.status==='faltou'?1:0);
-        const pkgDelta=(consumes(status)?1:0)-(consumes(a.status)?1:0);
-        const pkgIdFor=pid=>(a.pkgOf&&a.pkgOf[pid])||(!a.patientIds&&a.pkgId)||null;
-        if(faltaDelta||pkgDelta) patients=patients.map(p=>{
-          if(!affected.includes(p.id)) return p;
-          const np={...p};
-          if(faltaDelta) np.faltas=Math.max(0,(p.faltas||0)+faltaDelta);
-          const pid=pkgIdFor(p.id);
-          if(pkgDelta&&pid) np.pacotes=(p.pacotes||[]).map(pk=>{
-            if(pk.id!==pid) return pk;
-            const usadas=Math.min(pk.total,Math.max(0,pk.usadas+pkgDelta));
-            return {...pk,usadas,status:usadas>=pk.total?'concluido':(pk.status==='concluido'?'ativo':pk.status)};
-          });
-          return np;
-        });
-      }
+      const affected=a.patientIds?a.patientIds:(a.patientId?[a.patientId]:[]);
+      const wasFalta=a.status==='faltou' && !a.faltaJustificada;
+      const isFalta=status==='faltou';
+      const delta=(isFalta?1:0)-(wasFalta?1:0);
+      if(delta) patients=patients.map(p=> affected.includes(p.id)?{...p,faltas:Math.max(0,(p.faltas||0)+delta)}:p);
       return {appts,patients};
     });
     const meta=this.statusMeta(status);
     this.toast('Status alterado para “'+meta.label+'”');
-    if(status==='faltou'){ const a=this.state.appts.find(x=>x.id===id); setTimeout(()=>this.openModal('quemCabe',{slotAppt:id,profId:a.profId,start:a.start}),200); }
+    if(status==='faltou'){ const a=this.state.appts.find(x=>x.id===id); const started=a && (a.date<this.hoje() || (a.date===this.hoje() && a.start<=702)); if(started) setTimeout(()=>this.openModal('quemCabe',{slotAppt:id,profId:a.profId,start:a.start}),200); }
   }
   createAppt(d){
     const tp=this.type(d.typeId);
@@ -626,9 +1065,6 @@ class Component extends DCLogic {
     this.closeModal();
     this.toast(d._fromFila?('Agendado — '+this.patient(d.patientId).nome.split(' ')[0]+' saiu da fila'):(tp.grupo?'Turma agendada':'Agendamento criado'));
   }
-  moveAppt(id,profId,start){
-    this.setState(st=>({appts:st.appts.map(a=>a.id===id?{...a,profId,start}:a)}));
-  }
   addParticipant(apptId,patientId){ this.setState(st=>({appts:st.appts.map(a=>{ if(a.id!==apptId||!a.patientIds) return a; if(a.patientIds.includes(patientId)) return a; return {...a,patientIds:[...a.patientIds,patientId]}; })})); this.setState({pac:{q:'',loading:false,open:false}}); this.toast('Adicionado à turma'); }
   removeParticipant(apptId,patientId){ this.setState(st=>({appts:st.appts.map(a=>{ if(a.id!==apptId||!a.patientIds) return a; const patientIds=a.patientIds.filter(x=>x!==patientId); const pkgOf=a.pkgOf?Object.fromEntries(Object.entries(a.pkgOf).filter(([k])=>k!==patientId)):a.pkgOf; return {...a,patientIds,pkgOf}; })})); this.toast('Removido da turma'); }
   savePatient(d){
@@ -642,39 +1078,126 @@ class Component extends DCLogic {
     });
     this.closePacForm(); this.toast(d.id?'Paciente atualizado':'Paciente cadastrado');
   }
-  createSerie(d){
-    const tp=this.type(d.typeId);
-    const occ=this.computeSerie(d);
-    const novos=occ.filter(o=>!o.feriado).map((o,i)=>({id:'a'+Date.now()+'-'+i,profId:d.profId,typeId:d.typeId,start:this.t2m(d.hora),dur:tp.dur,date:o.data,status:'agendado',patientId:d.patientId,encaixe:false}));
-    this.setState(st=>{
-      let patients=st.patients;
-      if(d.criarPkg) patients=patients.map(p=>p.id===d.patientId?{...p,pkg:{tipo:tp.nome,total:d.n,usadas:0}}:p);
-      return {appts:[...st.appts,...novos],patients};
-    });
-    this.closeModal(); this.toast(novos.length+' sessões agendadas'+(occ.some(o=>o.feriado)?' (1 pulou feriado, série estendida)':''));
-  }
   computeSerie(d){
     const out=[]; const start=new Date((d.fromDate||this.state.date)+'T00:00');
-    let cur=new Date(start); let count=0; let guard=0;
+    let cur=new Date(start); if(!d.inclusive) cur.setDate(cur.getDate()+1); // séries que "começam depois" (ex.: renovação) pulam o dia âncora; pacotes novos incluem a data de início
+    let count=0; let guard=0;
     const dows=d.dows;
     while(count<d.n && guard<400){
       guard++;
-      cur.setDate(cur.getDate()+1);
       if(dows.includes(cur.getDay())){
         const ds=this.dstr(cur);
         const fer=this.state.holidays.some(h=>h.data===ds && h.tipo!=='horario');
         out.push({data:ds,feriado:fer, dow:cur.getDay()});
         if(!fer) count++;
       }
+      cur.setDate(cur.getDate()+1);
     }
     return out;
   }
+  hoje(){ return '2026-06-25'; }
+  plSes(n){ return n+' '+(n===1?'sessão':'sessões'); }
+  // ---------- pacote: falta punitiva & conciliação ----------
+  // Regra de consumo: concluído sempre debita; falta debita conforme a "falta punitiva" do pacote
+  // (com fallback pro ajuste global), a menos que a falta esteja justificada (faltaJustificada).
+  pkgPunitivo(pk){ return (pk && pk.faltaPunitiva!=null) ? !!pk.faltaPunitiva : !!this.state.settings.noShowConsome; }
+  wouldConsume(a,statusVal,pk){
+    if(statusVal==='concluido') return true;
+    if(statusVal==='faltou'){ if(a && a.faltaJustificada) return false; return this.pkgPunitivo(pk); }
+    return false;
+  }
+  // Localiza o pacote (e dono) ao qual um agendamento pertence.
+  apptPkg(a){
+    if(!a) return null;
+    if(a.patientIds){
+      if(a.pkgOf){ const ids=Object.keys(a.pkgOf); for(let k=0;k<ids.length;k++){ const pid=ids[k]; const pkgId=a.pkgOf[pid]; const p=this.patient(pid); const pk=((p&&p.pacotes)||[]).find(x=>x.id===pkgId); if(pk) return {pk,patient:p,ownerId:pid,pkgId}; } }
+      return null;
+    }
+    if(a.pkgId){ const p=this.patient(a.patientId); const pk=((p&&p.pacotes)||[]).find(x=>x.id===a.pkgId); if(pk) return {pk,patient:p,ownerId:a.patientId,pkgId:a.pkgId}; }
+    return null;
+  }
+  apptPkgDebitado(a){ const info=this.apptPkg(a); return this.wouldConsume(a,a.status,info&&info.pk); }
+  // Justificar falta: deixa de contar para o paciente E deixa de debitar o pacote (e vice-versa).
+  justificarFalta(id){
+    const a0=this.state.appts.find(x=>x.id===id); if(!a0) return;
+    const next=!a0.faltaJustificada; const affected=a0.patientIds?a0.patientIds:(a0.patientId?[a0.patientId]:[]);
+    this.setState(st=>({
+      appts:st.appts.map(x=>x.id===id?{...x,faltaJustificada:next}:x),
+      patients:st.patients.map(p=> affected.includes(p.id)?{...p,faltas:Math.max(0,(p.faltas||0)+(next?-1:1))}:p)
+    }));
+    this.toast(next?'Falta justificada — não conta para o paciente nem debita o pacote':'Justificativa removida — falta volta a contar');
+  }
+  // ---------- pacote: mudança em massa ----------
+  // ---------- reagendamento avulso ----------
+  openRemarcar(apptId){ const a=this.state.appts.find(x=>x.id===apptId); if(!a) return; this.setState({drawer:null}); this.openModal('remarcar',{apptId,date:a.date,hora:this.m2t(a.start),profId:a.profId}); }
+  saveRemarcar(d){ const a=this.state.appts.find(x=>x.id===d.apptId); if(!a) return; const start=this.t2m(d.hora); this.setState(st=>({appts:st.appts.map(x=>x.id===d.apptId?{...x,date:d.date,start,profId:d.profId,encaixe:!!d.encaixe}:x)})); this.closeModal(); this.toast('Remarcado para '+this.pkgFmt(d.date)+' às '+d.hora); }
+  openMassaPacote(apptId,fromDrag){
+    const a=this.state.appts.find(x=>x.id===apptId); if(!a) return;
+    const info=this.apptPkg(a); if(!info) return;
+    this.setState({drawer:null});
+    this.openModal('pacoteMassa',{apptId, escopo:'proximas', profId:a.profId, hora:this.m2t(a.start), aplicarProf:true, aplicarHora:true, fromDrag:!!fromDrag});
+  }
+  massaAffected(a,d){
+    const info=this.apptPkg(a); if(!info) return {list:[],horaList:[]};
+    const hoje=this.hoje(); const thisDow=new Date(a.date+'T00:00').getDay();
+    const escopo=d.escopo||'proximas';
+    const inScope=x=> escopo==='esta'?x.id===a.id:(escopo==='proximas'?x.date>=a.date:true);
+    const list=this.pkgAppts(info.pk).filter(x=> x.date>=hoje && ['agendado','confirmado','em_atendimento'].includes(x.status) && inScope(x));
+    const horaList=list.filter(x=>new Date(x.date+'T00:00').getDay()===thisDow);
+    return {list,horaList,thisDow,info};
+  }
+  applyMassaPacote(d){
+    const a=this.state.appts.find(x=>x.id===d.apptId); if(!a) return;
+    const {list,thisDow,info}=this.massaAffected(a,d);
+    if(!info) return;
+    const ids=new Set(list.map(x=>x.id));
+    const newStart=this.t2m(d.hora); let count=0;
+    this.setState(st=>{
+      const appts=st.appts.map(x=>{
+        if(!ids.has(x.id)) return x; let nx={...x}; let touched=false;
+        if(d.aplicarProf && d.profId){ nx.profId=d.profId; touched=true; }
+        if(d.aplicarHora && new Date(x.date+'T00:00').getDay()===thisDow){ nx.start=newStart; touched=true; }
+        if(touched) count++;
+        return nx;
+      });
+      const patients=st.patients.map(p=> p.id!==info.ownerId?p:{...p,pacotes:(p.pacotes||[]).map(pk=>{
+        if(pk.id!==info.pkgId) return pk; const g={...(pk.grade||{})}; const h={...(g.horarios||{})};
+        if(d.aplicarProf && d.profId && d.escopo!=='esta') g.profId=d.profId;
+        if(d.aplicarHora && d.escopo!=='esta'){ h[thisDow]=d.hora; g.horarios=h; }
+        return {...pk,grade:g};
+      })});
+      return {appts,patients};
+    });
+    this.closeModal();
+    this.toast(count?(this.plSes(count)+' do pacote '+(count>1?'atualizadas':'atualizada')):'Nada para atualizar');
+  }
+  cancelarMassaPacote(d){
+    const a=this.state.appts.find(x=>x.id===d.apptId); if(!a) return;
+    const {list,info}=this.massaAffected(a,d); if(!info) return;
+    const ids=new Set(list.map(x=>x.id)); let count=0;
+    this.setState(st=>({appts:st.appts.map(x=>{ if(!ids.has(x.id)) return x; count++; return {...x,status:'cancelado'}; })}));
+    this.closeModal();
+    this.toast(this.plSes(count)+' do pacote '+(count>1?'canceladas':'cancelada'));
+  }
+  switchEl(on,onClick){ const c=this.theme(); const html=this.html; return html`<button role="switch" aria-checked=${!!on} onClick=${onClick} style=${{width:'40px',height:'23px',flexShrink:0,borderRadius:'999px',border:'none',cursor:'pointer',padding:'2px',background:on?c.teal.solid:c.bd,transition:'background .18s',position:'relative'}}><span style=${{display:'block',width:'19px',height:'19px',borderRadius:'50%',background:'#fff',transform:on?'translateX(17px)':'translateX(0)',transition:'transform .18s',boxShadow:'0 1px 3px rgba(8,10,12,.35)'}}></span></button>`; }
   navDay(delta){ const d=new Date(this.state.date+'T00:00'); d.setDate(d.getDate()+delta); this.setState({date:this.dstr(d)}); }
   navShift(delta){ const v=this.state.view; const d=new Date(this.state.date+'T00:00'); if(v==='semana') d.setDate(d.getDate()+delta*7); else if(v==='mes') d.setMonth(d.getMonth()+delta); else d.setDate(d.getDate()+delta); this.setState({date:this.dstr(d)}); }
   goToday(){ this.setState({date:'2026-06-25'}); }
   resolveFila(id){ this.setState(st=>({fila:st.fila.filter(f=>f.id!==id)})); this.toast('Excluído da fila de espera'); }
-  addFila(d){ this.setState(st=>{ if(d.id) return {fila:st.fila.map(f=>f.id===d.id?{...f,...d}:f)}; return {fila:[{id:'f'+Date.now(),...d},...st.fila]}; }); this.closeModal(); this.toast(d.id?'Fila atualizada':'Adicionado à fila'); }
+  addFila(d){ let upd=false; this.setState(st=>{
+      if(d.id && st.fila.some(f=>f.id===d.id)){ upd=true; return {fila:st.fila.map(f=>f.id===d.id?{...f,...d}:f)}; }
+      const mesmo=d.patientId && st.fila.find(f=>f.patientId===d.patientId); // evita duplicar o mesmo paciente
+      if(mesmo){ upd=true; return {fila:st.fila.map(f=>f===mesmo?{...f,...d,id:f.id}:f)}; }
+      return {fila:[{id:d.id||('f'+Date.now()),...d},...st.fila]};
+    }); this.closeModal(); this.toast(upd?'Fila atualizada':'Adicionado à fila'); }
   saveProf(d){
+    // Guarda: se a mudança de horário/exceção do profissional deixaria agendamentos futuros fora do expediente, bloqueia o salvamento até a agenda ser ajustada.
+    const existing=d.id?this.state.profs.find(p=>p.id===d.id):null;
+    if(existing){
+      const cand={...existing,...d};
+      const conf=this.futureConflicts((a)=>this.dayPeriods(cand,a.date,this.state.hours),(a)=>a.profId===existing.id);
+      if(conf.length){ this.setState({modal:'horarioConflitos',conflictData:{conf,scope:'prof',profNome:cand.nome}}); return; }
+    }
     this.setState(st=>{
       if(d.id) return {profs:st.profs.map(p=>p.id===d.id?{...p,...d}:p)};
       return {profs:[...st.profs,{...d,id:'p'+Date.now()}]};
@@ -686,7 +1209,19 @@ class Component extends DCLogic {
   closeProfForm(){ this._formScrollEl=null; this.setState({profForm:false,modalData:{},formSec:'ident'}); }
   saveType(d){ this.setState(st=>{ if(d.id) return {types:st.types.map(t=>t.id===d.id?{...t,...d}:t)}; return {types:[...st.types,{...d,id:'t'+Date.now()}]}; }); this.closeModal(); this.toast('Tipo de atendimento salvo'); }
   rmType(id){ this.setState(st=>({types:st.types.filter(t=>t.id!==id)})); this.toast('Tipo removido'); }
-  addHoliday(d){ this.setState(st=>({holidays:[...st.holidays,{...d,id:'h'+Date.now()}]})); }
+  addHoliday(d){
+    // Guarda: uma exceção da clínica (fechar o dia ou reduzir o horário) que deixaria agendamentos futuros sem atendimento bloqueia a criação até a agenda ser ajustada.
+    const simulate=(a,prof)=>{
+      if(a.date!==d.data) return this.dayPeriods(prof,a.date,this.state.hours);
+      const pex=this.profException(prof,a.date);
+      if(pex) return pex.tipo==='horario'?(pex.periods||[]):null; // exceção do profissional continua com prioridade
+      return d.tipo==='horario'?(d.periods||[]):null;
+    };
+    const conf=this.futureConflicts(simulate);
+    if(conf.length){ this.setState({modal:'horarioConflitos',conflictData:{conf,scope:'excecao',dataExc:d.data}}); return; }
+    this.setState(st=>({holidays:[...st.holidays,{...d,id:'h'+Date.now()}],modalData:{...st.modalData,fdata:'',fnome:'',ftipo:'fechado',fperiods:null}}));
+    this.toast('Exceção adicionada');
+  }
   rmHoliday(id){ this.setState(st=>({holidays:st.holidays.filter(h=>h.id!==id)})); }
 
   // density px/min
@@ -721,7 +1256,9 @@ class Component extends DCLogic {
         const field='profId';
         const conf=this.checkConflict(g.colId,g.start,ap.dur,ap.date,ap.id,ap.encaixe);
         if(conf){ this.setState({drag:null,ghost:null}); this.openModal('override',{id:dr.id,field,colId:g.colId,start:g.start}); return; }
-        this.commitMove(dr.id,field,g.colId,g.start); this.toast('Remarcado para '+this.m2t(g.start));
+        this.commitMove(dr.id,field,g.colId,g.start); this.setState({drag:null,ghost:null}); this.toast('Remarcado para '+this.m2t(g.start));
+        if(moved) this._afterDrag=Date.now();
+        return;
       }
       this.setState({drag:null,ghost:null});
       if(moved) this._afterDrag=Date.now();
@@ -937,7 +1474,7 @@ class Component extends DCLogic {
   }
   sbConfig(){
     const html=this.html; const tab=this.state.configTab;
-    const items=[['tipos','Tipos de atendimento','Stethoscope'],['horario','Horário','Clock'],['feriados','Exceções','CalendarOff'],['equipe','Equipe & acessos','Users']];
+    const items=[['tipos','Tipos de atendimento','Stethoscope'],['horario','Horário','Clock'],['feriados','Exceções','CalendarOff'],['operacao','Operação','SlidersHorizontal'],['equipe','Equipe & acessos','Users']];
     return html`<div>
       ${this.sbHeader('Ajustes')}
       ${items.map(it=>this.sbRow(it[1],tab===it[0],()=>this.setState({configTab:it[0]}),null,null,it[2]))}
@@ -1142,13 +1679,16 @@ class Component extends DCLogic {
     const wCalc=lanes>1?'calc(('+avail+' - '+(pd*2)+'px - '+((lanes-1)*g)+'px) / '+lanes+')':'calc('+avail+' - 4px)';
     const leftCalc=lanes>1?'calc('+pd+'px + ('+wCalc+' + '+g+'px) * '+lane+')':'4px';
     const profDot=this.profColor(a.profId);
+    const pkg=this.apptPkg(a); const isPkg=!!pkg; const pkgColor=isPkg?this.pkgTypeColor(pkg.pk):null; const pkgTitle=isPkg?('Pacote · '+this.pkgTypeName(pkg.pk)+' · '+this.pkgUsadas(pkg.pk)+'/'+pkg.pk.total+' usadas'):null;
     return html`<div key=${a.id} data-appt onPointerDown=${(e)=>{if(e.target.closest('button'))return; this.startDrag(e,a);}} onClick=${(e)=>{e.stopPropagation(); if(this._afterDrag&&Date.now()-this._afterDrag<300) return; if(!this.state.drag) this.setState({drawer:a.id});}} style=${{position:'absolute',top:top+'px',left:leftCalc,width:wCalc,height:Math.max(h-2,18)+'px',background:fill,border:(conf||na?'1.5px':'1px')+' solid '+border,borderRadius:'8px',padding:'4px '+(lanes>1?'6px':'7px'),overflow:'hidden',cursor:'grab',opacity:dragging?0.4:(m.dim?0.72:1),zIndex:conf?3:(na?2:2),boxShadow:c.d?'none':'0 1px 1px rgba(20,24,30,.03)',transition:'opacity .15s',display:'flex',flexDirection:'column',gap:'2px'}}>
+      ${isPkg?html`<span title=${pkgTitle} style=${{position:'absolute',left:0,top:0,bottom:0,width:'3px',background:pkgColor,borderRadius:'7px 0 0 7px',zIndex:1}}></span>`:null}
       <div style=${{display:'flex',alignItems:'center',gap:'5px',position:'relative'}}>
         <span style=${{width:'6px',height:'6px',borderRadius:'50%',background:profDot,flexShrink:0}}></span>
         <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10.5px',fontWeight:600,color:m.color,fontVariantNumeric:'tabular-nums'}}>${this.m2t(a.start)}</span>
         ${conf?html`<${Icon} name="TriangleAlert" size=${11} color=${c.danger}/>`:null}
         ${na&&!conf?html`<span style=${{display:'inline-flex',alignItems:'center',gap:'3px',fontSize:'8.5px',fontWeight:800,letterSpacing:'.03em',color:'#fff',background:c.warning,padding:'1px 5px',borderRadius:'4px'}}><${Icon} name="CircleAlert" size=${9} color="#fff"/> AÇÃO</span>`:null}
-        <${Icon} name=${tp.icon} size=${12} color=${m.color} style=${{marginLeft:'auto'}}/>
+        ${isPkg?html`<span title=${pkgTitle} style=${{marginLeft:'auto',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,width:'16px',height:'16px',borderRadius:'5px',background:this.tint(pkgColor,c.d?.32:.15)}}><${Icon} name="Package" size=${10} color=${pkgColor}/></span>`:null}
+        <${Icon} name=${tp.icon} size=${12} color=${m.color} style=${{marginLeft:isPkg?'6px':'auto'}}/>
         ${m.live?html`<span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.teal.solid,animation:'mvPulse 1.3s infinite'}}></span>`:null}
         ${a.encaixe?html`<span style=${{fontSize:'9px',fontWeight:700,color:'#fff',background:c.warning,padding:'0 4px',borderRadius:'4px'}}>ENCAIXE</span>`:null}
       </div>
@@ -1261,6 +1801,7 @@ class Component extends DCLogic {
     const tp=this.type(a.typeId); const prof=this.state.profs.find(p=>p.id===a.profId);
     const pats=this.apptPatients(a); const pat=pats[0];
     const m=this.statusMeta(a.status);
+    const started=a.date<this.hoje()||(a.date===this.hoje()&&a.start<=702);
     const actions=[
       {s:'concluido',l:'Concluir',ic:'Check'},
       {s:'faltou',l:'Faltou',ic:'UserX'},
@@ -1280,22 +1821,23 @@ class Component extends DCLogic {
           <div style=${{display:'flex',gap:'8px',alignItems:'center',marginBottom:'14px'}}>${this.statusPill(a.status)} ${a.encaixe?html`<span style=${{fontSize:'10px',fontWeight:700,color:'#fff',background:c.warning,padding:'2px 7px',borderRadius:'4px'}}>ENCAIXE</span>`:null}</div>
           ${this.drawerRow('Clock','Horário',this.m2t(a.start)+'–'+this.m2t(a.start+a.dur)+'  ('+a.dur+'min)')}
           ${this.drawerRow(tp.icon,'Tipo',tp.nome)}
+          ${this.drawerPkgSection(a)}
+          ${this.faltaBlock(a)}
           ${a.patientIds?html`<div style=${{margin:'14px 0'}}><div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'8px',display:'flex',justifyContent:'space-between'}}><span>Pacientes na turma</span><span style=${{color:pats.length>=(tp.cap||99)?c.warning:c.faint}}>${pats.length}/${tp.cap||'∞'}</span></div>${pats.map(pt=>html`<div key=${pt.id} style=${{display:'flex',alignItems:'center',gap:'9px',padding:'6px 0'}}>${this.avatar(pt.nome,this.profColor(prof),26)}<button onClick=${()=>{this.setState({drawer:null,selPaciente:pt.id,screen:'pacientes'});}} style=${{flex:1,minWidth:0,textAlign:'left',background:'none',border:'none',cursor:'pointer',padding:0,fontSize:'13px',color:c.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${pt.nome}</button><button onClick=${()=>this.removeParticipant(a.id,pt.id)} title="Remover da turma" style=${{border:'none',background:'none',cursor:'pointer',color:c.faint,display:'grid',placeItems:'center',padding:'4px',borderRadius:'6px'}}><${Icon} name="UserMinus" size=${15}/></button></div>`)}
             ${pats.length<(tp.cap||99)?html`<div style=${{marginTop:'8px'}}>${this.patientField({multi:true,hideSelected:true,selectedIds:a.patientIds||[],onPick:p=>{clearTimeout(this._patBlur); this.addParticipant(a.id,p.id);}})}</div>`:html`<div style=${{marginTop:'6px',fontSize:'11.5px',color:c.warning,fontWeight:600}}>Turma cheia</div>`}
           </div>`:html`<div style=${{marginTop:'16px',padding:'12px',border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface2}}>
             <div style=${{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>${this.avatar(pat.nome,this.profColor(prof),34)}<div><div style=${{fontWeight:600,fontSize:'13.5px'}}>${pat.nome}</div><div style=${{fontSize:'10.5px',color:c.muted,fontFamily:"'Martian Mono', monospace"}}>${pat.tel}</div></div></div>
             <div style=${{display:'flex',gap:'14px',fontSize:'12px'}}>
               <div><span style=${{color:c.faint}}>Faltas</span> <b style=${{color:pat.faltas>0?c.danger:c.text,fontFamily:"'Martian Mono', monospace"}}>${pat.faltas}</b></div>
-              ${(()=>{const pk=this.pkgActive(pat); return pk?html`<div><span style=${{color:c.faint}}>Pacote</span> <b style=${{fontFamily:"'Martian Mono', monospace",color:this.pkgEnding(pk)?c.warning:c.text}}>${pk.usadas}/${pk.total}</b></div>`:html`<div style=${{color:c.faint}}>Sem pacote</div>`;})()}
             </div>
-            ${(()=>{const pk=this.pkgActive(pat); return pk&&this.pkgEnding(pk)?html`<button onClick=${()=>{this.setState({drawer:null}); this.openRenovar(pat.id,pk.id);}} style=${{marginTop:'10px',width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',padding:'7px',borderRadius:'8px',border:'none',background:c.warning,color:'#fff',fontWeight:600,cursor:'pointer',fontSize:'12px'}}><${Icon} name="RefreshCw" size=${13}/> Renovar pacote</button>`:null;})()}
             <button onClick=${()=>{this.setState({drawer:null,selPaciente:pat.id,screen:'pacientes'});}} style=${{marginTop:'10px',fontSize:'12px',color:c.teal.text,background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:0}}>Abrir ficha →</button>
           </div>`}
           <div style=${{marginTop:'18px'}}>
+            <button onClick=${()=>this.openRemarcar(a.id)} style=${{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'9px',borderRadius:'8px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontWeight:600,cursor:'pointer',fontSize:'13px',marginBottom:'14px'}}><${Icon} name="CalendarClock" size=${15}/> Remarcar sessão</button>
             <div style=${{fontSize:'11px',fontWeight:700,color:c.faint,marginBottom:'8px'}}>Mudar status</div>
             <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
-              ${actions.map(ac=>{const am=this.statusMeta(ac.s); const on=a.status===ac.s;
-              return html`<button key=${ac.s} disabled=${on} onClick=${()=>this.setStatus(a.id,ac.s)} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px',borderRadius:'8px',border:'1px solid '+(on?am.color:c.bs),background:on?this.tint(am.base||am.color,c.d?.2:.1):c.surface,color:on?am.color:c.text,cursor:on?'default':'pointer',fontSize:'12.5px',fontWeight:600,opacity:on?1:1}}><${Icon} name=${ac.ic} size=${14} color=${on?am.color:c.muted}/> ${ac.l}</button>`;})}
+              ${actions.map(ac=>{const am=this.statusMeta(ac.s); const on=a.status===ac.s; const dis=on||((ac.s==='concluido'||ac.s==='faltou')&&!started);
+              return html`<button key=${ac.s} disabled=${dis} title=${(!on&&(ac.s==='concluido'||ac.s==='faltou')&&!started)?'Disponível após o horário da sessão':''} onClick=${()=>this.setStatus(a.id,ac.s)} style=${{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px',borderRadius:'8px',border:'1px solid '+(on?am.color:c.bs),background:on?this.tint(am.base||am.color,c.d?.2:.1):c.surface,color:dis&&!on?c.faint:(on?am.color:c.text),cursor:dis?'default':'pointer',fontSize:'12.5px',fontWeight:600,opacity:dis&&!on?.55:1}}><${Icon} name=${ac.ic} size=${14} color=${on?am.color:c.muted}/> ${ac.l}</button>`;})}
             </div>
           </div>
         </div>
@@ -1312,6 +1854,43 @@ class Component extends DCLogic {
       <${Icon} name=${icon} size=${15} color=${c.faint}/>
       <span style=${{fontSize:'12px',color:c.muted,width:'68px'}}>${label}</span>
       <span style=${{fontSize:'11.5px',fontWeight:500,fontFamily:label==='Horário'?"'Martian Mono', monospace":'inherit'}}>${val}</span>
+    </div>`;
+  }
+  // Bloco do drawer para justificar uma falta (conta/não conta e debita/não debita o pacote).
+  faltaBlock(a){
+    if(a.status!=='faltou') return null;
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const just=!!a.faltaJustificada; const info=this.apptPkg(a); const punit=info&&this.pkgPunitivo(info.pk);
+    return html`<div style=${{marginTop:'14px',border:'1px solid '+(just?this.tint(c.success,.4):this.tint(c.danger,.32)),borderRadius:'12px',padding:'11px 13px',background:just?this.tint(c.success,.07):this.tint(c.danger,.06)}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'10px'}}>
+        <span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:just?this.tint(c.success,.14):this.tint(c.danger,.12),color:just?c.success:c.danger,flexShrink:0}}><${Icon} name=${just?'ShieldCheck':'UserX'} size=${16}/></span>
+        <div style=${{flex:1,minWidth:0}}>
+          <div style=${{fontSize:'13px',fontWeight:600}}>Falta justificada</div>
+          <div style=${{fontSize:'11.5px',color:c.muted}}>${just?'Não conta para o paciente'+(info?' nem debita o pacote':''):('Conta como falta'+(info&&punit?' e debita o pacote':''))}</div>
+        </div>
+        ${this.switchEl(just,()=>this.justificarFalta(a.id))}
+      </div>
+    </div>`;
+  }
+  // Exibe no drawer que o agendamento pertence a um pacote + estado da falta + atalho de mudança em massa.
+  drawerPkgSection(a){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon;
+    const info=this.apptPkg(a); if(!info) return null;
+    const pk=info.pk; const tp=this.type(pk.typeId);
+    const all=this.pkgAppts(pk); const idx=all.findIndex(x=>x.id===a.id); const pos=idx>=0?idx+1:null;
+    const rem=this.pkgRemaining(pk); const isFalta=a.status==='faltou'; const debitado=this.apptPkgDebitado(a); const punit=this.pkgPunitivo(pk);
+    return html`<div style=${{marginTop:'14px',border:'1px solid '+c.teal.border,borderRadius:'12px',overflow:'hidden'}}>
+      <div style=${{display:'flex',alignItems:'center',gap:'9px',padding:'10px 12px',background:c.teal.subtle}}>
+        <span style=${{width:'26px',height:'26px',borderRadius:'7px',display:'grid',placeItems:'center',background:c.teal.solid,color:'#fff',flexShrink:0}}><${Icon} name="Package" size=${15}/></span>
+        <div style=${{flex:1,minWidth:0}}>
+          <div style=${{fontSize:'12.5px',fontWeight:700,color:c.teal.text}}>Sessão de pacote${pos?html`<span style=${{fontWeight:500,opacity:.8}}> · ${pos}/${all.length}</span>`:null}</div>
+          <div style=${{fontSize:'11px',color:c.teal.text,opacity:.85,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${tp.nome} · ${this.pkgUsadas(pk)}/${pk.total} usadas · ${rem} restante${rem===1?'':'s'}</div>
+        </div>
+        <span style=${{fontSize:'9.5px',fontWeight:800,letterSpacing:'.04em',color:'#fff',background:c.teal.solid,padding:'3px 8px',borderRadius:'999px',flexShrink:0}}>PACOTE</span>
+      </div>
+      <div style=${{padding:'10px 12px',display:'flex',flexDirection:'column',gap:'9px'}}>
+        ${isFalta?html`<div style=${{fontSize:'11.5px',color:c.muted,display:'flex',alignItems:'center',gap:'7px'}}><${Icon} name=${debitado?'AlertOctagon':'ShieldCheck'} size=${13} color=${debitado?c.danger:c.success}/> ${debitado?'Esta falta debitou 1 sessão do pacote':('Esta falta não debitou o pacote'+(a.faltaJustificada?' — justificada':(punit?'':' — pacote não punitivo')))}</div>`:html`<div style=${{fontSize:'11.5px',color:c.muted,display:'flex',alignItems:'center',gap:'7px'}}><${Icon} name=${a.status==='concluido'?'CircleCheck':(punit?'AlertOctagon':'ShieldCheck')} size=${13} color=${a.status==='concluido'?c.success:c.faint}/> ${a.status==='concluido'?'Sessão debitada do pacote':('Falta '+(punit?'debita':'não debita')+' sessão neste pacote')}</div>`}
+        <button onClick=${()=>{this.setState({drawer:null}); this.openPkgGrade(info.ownerId,info.pkgId);}} style=${{display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'8px 10px',borderRadius:'8px',border:'1px solid '+c.teal.border,background:c.surface,color:c.teal.text,fontWeight:600,cursor:'pointer',fontSize:'12.5px'}}><${Icon} name="SlidersHorizontal" size=${14}/> Ajustar grade / horário</button>
+      </div>
     </div>`;
   }
 
@@ -1334,6 +1913,11 @@ class Component extends DCLogic {
     switch(this.state.modal){
       case 'novoAgendamento': return this.modalNovoAgendamento();
       case 'agendarPacote': return this.modalPacote();
+      case 'pacoteMassa': return this.modalPacoteMassa();
+      case 'renovarPacote': return this.modalRenovar();
+      case 'pkgSessoes': return this.modalSessoes();
+      case 'pkgGrade': return this.modalAjustarGrade();
+      case 'pkgCancelar': return this.modalPkgCancelar();
       case 'addFila': return this.modalAddFila();
       case 'quemCabe': return this.modalQuemCabe();
       case 'oferecer': return this.modalOferecer();
@@ -1341,6 +1925,7 @@ class Component extends DCLogic {
       case 'tipoEdit': return this.modalTipo();
       case 'membroEdit': return this.modalMembro();
       case 'override': return this.modalOverride();
+      case 'remarcar': return this.modalRemarcar();
       case 'horarioConflitos': return this.modalHorarioConflitos();
       default: return null;
     }
@@ -1608,42 +2193,12 @@ class Component extends DCLogic {
       ${footer}
     </div>`;
   }
-  modalNovaSerie(){
-    const c=this.theme(); const html=this.html; const d=this.state.modalData; const sel=this.inputStyle(c);
-    const dows=d.dows||[1,3]; const n=d.n||10; const hora=d.hora||'09:00'; const typeId=d.typeId||'t2';
-    const preview=(d.patientId&&d.profId)?this.computeSerie({n,dows,typeId}):[];
-    const skipped=preview.filter(o=>o.feriado).length;
-    const dlabels=['D','S','T','Q','Q','S','S'];
-    const body=html`<div>
-      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-        ${this.fld('Paciente',this.patientField())}
-        ${this.fld('Profissional',html`<select value=${d.profId||''} onChange=${e=>this.setMD({profId:e.target.value})} style=${sel}><option value="">Selecione…</option>${this.state.profs.map(p=>html`<option key=${p.id} value=${p.id}>${p.nome}</option>`)}</select>`)}
-      </div>
-      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}}>
-        ${this.fld('Tipo',html`<select value=${typeId} onChange=${e=>this.setMD({typeId:e.target.value})} style=${sel}>${this.state.types.map(t=>html`<option key=${t.id} value=${t.id}>${t.nome}</option>`)}</select>`)}
-        ${this.fld('Horário',html`<input type="time" step=${900} value=${hora} onChange=${e=>this.setMD({hora:e.target.value})} style=${sel}/>`)}
-        ${this.fld('Nº de sessões',html`<input type="number" min=${1} max=${30} value=${n} onChange=${e=>this.setMD({n:parseInt(e.target.value)||1})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
-      </div>
-      ${this.fld('Dias da semana',html`<div style=${{display:'flex',gap:'6px'}}>${dlabels.map((l,i)=>html`<button key=${i} onClick=${()=>{const has=dows.includes(i); this.setMD({dows:has?dows.filter(x=>x!==i):[...dows,i]});}} style=${{flex:1,height:'36px',borderRadius:'8px',border:'1px solid '+(dows.includes(i)?'transparent':c.bs),background:dows.includes(i)?c.primary:c.surface,color:dows.includes(i)?c.onPrimary:c.muted,fontWeight:600,cursor:'pointer'}}>${l}</button>`)}</div>`)}
-      <label style=${{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',marginBottom:'12px'}}>
-        <input type="checkbox" checked=${!!d.criarPkg} onChange=${e=>this.setMD({criarPkg:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px'}}/> Criar pacote de ${n} sessões
-      </label>
-      ${preview.length?html`<div style=${{padding:'12px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs}}>
-        <div style=${{fontSize:'12px',fontWeight:700,marginBottom:'8px',display:'flex',justifyContent:'space-between'}}><span>Prévia das ocorrências</span><span style=${{color:c.teal.text}}>${preview.filter(o=>!o.feriado).length} sessões</span></div>
-        <div style=${{display:'flex',flexWrap:'wrap',gap:'5px'}}>${preview.map((o,i)=>{const dd=new Date(o.data+'T00:00'); return html`<span key=${i} style=${{fontFamily:"'Martian Mono', monospace",fontSize:'10px',padding:'2px 7px',borderRadius:'6px',background:o.feriado?this.tint(c.danger,.12):c.surface,color:o.feriado?c.danger:c.text,border:'1px solid '+(o.feriado?'transparent':c.bs),textDecoration:o.feriado?'line-through':'none'}}>${String(dd.getDate()).padStart(2,'0')}/${String(dd.getMonth()+1).padStart(2,'0')}</span>`;})}</div>
-        ${skipped?html`<div style=${{marginTop:'8px',fontSize:'11.5px',color:c.warning,fontWeight:600}}>⚠ ${skipped} ocorrência em feriado foi pulada — a série foi estendida +${skipped} para entregar as ${n} sessões.</div>`:null}
-      </div>`:html`<div style=${{fontSize:'12.5px',color:c.faint,textAlign:'center',padding:'12px'}}>Selecione paciente, profissional e dias para ver a prévia.</div>`}
-    </div>`;
-    const can=d.patientId&&d.profId&&dows.length;
-    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP('Gerar série',()=>this.createSerie({...d,n,dows,hora,typeId}),!can)}`;
-    return this.modalShell('Nova série / pacote',body,footer,'540px');
-  }
   modalAddFila(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
     const profIds=d.profIds||[];
     const regras=d.regras||[];
     const timeStyle={height:'32px',width:'82px',padding:'0 6px',borderRadius:'7px',border:'1px solid '+c.bd,background:c.surface,color:c.text,fontFamily:"'Martian Mono', monospace",fontSize:'12px'};
-    const toggleProf=(id)=>{ const has=profIds.includes(id); const next=has?profIds.filter(x=>x!==id):[...profIds,id]; const upd={profIds:next}; if(!has && !(d.regras&&d.regras.length)){ upd.regras=this.profDefaultRegras(id); } this.setMD(upd); };
+    const toggleProf=(id)=>{ const has=profIds.includes(id); this.setMD({profIds:has?profIds.filter(x=>x!==id):[...profIds,id]}); };
     const setRegras=(fn)=>this.setMD({regras:fn((d.regras||[]).map(x=>({...x,dows:x.dows?x.dows.slice():undefined})))});
     const addSemana=()=>setRegras(r=>[...r,{tipo:'semana',dows:[1],periodos:[['14:00','16:00']]}]);
     const addData=()=>setRegras(r=>[...r,{tipo:'data',data:'',periodos:[['08:00','12:00']]}]);
@@ -1673,7 +2228,7 @@ class Component extends DCLogic {
     const body=html`<div>
       ${this.fld('Paciente',this.patientField())}
       ${this.fld('Prioridade',html`<select value=${d.prio||'normal'} onChange=${e=>this.setMD({prio:e.target.value})} style=${sel}><option value="urgente">Urgente</option><option value="alta">Alta</option><option value="normal">Normal</option><option value="baixa">Baixa</option></select>`)}
-      ${this.fld('Profissionais preferidos',html`<div><div style=${{display:'flex',flexWrap:'wrap',gap:'7px'}}>${this.state.profs.filter(p=>p.ativo).map(p=>chipBtn(profIds.includes(p.id),p.nome.replace(/^Dra?\.\s*/,''),()=>toggleProf(p.id),p.id))}</div><div style=${{fontSize:'11.5px',color:c.faint,marginTop:'7px'}}>Pode escolher mais de um. Ao selecionar, a disponibilidade abaixo já vem preenchida com a agenda do profissional — você pode ajustar.</div></div>`)}
+      ${this.fld('Profissionais preferidos',html`<div><div style=${{display:'flex',flexWrap:'wrap',gap:'7px'}}>${this.state.profs.filter(p=>p.ativo).map(p=>chipBtn(profIds.includes(p.id),p.nome.replace(/^Dra?\.\s*/,''),()=>toggleProf(p.id),p.id))}</div><div style=${{fontSize:'11.5px',color:c.faint,marginTop:'7px'}}>Pode escolher mais de um, ou deixar em branco para qualquer profissional.</div></div>`)}
       <div style=${{border:'1px solid '+c.bs,borderRadius:'10px',padding:'13px',marginBottom:'12px',background:c.surface}}>
         <div style=${{fontSize:'13px',fontWeight:700,marginBottom:'1px'}}>Disponibilidade do paciente</div>
         <div style=${{fontSize:'11.5px',color:c.muted,marginBottom:'13px'}}>Quando ele consegue vir para um encaixe.</div>
@@ -1702,10 +2257,37 @@ class Component extends DCLogic {
         ${this.avatar(p.nome,this.profColor(this.filaProfIds(f)[0]||'p1'),30)}
         <div style=${{flex:1,minWidth:0}}><div style=${{fontWeight:600,fontSize:'13px'}}>${p.nome}</div><div style=${{fontSize:'11.5px',color:c.muted}}>${f.janela} · ${f.dias} dias na fila</div></div>
         <span style=${{fontSize:'10.5px',fontWeight:700,color:'#fff',background:pc.color,padding:'1px 7px',borderRadius:'999px'}}>${pc.label}</span>
-        ${this.btnP('Oferecer',()=>{this.resolveFila(f.id); this.closeModal(); this.toast('Vaga oferecida a '+p.nome.split(' ')[0]);})}
+        ${this.btnP('Oferecer',()=>this.offerVaga(f,{date:slot.date,start:slot.start,profId:slot.profId||d.profId}))}
       </div>`;}):html`<div style=${{color:c.faint,textAlign:'center',padding:'16px'}}>Nenhum candidato compatível na fila.</div>`}
     </div>`;
     return this.modalShell('Quem cabe aqui?',body,html`${this.btnS('Fechar',()=>this.closeModal())}`);
+  }
+  modalRemarcar(){
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData; const sel=this.inputStyle(c);
+    const a=this.state.appts.find(x=>x.id===d.apptId); if(!a) return null;
+    const tp=this.type(a.typeId); const isGroup=!!a.patientIds;
+    const profId=d.profId||a.profId; const date=d.date||a.date; const hora=d.hora||this.m2t(a.start); const start=this.t2m(hora);
+    const avail=this.checkAvail(profId,start,tp.dur,date);
+    const conf=this.checkConflict(profId,start,tp.dur,date,a.id,d.encaixe);
+    const pats=this.apptPatients(a);
+    const body=html`<div>
+      <div style=${{display:'flex',alignItems:'center',gap:'10px',padding:'11px 13px',borderRadius:'10px',background:c.surface2,border:'1px solid '+c.bs,marginBottom:'14px'}}>
+        <span style=${{width:'30px',height:'30px',borderRadius:'8px',display:'grid',placeItems:'center',background:this.tint(tp.cor,.14),color:tp.cor,flexShrink:0}}><${Icon} name=${tp.icon} size=${16}/></span>
+        <div style=${{flex:1,minWidth:0}}><div style=${{fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${isGroup?(tp.nome+' em grupo'):pats[0].nome}</div><div style=${{fontSize:'11.5px',color:c.muted}}>Atual: ${new Date(a.date+'T00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} \u00b7 ${this.m2t(a.start)}</div></div>
+      </div>
+      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+        ${this.fld('Nova data',html`<input type="date" value=${date} onChange=${e=>this.setMD({date:e.target.value||a.date})} style=${sel}/>`)}
+        ${this.fld('Novo hor\u00e1rio',html`<input type="time" step=${900} value=${hora} onChange=${e=>this.setMD({hora:e.target.value})} style=${{...sel,fontFamily:"'Martian Mono', monospace"}}/>`)}
+      </div>
+      ${this.fld('Profissional',html`<select value=${profId} onChange=${e=>this.setMD({profId:e.target.value})} style=${sel}>${this.state.profs.filter(p=>p.ativo).map(p=>html`<option key=${p.id} value=${p.id}>${p.nome}</option>`)}</select>`)}
+      <label style=${{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',padding:'2px 0'}}><input type="checkbox" checked=${!!d.encaixe} onChange=${e=>this.setMD({encaixe:e.target.checked})} style=${{accentColor:c.teal.solid,width:'16px',height:'16px'}}/> Encaixe <span style=${{color:c.faint,fontSize:'12px'}}>(ignora conflito de hor\u00e1rio)</span></label>
+      ${conf?html`<div style=${{marginTop:'8px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.danger,.1),color:c.danger,fontSize:'12.5px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name=\"TriangleAlert\" size=${16}/><span>Choca com outro agendamento de ${this.state.profs.find(p=>p.id===conf.profId).nome.split(' ').slice(-1)} \u00e0s ${this.m2t(conf.start)}. Marque \u201cEncaixe\u201d para for\u00e7ar.</span></div>`:null}
+      ${avail?html`<div style=${{marginTop:'8px',padding:'10px 12px',borderRadius:'8px',background:this.tint(c.warning,.12),color:'#9a6a05',fontSize:'12.5px',display:'flex',gap:'8px',alignItems:'flex-start'}}><${Icon} name=\"Clock\" size=${16}/><span>${avail}</span></div>`:null}
+      ${this.apptPkg(a)?html`<div style=${{marginTop:'10px',fontSize:'11.5px',color:c.muted,display:'flex',gap:'7px',alignItems:'flex-start'}}><${Icon} name=\"Info\" size=${14} color=${c.teal.text} style=${{flexShrink:0,marginTop:'1px'}}/> Remarca s\u00f3 esta sess\u00e3o do pacote. Para mudar toda a grade use \u201cAjustar grade / horário\u201d.</div>`:null}
+    </div>`;
+    const can=!avail&&(!conf||d.encaixe);
+    const footer=html`${this.btnS('Cancelar',()=>this.closeModal())}${this.btnP('Remarcar',()=>this.saveRemarcar({apptId:a.id,date,profId,hora,encaixe:!!d.encaixe}),!can)}`;
+    return this.modalShell('Remarcar sess\u00e3o',body,footer,'460px');
   }
   modalOverride(){
     const c=this.theme(); const html=this.html; const Icon=this.Icon; const d=this.state.modalData;
@@ -1720,12 +2302,18 @@ class Component extends DCLogic {
     return this.modalShell('Conflito detectado',body,footer);
   }
   modalHorarioConflitos(){
-    const c=this.theme(); const html=this.html; const Icon=this.Icon; const list=this.state.modalData.conf||[];
-    const goto=(a)=>this.setState({date:a.date,screen:'agenda',drawer:a.id,modal:null,modalData:{}});
+    const c=this.theme(); const html=this.html; const Icon=this.Icon; const dd=this.state.conflictData||{}; const list=dd.conf||[];
+    const goto=(a)=>this.setState({date:a.date,screen:'agenda',drawer:a.id,modal:null,conflictData:null,profForm:false});
+    const n=list.length; const plural=n===1?'':'s';
+    const lead={
+      clinica:'ficaria'+(n===1?'':'m')+' fora do novo horário de atendimento. Ajuste a agenda (remarque ou cancele) antes de salvar — o horário da clínica não foi alterado.',
+      prof:'ficaria'+(n===1?'':'m')+' fora do novo horário de '+(dd.profNome||'atendimento do profissional')+'. Ajuste a agenda (remarque ou cancele) antes de salvar — o cadastro não foi alterado.',
+      excecao:'ficaria'+(n===1?'':'m')+' sem atendimento com esta exceção. Ajuste a agenda (remarque ou cancele) antes de criar a exceção — nada foi alterado ainda.',
+    }[dd.scope||'clinica'];
     const body=html`<div>
       <div style=${{display:'flex',gap:'11px',padding:'12px 14px',borderRadius:'10px',background:this.tint(c.warning,.12),marginBottom:'14px'}}>
         <${Icon} name="TriangleAlert" size=${20} color=${c.warning} style=${{flexShrink:0,marginTop:'1px'}}/>
-        <div style=${{fontSize:'13px',color:c.text,lineHeight:1.45}}><b>${list.length} agendamento${list.length===1?'':'s'} futuro${list.length===1?'':'s'}</b> ficaria${list.length===1?'':'m'} fora do novo horário de atendimento. Ajuste a agenda (remarque ou cancele) antes de salvar — o horário da clínica não foi alterado.</div>
+        <div style=${{fontSize:'13px',color:c.text,lineHeight:1.45}}><b>${n} agendamento${plural} futuro${plural}</b> ${lead}</div>
       </div>
       <div style=${{maxHeight:'340px',overflow:'auto',border:'1px solid '+c.bs,borderRadius:'10px'}}>
         ${list.map(({appt,prof,reason},i)=>{const pat=appt.patientId?this.patient(appt.patientId):null; const dd=new Date(appt.date+'T00:00');
@@ -1742,7 +2330,7 @@ class Component extends DCLogic {
         </div>`;})}
       </div>
     </div>`;
-    const footer=html`${this.btnP('Entendi',()=>this.closeModal())}`;
+    const footer=html`${this.btnP('Entendi',()=>this.setState({modal:null,conflictData:null}))}`;
     return this.modalShell('Ajuste a agenda antes de salvar',body,footer,'560px');
   }
   modalProf(){
@@ -1949,7 +2537,21 @@ class Component extends DCLogic {
     if(!profs.length) return [];
     const janela=f.janela||'qualquer';
     const regras=(f.regras||[]).filter(r=>!this.filaRegraExpirada(r) && this.filaRegraPeriodos(r).length);
-    const out=[];
+    // Passa na janela + regras? devolve ruleIdx (>=0), -1 (sem regras) ou null (não passa)
+    const fitsWin=(start,end,date,dow)=>{
+      if(janela==='manhã' && start>=720) return null;
+      if(janela==='tarde' && start<720) return null;
+      if(!regras.length) return -1;
+      const idx=(f.regras||[]).findIndex(r=>{
+        if(this.filaRegraExpirada(r)) return false;
+        if(r.tipo==='data'){ if(r.data!==date) return false; }
+        else if(!((r.dows||[]).includes(dow))) return false;
+        return this.filaRegraPeriodos(r).some(pp=>start>=this.t2m(pp[0])&&end<=this.t2m(pp[1]));
+      });
+      return idx<0?null:idx;
+    };
+    const out=[]; const seen=new Set();
+    const add=(date,start,profId,dow,ruleIdx,freed)=>{ const k=date+'|'+start+'|'+profId; if(seen.has(k)) return; seen.add(k); out.push({date,start,dur:DUR,profId,dow,ruleIdx,freed}); };
     for(let dOff=0; dOff<DAYS; dOff++){
       const dd=new Date(anchor); dd.setDate(dd.getDate()+dOff);
       const date=this.dstr(dd); const dow=dd.getDay();
@@ -1960,35 +2562,36 @@ class Component extends DCLogic {
         const periods=this.dayPeriods(prof,date);
         if(!periods||!periods.length) continue;
         const busy=busyAll.filter(a=>a.profId===prof.id).map(a=>[a.start,a.start+a.dur]);
-        const freed=freeAll.filter(a=>a.profId===prof.id).map(a=>[a.start,a.start+a.dur]);
+        const inPeriod=(start,end)=>periods.some(p=>start>=this.t2m(p[0])&&end<=this.t2m(p[1]));
+        const isFree=(start,end)=>!busy.some(b=>start<b[1]&&b[0]<end);
+        // 1) VAGAS QUE ABRIRAM (cancelamento/falta): horário exato, sempre listado, sem esconder atrás de outra brecha.
+        freeAll.filter(a=>a.profId===prof.id).forEach(a=>{
+          const start=a.start, end=start+DUR;
+          if(dOff===0 && start<NOW) return;
+          if(!inPeriod(start,end) || !isFree(start,end)) return;
+          const ri=fitsWin(start,end,date,dow); if(ri===null) return;
+          add(date,start,prof.id,dow,ri,true);
+        });
+        // 2) Disponibilidade geral: primeira brecha livre de cada período.
         for(const per of periods){
           const ps=this.t2m(per[0]), pe=this.t2m(per[1]);
           for(let s=ps; s+DUR<=pe; s+=STEP){
             const start=s, end=s+DUR;
             if(dOff===0 && start<NOW) continue;
-            if(janela==='manhã' && start>=720) continue;
-            if(janela==='tarde' && start<720) continue;
-            let ruleIdx=-1;
-            if(regras.length){
-              ruleIdx=(f.regras||[]).findIndex(r=>{
-                if(this.filaRegraExpirada(r)) return false;
-                if(r.tipo==='data'){ if(r.data!==date) return false; }
-                else if(!((r.dows||[]).includes(dow))) return false;
-                return this.filaRegraPeriodos(r).some(pp=>start>=this.t2m(pp[0])&&end<=this.t2m(pp[1]));
-              });
-              if(ruleIdx<0) continue;
-            }
-            if(busy.some(b=>start<b[1]&&b[0]<end)) continue;
-            out.push({date,start,dur:DUR,profId:prof.id,dow,ruleIdx,freed:freed.some(b=>start<b[1]&&b[0]<end)});
-            break; // primeira vaga livre deste período/profissional/dia
+            const ri=fitsWin(start,end,date,dow); if(ri===null) continue;
+            if(!isFree(start,end)) continue;
+            add(date,start,prof.id,dow,ri,false);
+            break;
           }
         }
       }
       if(out.length>=CAP) break;
     }
-    out.sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.start-b.start) || (a.profId<b.profId?-1:a.profId>b.profId?1:0));
+    // vagas que abriram primeiro, depois por data/horário
+    out.sort((a,b)=> (b.freed?1:0)-(a.freed?1:0) || (a.date<b.date?-1:a.date>b.date?1:0) || (a.start-b.start) || (a.profId<b.profId?-1:a.profId>b.profId?1:0));
     return out;
   }
+  filaTemAbriu(vagas){ return (vagas||[]).some(v=>v.freed); }
   vagaLabel(v){ const dd=new Date(v.date+'T00:00'); const wd=['dom','seg','ter','qua','qui','sex','sáb'][dd.getDay()]; return wd+' '+String(dd.getDate()).padStart(2,'0')+'/'+String(dd.getMonth()+1).padStart(2,'0'); }
   offerVaga(f,slot){ this.openModal('novoAgendamento',{patientId:f.patientId,profId:slot.profId,date:slot.date,hora:this.m2t(slot.start),typeId:'t2',encaixe:false,_fromFila:f.id}); }
   // Célula de disponibilidade da fila: chips ficam teal + clicáveis quando aquela janela tem vaga livre casada.
@@ -1998,7 +2601,7 @@ class Component extends DCLogic {
     const regras=f.regras||[];
     const base={fontSize:'10.5px',fontWeight:500,padding:'2px 7px',borderRadius:'5px',lineHeight:1.5,whiteSpace:'nowrap'};
     const neutral=(label,exp,mono,key)=>html`<span key=${key} style=${{...base,background:'transparent',border:'1px '+(exp?'dashed':'solid')+' '+(exp?c.bs:c.bd),color:exp?c.faint:c.text,textDecoration:exp?'line-through':'none',fontFamily:mono?"'Martian Mono', monospace":'inherit'}}>${label}</span>`;
-    const match=(label,slot,key)=>html`<button key=${key} onClick=${()=>this.offerVaga(f,slot)} title=${'Oferecer '+this.vagaLabel(slot)+' às '+this.m2t(slot.start)+(slot.freed?' · vaga que abriu':'')} style=${{...base,fontWeight:600,display:'inline-flex',alignItems:'center',gap:'5px',cursor:'pointer',background:c.teal.subtle,border:'1px solid '+c.teal.border,color:c.teal.text}}><span style=${{width:'6px',height:'6px',borderRadius:'50%',background:c.teal.solid,flexShrink:0}}></span>${label} <span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700}}>${this.vagaLabel(slot)} ${this.m2t(slot.start)}</span></button>`;
+    const match=(label,slot,key)=>html`<button key=${key} onClick=${()=>this.offerVaga(f,slot)} title=${'Oferecer '+this.vagaLabel(slot)+' às '+this.m2t(slot.start)+(slot.freed?' · vaga que abriu':'')} style=${{...base,whiteSpace:'normal',flexWrap:'wrap',textAlign:'left',fontWeight:600,display:'inline-flex',alignItems:'center',gap:'4px 5px',cursor:'pointer',background:slot.freed?c.teal.solid:c.teal.subtle,border:'1px solid '+c.teal.border,color:slot.freed?'#fff':c.teal.text}}><span style=${{width:'6px',height:'6px',borderRadius:'50%',background:slot.freed?'#fff':c.teal.solid,flexShrink:0}}></span><span style=${{whiteSpace:'nowrap'}}>${label}</span><span style=${{fontFamily:"'Martian Mono', monospace",fontWeight:700,whiteSpace:'nowrap'}}>${this.vagaLabel(slot)} ${this.m2t(slot.start)}</span>${slot.freed?html`<span style=${{fontSize:'8.5px',fontWeight:800,letterSpacing:'.05em',background:'rgba(255,255,255,.25)',padding:'1px 4px',borderRadius:'3px'}}>ABRIU</span>`:''}</button>`;
     const items=[];
     if(regras.length){
       if(jan) items.push(neutral(jan==='manhã'?'Manhã':'Tarde',false,false,'jan'));
@@ -2007,8 +2610,8 @@ class Component extends DCLogic {
         else items.push(neutral(this.filaRegraLabel(r),exp,true,'r'+i));
       });
     } else {
-      const label=jan?(jan==='manhã'?'Manhã':'Tarde'):'Qualquer horário';
       const slot=vagas[0];
+      const label=jan?(jan==='manhã'?'Manhã':'Tarde'):(slot?'Qualquer':'Qualquer horário');
       if(slot) items.push(match(label,slot,'m')); else items.push(neutral(label,false,false,'m'));
     }
     if(!vagas.length) items.push(html`<span key="no" style=${{fontSize:'10.5px',color:c.faint,fontStyle:'italic'}}>· sem vaga compatível</span>`);
@@ -2071,7 +2674,7 @@ class Component extends DCLogic {
     const at=this.state.pacAtend||'todos';
     const pf=this.state.pacProf||'';
     const list=this.state.patients.filter(p=>{
-      if(q&&!(p.nome.toLowerCase().includes(q)||p.cpf.includes(q)||p.tel.includes(q))) return false;
+      if(q&&!(p.nome.toLowerCase().includes(q)||p.cpf.includes(q)||p.tel.includes(q)||(p.pacotes||[]).some(pk=>this.pkgCode(pk).toLowerCase().includes(q)))) return false;
       if(!(ff==='todos'||(ff==='pacote'&&this.pkgActive(p))||(ff==='acabando'&&(()=>{const pk=this.pkgActive(p);return pk&&this.pkgEnding(pk);})())||(ff==='faltas'&&p.faltas>0)||(ff==='resp'&&p.resp))) return false;
       if(at!=='todos'&&(p.atendTipo||'particular')!==at) return false;
       if(pf&&!(p.prefs||[]).includes(pf)) return false;
@@ -2084,7 +2687,7 @@ class Component extends DCLogic {
       <div style=${{display:'flex',gap:'10px',marginBottom:'14px',alignItems:'center'}}>
         <div style=${{flex:1,maxWidth:mobile?'none':'380px',position:'relative'}}>
           <${Icon} name="Search" size=${15} color=${c.faint} style=${{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)'}}/>
-          <input value=${this.state.pacQuery||''} onInput=${e=>this.setState({pacQuery:e.target.value})} placeholder="Buscar por nome, CPF ou telefone" style=${{width:'100%',height:'36px',padding:'0 12px 0 32px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontSize:'13px'}}/>
+          <input value=${this.state.pacQuery||''} onInput=${e=>this.setState({pacQuery:e.target.value})} placeholder="Buscar por nome, CPF, telefone ou código do pacote" style=${{width:'100%',height:'36px',padding:'0 12px 0 32px',borderRadius:'8px',border:'1px solid '+c.bs,background:c.surface,color:c.text,fontSize:'13px'}}/>
         </div>
         ${mobile?null:html`<div style=${{flex:1}}></div>`}
         ${mobile?null:html`<button onClick=${()=>this.openPacForm({})} style=${{display:'flex',alignItems:'center',gap:'7px',padding:'9px 14px',borderRadius:'8px',border:'none',background:c.primary,color:c.onPrimary,fontWeight:600,cursor:'pointer',fontSize:'13px',flexShrink:0}}><${Icon} name="UserPlus" size=${15}/> Novo paciente</button>`}
@@ -2154,10 +2757,9 @@ class Component extends DCLogic {
           </div>
         </div>
         ${p.tags&&p.tags.length?html`<div style=${{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'14px'}}>${p.tags.map(t=>html`<span key=${t} style=${{fontSize:'12px',padding:'3px 10px',borderRadius:'999px',background:c.surface2,color:c.muted,border:'1px solid '+c.bs}}>${t}</span>`)}</div>`:null}
-        <div style=${{display:'grid',gridTemplateColumns:mobile?'1fr 1fr':'repeat(4,1fr)',gap:'10px',marginTop:'16px'}}>
+        <div style=${{display:'grid',gridTemplateColumns:mobile?'1fr 1fr':'repeat(3,1fr)',gap:'10px',marginTop:'16px'}}>
           ${stat('Idade',idade!==''?idade+' anos':'—')}
           ${stat('Faltas',String(p.faltas),p.faltas>0?c.danger:c.text)}
-          ${(()=>{const pk=this.pkgActive(p);return pk?stat('Pacote',pk.usadas+'/'+pk.total,this.pkgEnding(pk)?c.warning:c.teal.text):stat('Pacote','—');})()}
           ${stat('Consentimento LGPD','OK',c.success)}
         </div>
       </div>
@@ -2234,7 +2836,7 @@ class Component extends DCLogic {
     const order={urgente:0,alta:1,normal:2,baixa:3};
     const fp=this.state.filaPrio||'todas';
     const list=this.state.fila.filter(x=>fp==='todas'||x.prio===fp).slice().sort((a,b)=>order[a.prio]-order[b.prio]);
-    const gcols='minmax(180px,1.7fr) 108px minmax(200px,2fr) minmax(96px,0.85fr) 60px 176px';
+    const gcols='minmax(180px,1.7fr) 108px minmax(236px,2fr) minmax(96px,0.85fr) 60px 176px';
     const hcell=(t,alignEnd)=>html`<div style=${{fontSize:'12px',fontWeight:500,color:c.faint,textAlign:alignEnd?'right':'left'}}>${t}</div>`;
     const chip=(label,exp,mono)=>html`<span style=${{fontSize:'10.5px',fontWeight:500,padding:'2px 7px',borderRadius:'5px',lineHeight:1.5,whiteSpace:'nowrap',background:'transparent',border:'1px '+(exp?'dashed':'solid')+' '+(exp?c.bs:c.bd),color:exp?c.faint:c.text,textDecoration:exp?'line-through':'none',fontFamily:mono?"'Martian Mono', monospace":'inherit'}}>${label}</span>`;
     return html`<div style=${{padding:narrow?'16px':'22px 24px'}}>
@@ -2377,6 +2979,14 @@ class Component extends DCLogic {
     const invalidDays=follow?[]:[1,2,3,4,5,6,0].filter(dow=>Array.isArray(av[dow])&&av[dow].length&&!dayValid(dow));
     const hasInvalid=invalidDays.length>0;
     const toggleOwn=(dow,on)=>{ const m={...av}; if(on){ const cl=clinic[dow]; if(!cl||!cl.length) return; m[dow]=(Array.isArray(av[dow])&&av[dow].length?av[dow]:cl.map(p=>p.slice())); } else delete m[dow]; setAvail(m); };
+    // Exceções de data do profissional (mesma estrutura das exceções da clínica; valem sobre o horário semanal).
+    const exc=(d.exc||[]).slice();
+    const exTipo=d.exTipo||'fechado';
+    const exPer=d.exPeriods||[['08:00','12:00']];
+    const setExPer=fn=>{const np=exPer.map(p=>p.slice()); const r=fn(np); this.setMD({exPeriods:r});};
+    const addExc=()=>{ if(!d.exData) return; const rec={id:'pe'+Date.now(),data:d.exData,nome:(d.exNome||'').trim()||(exTipo==='horario'?'Horário especial':'Ausência'),tipo:exTipo}; if(exTipo==='horario') rec.periods=exPer.map(p=>p.slice()); this.setMD({exc:[...exc,rec],exData:'',exNome:'',exTipo:'fechado',exPeriods:null}); };
+    const rmExc=(id)=>this.setMD({exc:exc.filter(e=>e.id!==id)});
+    const exSeg=(k,l)=>html`<button key=${k} onClick=${()=>this.setMD({exTipo:k})} style=${{flex:1,padding:'7px 8px',borderRadius:'7px',border:'1px solid '+(exTipo===k?c.teal.solid:c.bd),background:exTipo===k?c.teal.subtle:c.surface,color:exTipo===k?c.teal.text:c.muted,fontWeight:exTipo===k?700:500,cursor:'pointer',fontSize:'12px'}}>${l}</button>`;
     const wds2=[['Segunda',1],['Terça',2],['Quarta',3],['Quinta',4],['Sexta',5],['Sábado',6],['Domingo',0]];
     const dayRow=([lbl,dow])=>{
       const cl=clinic[dow]; const clinicOpen=!!(cl&&cl.length);
@@ -2442,7 +3052,7 @@ class Component extends DCLogic {
       </div>`}
     </div>`;
 
-    const savePayload=()=>{const p={...d,ci,followClinic:follow,avail:av,ativo:d.ativo!==false,vinculo,contaTipo}; p.sub=(d.esp&&d.esp[0])||d.sub||''; return p;};
+    const savePayload=()=>{const {exData,exNome,exTipo,exPeriods,...rest}=d; const p={...rest,ci,followClinic:follow,avail:av,exc,ativo:d.ativo!==false,vinculo,contaTipo}; p.sub=(d.esp&&d.esp[0])||d.sub||''; return p;};
     const footer=html`<div style=${{flexShrink:0,padding:mobile?'11px 16px':'12px 24px',borderTop:'1px solid '+c.bs,background:c.surface,display:'flex',alignItems:'center',gap:'12px'}}>
       <span style=${{fontSize:'12px',color:hasInvalid?c.danger:c.faint,flex:1,display:mobile?'none':'flex',alignItems:'center',gap:'6px'}}>${hasInvalid?html`<${Icon} name="TriangleAlert" size=${14}/> Há horários fora do funcionamento da clínica.`:'Apenas o nome é obrigatório — salve e complete depois.'}</span>
       ${mobile?html`<div style=${{flex:1}}></div>`:null}
@@ -2536,6 +3146,29 @@ class Component extends DCLogic {
                 <div><div style=${{fontSize:'13px',fontWeight:600}}>Seguir o horário da clínica</div><div style=${{fontSize:'11.5px',color:c.muted}}>${follow?'O profissional atende exatamente no horário da clínica.':'Defina o horário do profissional — sempre dentro do funcionamento da clínica.'}</div></div>
               </div>
               ${follow?'':html`<div style=${{border:'1px solid '+c.bs,borderRadius:'8px',overflow:'hidden'}}>${wds2.map(dayRow)}</div>${hasInvalid?html`<div style=${{marginTop:'8px',padding:'8px 11px',borderRadius:'8px',background:this.tint(c.danger,.1),color:c.danger,fontSize:'11.5px',fontWeight:600,display:'flex',alignItems:'center',gap:'7px'}}><${Icon} name="TriangleAlert" size=${14}/> Há horários fora do funcionamento da clínica. Ajuste antes de salvar.</div>`:''}`}
+              <div style=${{marginTop:'18px',paddingTop:'16px',borderTop:'1px solid '+c.bs}}>
+                <div style=${{display:'flex',alignItems:'center',gap:'8px',marginBottom:'3px'}}><${Icon} name="CalendarOff" size=${15} color=${c.muted}/><span style=${{fontWeight:600,fontSize:'13.5px'}}>Exceções de data</span></div>
+                <div style=${{fontSize:'11.5px',color:c.muted,marginBottom:'12px'}}>Folgas, férias, congressos ou um horário pontual só deste profissional. Valem sobre o horário semanal e são checadas contra os agendamentos futuros ao salvar.</div>
+                <div style=${{padding:'12px',borderRadius:'10px',border:'1px solid '+c.bs,background:c.surface2,marginBottom:exc.length?'12px':0}}>
+                  <div style=${{display:'flex',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
+                    <input type="date" value=${d.exData||''} onChange=${e=>this.setMD({exData:e.target.value})} style=${{...sel,maxWidth:'170px'}}/>
+                    <input value=${d.exNome||''} onChange=${e=>this.setMD({exNome:e.target.value})} placeholder="Descrição (ex.: férias, congresso)" style=${{...sel,flex:'1 1 170px',minWidth:'150px'}}/>
+                  </div>
+                  <div style=${{display:'flex',gap:'6px',marginBottom:'10px'}}>${exSeg('fechado','Não atende no dia')}${exSeg('horario','Horário específico')}</div>
+                  ${exTipo==='horario'?html`<div style=${{marginBottom:'10px'}}><div style=${{fontSize:'11.5px',color:c.muted,marginBottom:'6px'}}>Períodos de atendimento neste dia:</div>${this.periodEditor(c,exPer,{set:(pi,idx,v)=>setExPer(p=>{p[pi][idx]=v;return p;}),add:()=>setExPer(p=>{const last=p.length?p[p.length-1][1]:'13:00';p.push([last,last<'18:00'?'18:00':'19:00']);return p;}),rm:pi=>setExPer(p=>{p.splice(pi,1);return p.length?p:[['08:00','12:00']];})})}</div>`:''}
+                  <button onClick=${addExc} disabled=${!d.exData} style=${{padding:'8px 14px',borderRadius:'8px',border:'none',background:d.exData?c.primary:c.bd,color:c.onPrimary,fontWeight:600,cursor:d.exData?'pointer':'default',fontSize:'13px'}}>Adicionar exceção</button>
+                </div>
+                ${exc.length?html`<div style=${{border:'1px solid '+c.bs,borderRadius:'10px',overflow:'hidden'}}>${exc.slice().sort((a,b)=>a.data<b.data?-1:1).map((e,i)=>{const dt=new Date(e.data+'T00:00'); const isH=e.tipo==='horario';
+                return html`<div key=${e.id} style=${{display:'flex',alignItems:'center',gap:'11px',padding:'10px 12px',borderTop:i?'1px solid '+c.bs:'none'}}>
+                  <${Icon} name=${isH?'Clock':'CalendarOff'} size=${16} color=${isH?c.teal.solid:c.danger}/>
+                  <span style=${{fontFamily:"'Martian Mono', monospace",fontSize:'11.5px',width:'82px',flexShrink:0}}>${dt.toLocaleDateString('pt-BR')}</span>
+                  <div style=${{flex:1,minWidth:0}}>
+                    <div style=${{fontSize:'13px',fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>${e.nome}</div>
+                    <div style=${{fontSize:'10.5px',fontFamily:"'Martian Mono', monospace",color:isH?c.teal.text:c.danger,marginTop:'1px'}}>${isH?(e.periods||[]).map(p=>p[0]+'–'+p[1]).join(', '):'Não atende o dia inteiro'}</div>
+                  </div>
+                  <button onClick=${()=>rmExc(e.id)} title="Remover" style=${this.iconBtn(c)}><${Icon} name="Trash2" size=${14} color=${c.danger}/></button>
+                </div>`;})}</div>`:null}
+              </div>
             </div>`)}
 
             ${card(SECTIONS[5],html`<div>
@@ -2557,7 +3190,7 @@ class Component extends DCLogic {
     const tabs=[['tipos','Tipos de atendimento'],['horario','Horário'],['feriados','Exceções'],['equipe','Equipe & acessos']];
     const tBtn=([k,l])=>html`<button key=${k} onClick=${()=>this.setState({configTab:k})} style=${{padding:'7px 13px',borderRadius:'8px',border:'none',cursor:'pointer',background:tab===k?c.surface:'transparent',color:tab===k?c.text:c.muted,fontWeight:tab===k?600:500,fontSize:'13px',boxShadow:tab===k?'0 1px 2px rgba(0,0,0,.06)':'none',whiteSpace:'nowrap'}}>${l}</button>`;
     return html`<div style=${{padding:'16px 18px',maxWidth:tab==='equipe'?'920px':'760px'}}>
-      ${tab==='horario'?this.cfgHorario():tab==='equipe'?this.cfgEquipe():tab==='feriados'?this.cfgFeriados():this.cfgTipos()}
+      ${tab==='horario'?this.cfgHorario():tab==='operacao'?this.cfgOperacao():tab==='equipe'?this.cfgEquipe():tab==='feriados'?this.cfgFeriados():this.cfgTipos()}
     </div>`;
   }
   card(title,body){ const c=this.theme(); const html=this.html; return html`<div style=${{border:'1px solid '+c.bs,borderRadius:'10px',background:c.surface,padding:'16px',marginBottom:'12px'}}>${title?html`<div style=${{fontWeight:600,fontSize:'14px',marginBottom:'12px'}}>${title}</div>`:null}${body}</div>`; }
@@ -2587,7 +3220,7 @@ class Component extends DCLogic {
     const tog=(k,l,desc)=>html`<label style=${{display:'flex',alignItems:'center',gap:'10px',padding:'10px 0',borderTop:'1px solid '+c.bs,cursor:'pointer'}}><div style=${{flex:1}}><div style=${{fontSize:'13.5px',fontWeight:500}}>${l}</div><div style=${{fontSize:'12px',color:c.muted}}>${desc}</div></div><input type="checkbox" checked=${!!S[k]} onChange=${e=>this.setState({settings:{...S,[k]:e.target.checked}})} style=${{accentColor:c.teal.solid,width:'18px',height:'18px'}}/></label>`;
     return this.card('Operação da agenda',html`<div>
       ${this.fld('Capacidade padrão de grupo (Pilates)',html`<input type="number" value=${S.capPilates} onChange=${e=>this.setState({settings:{...S,capPilates:parseInt(e.target.value)||1}})} style=${{...sel,fontFamily:"'Martian Mono', monospace",width:'120px'}}/>`)}
-      ${tog('noShowConsome','Falta consome sessão do pacote','Quando o paciente falta, debita 1 sessão do pacote vinculado')}
+      ${tog('noShowConsome','Falta punitiva — padrão de novos pacotes','Valor inicial ao criar um pacote: falta debita 1 sessão. Cada pacote pode ajustar e cada falta pode ser justificada.')}
     </div>`);
   }
   cfgTipos(){
@@ -2636,7 +3269,7 @@ class Component extends DCLogic {
     const tipo=d.ftipo||'fechado';
     const per=d.fperiods||[['08:00','12:00']];
     const setPer=fn=>{const np=per.map(p=>p.slice()); const r=fn(np); this.setMD({fperiods:r});};
-    const add=()=>{if(!d.fdata) return; const rec={data:d.fdata,nome:d.fnome||(tipo==='horario'?'Horário especial':'Feriado'),tipo}; if(tipo==='horario') rec.periods=per.map(p=>p.slice()); this.addHoliday(rec); this.setMD({fdata:'',fnome:'',ftipo:'fechado',fperiods:null}); this.toast('Exceção adicionada');};
+    const add=()=>{if(!d.fdata) return; const rec={data:d.fdata,nome:d.fnome||(tipo==='horario'?'Horário especial':'Feriado'),tipo}; if(tipo==='horario') rec.periods=per.map(p=>p.slice()); this.addHoliday(rec);};
     const seg=(k,l)=>html`<button key=${k} onClick=${()=>this.setMD({ftipo:k})} style=${{flex:1,padding:'7px 8px',borderRadius:'7px',border:'1px solid '+(tipo===k?c.teal.solid:c.bd),background:tipo===k?c.teal.subtle:c.surface,color:tipo===k?c.teal.text:c.muted,fontWeight:tipo===k?700:500,cursor:'pointer',fontSize:'12px'}}>${l}</button>`;
     return this.card('Exceções da agenda',html`<div>
       <div style=${{fontSize:'12px',color:c.muted,marginBottom:'12px'}}>Datas específicas que fogem ao horário normal: feche o dia inteiro ou defina um horário só para aquele dia.</div>
