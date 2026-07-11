@@ -1,0 +1,18 @@
+# Dev image for the Movimento API (Phoenix + Ash). Runtime only —
+# source is bind-mounted and deps/_build live in named volumes (see compose).
+FROM elixir:1.18.4-otp-27
+
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends build-essential git inotify-tools postgresql-client \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mix local.hex --force && mix local.rebar --force
+
+ENV MIX_ENV=dev \
+    LANG=C.UTF-8
+
+WORKDIR /app
+
+EXPOSE 4000
+
+ENTRYPOINT ["bash", "/app/entrypoint.dev.sh"]

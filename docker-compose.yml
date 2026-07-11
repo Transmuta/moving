@@ -1,0 +1,68 @@
+# Movimento — ambiente de desenvolvimento 100% em container.
+# Sobe: db (Postgres) + api (Phoenix/Ash) + web (SvelteKit BFF).
+#   docker compose up
+# Nada roda local — mix e npm executam dentro dos serviços.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: movimento_dev
+    ports:
+      # Host port 5434 (5432/5433 já usados por outros stacks) -> Postgres do container.
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: movimento_dev
+      PORT: "4000"
+    ports:
+      # Host 4010 (4000 já usado por outro stack) -> Phoenix do container.
+      - "4010:4000"
+    volumes:
+      - ./api:/app
+      - api_deps:/app/deps
+      - api_build:/app/_build
+    stdin_open: true
+    tty: true
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - api
+    environment:
+      # Endereço da API server-to-server (BFF -> Phoenix), pela rede do compose.
+      API_URL: http://api:4000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+    stdin_open: true
+    tty: true
+
+volumes:
+  pgdata:
+  api_deps:
+  api_build:
+  web_node_modules:

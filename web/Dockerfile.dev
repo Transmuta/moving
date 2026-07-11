@@ -1,0 +1,13 @@
+# Dev image for the Movimento web BFF (SvelteKit + Svelte 5 runes).
+# node_modules is baked here and preserved via an anonymous volume in compose,
+# while the source is bind-mounted for live reload.
+FROM node:22
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
