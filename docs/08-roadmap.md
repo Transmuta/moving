@@ -6,17 +6,17 @@ ou pontos seria inventar. O que este documento fixa é **ordem e dependência**:
 vem antes do quê, e por quê. As decisões que sustentam cada escolha estão em
 [00-decisoes.md](00-decisoes.md); o desenho de sistema, em [04-arquitetura.md](04-arquitetura.md).
 
-> **Nota de proveniência (revisada nesta rodada).** Os documentos
+> **Nota de proveniência (atualizada em 2026-07-10).** Os documentos
 > [01-dominio-ash.md](01-dominio-ash.md), [02-regras-e-lacunas.md](02-regras-e-lacunas.md) e
-> [03-frontend-sveltekit.md](03-frontend-sveltekit.md) são citados aqui como destino de
-> detalhamento e **ainda não existem** no repositório — verificado nesta revisão (`ls docs/`).
-> As afirmações abaixo se apoiam apenas no protótipo (com linha verificada) e nos ADRs já
-> travados. Como o 02 (catálogo formal de regras e lacunas) ainda não foi escrito, esta revisão
-> fixa em [§9](#9-catálogo-provisório-de-gaps-para-o-02) um **catálogo provisório de GAPs
-> numerados**, para que o 02 o adote quando for redigido — as duas ordens de numeração devem
-> coincidir. Já os documentos [05-observabilidade-e-producao.md](05-observabilidade-e-producao.md)
-> e [06-seguranca-e-lgpd.md](06-seguranca-e-lgpd.md), citados no Gate G1 (§6), **já existem** e
-> são referenciados como fontes reais, não como destinos futuros.
+> [03-frontend-sveltekit.md](03-frontend-sveltekit.md) — que rodadas anteriores deste roadmap
+> davam como inexistentes — **já existem e são densos**: o `02` traz o catálogo formal de regras
+> (RN-01…RN-60) e lacunas (GAP-01…16), e o `01`, o modelo Ash completo. O catálogo provisório de
+> GAPs de [§9](#9-catálogo-provisório-de-gaps-para-o-02) foi **absorvido e renumerado** pelo `02`
+> (a numeração canônica é a do `02`; onde §9 divergir, vale o `02`). Os documentos
+> [05-observabilidade-e-producao.md](05-observabilidade-e-producao.md) e
+> [06-seguranca-e-lgpd.md](06-seguranca-e-lgpd.md) também existem. As decisões de produto que este
+> roadmap listava como abertas foram fechadas em [10-decisoes-de-produto-v1.md](10-decisoes-de-produto-v1.md)
+> e nos ADRs 011–013; o resumo consolidado é [11-resumo-consolidado.md](11-resumo-consolidado.md).
 
 ---
 
@@ -280,10 +280,9 @@ e retomar reprojeta as sessões restantes para datas futuras, nunca para o passa
 **GAPs que fecha.** O bug de retomada em datas passadas ([`:561`](../interface/Movimento.dc.html#L561)).
 A ausência de um débito de sessão consistente e transacional.
 
-**Perguntas de produto ANTES (bloqueiam schema — de [00-decisoes.md](00-decisoes.md)).**
-Pacote tem validade real? Pausar estende a validade por quanto? "Renovar" é continuar o mesmo
-pacote ou criar um sucessor? — hoje os dois coexistem no protótipo. Sem essas respostas, o
-schema de pacote é palpite.
+**Perguntas de produto ANTES — RESPONDIDAS (2026-07-10).** Pacote **sem validade** (D6); **não
+há renovação** ([ADR-011](00-decisoes.md)) — o total de sessões é editável (+/−) a qualquer
+momento, sempre no mesmo pacote. Schema de pacote destravado.
 
 ### Fatia 4 — Fila de espera + reserva de vaga (hold)
 
@@ -356,10 +355,18 @@ participante e **ignora em silêncio** os pacotes dos outros. Decidir o comporta
 o ajuste em massa deve alcançar todos os pacotes da turma ou só o do agendamento âncora, e como
 a UI comunica isso — é pré-requisito desta fatia. A decisão está registrada em §8.
 
-### Fatia 6 — Pacientes / prontuário completo + anexos (fatia LGPD)
+### Fatia 6 — Paciente / ficha (v1) · prontuário completo é v2
 
-**Escopo.** O prontuário de verdade: tags clínicas, anexos (laudos/exames), encaminhamento
-médico, consentimento versionado. Substitui o paciente-mínimo da Fatia 1.
+> **Revisado por [ADR-013](00-decisoes.md) (2026-07-10).** A v1 **não tem prontuário** — só a
+> **ficha do paciente** (dados cadastrais/contato). Todos os papéis visualizam o paciente; o
+> profissional é somente-leitura. Tudo que esta seção descreve abaixo (tags clínicas, anexos,
+> consentimento versionado, LGPD Art. 11) é **v2**. Três sub-decisões da ficha v1 seguem abertas
+> (ADR-013): a ficha inclui médico/CRM/convênio? CPF precisa de cifra + índice cego? `fila.obs`
+> é observação operacional ou campo protegido?
+
+**Escopo (v2 — quando o prontuário entrar).** O prontuário de verdade: tags clínicas, anexos
+(laudos/exames), encaminhamento médico, consentimento versionado. Substitui o paciente-mínimo
+da Fatia 1.
 
 **Por que aqui.** Valor alto, **custo de conformidade alto**, e por isso atrás do **gate de
 dado real de paciente** (§6). Esta é a fatia que o ADR-007 governa: no protótipo, diagnóstico
@@ -519,6 +526,14 @@ deste gate; a verificação de região/réplicas do Postgres e a telemetria de p
 condicionam o gate ficam em
 [05-observabilidade-e-producao.md](05-observabilidade-e-producao.md).
 
+> **Revisado por [ADR-013](00-decisoes.md) (2026-07-10).** Como a **v1 não tem prontuário** (só a
+> ficha do paciente), o peso deste gate cai na v1: sem tags clínicas, anexos e consentimento
+> versionado, os pré-requisitos **1–6** (que protegem dado clínico Art. 11) **não bloqueiam as
+> fatias da v1** — voltam integralmente na **v2**, quando o prontuário entrar. Ressalva: a ficha
+> v1 ainda pode conter dado sensível (CPF, médico/CRM, `fila.obs`), e o que disso exige proteção
+> na v1 depende das três sub-decisões abertas do ADR-013. O item **7** (região/réplicas do
+> Postgres) e a telemetria seguem valendo para **qualquer** dado real de paciente, inclusive a ficha.
+
 Pré-requisitos (todos do ADR-007, salvo indicação):
 1. Criptografia de campo (`AshCloak`) ativa nos campos sensíveis catalogados.
 2. Trilha de auditoria (`AshPaperTrail`) sobre acesso e mutação de prontuário.
@@ -558,16 +573,15 @@ expresso em fatia, não em data.
 
 | Decisão de produto (aberta) | O que ela bloqueia | Quando precisamos (fatia) |
 |---|---|---|
-| Pacote tem validade real? Pausar estende por quanto? | Schema de pacote e a reprojeção da série na retomada | **Antes da Fatia 3** |
-| "Renovar" é continuar o mesmo pacote ou criar um sucessor? (hoje os dois coexistem) | Schema de pacote e a semântica de débito acumulado | **Antes da Fatia 3** |
-| Cancelamento libera a vaga para a fila automaticamente? | Fluxo entre transição e fila | Antes da Fatia 2 (ou início da Fatia 4) |
-| TTL e prioridade da fila de espera | Regra do `SlotHold` e ordenação da fila | **Antes da Fatia 4** |
-| Presença individual em turma confirma-se como requisito? | Schema do agendamento de turma e débito por participante | **Antes da Fatia 5** |
-| Turma multi-pacote: participantes da mesma turma podem estar em pacotes diferentes (`pkgOf`, [`:330`](../interface/Movimento.dc.html#L330)); um ajuste em massa deve afetar todos os pacotes ou só o do agendamento âncora? Hoje afeta um só e **ignora os demais em silêncio** (`apptPkg` [`:1110`](../interface/Movimento.dc.html#L1110), `massaAffected` [`:1145`](../interface/Movimento.dc.html#L1145)) | Semântica de `apptPkg`/`massaAffected` e schema do vínculo turma↔pacote↔participante | **Antes da Fatia 5** |
-| Quais papéis leem quais campos do prontuário? Retenção por tipo de dado? | `field_policies`, `AshCloak`, política de purga | **Antes da Fatia 6** (é parte do Gate G1) |
-| Ao mudar horário, agendamentos futuros conflitantes são bloqueados, remarcados ou sinalizados? | Comportamento do `futureConflicts` na escrita | **Antes da Fatia 7** |
-| Timezone da clínica pode mudar após existirem agendamentos? Feriado admite exceção por profissional? | Camadas de precedência editáveis do `dayPeriods` | Antes da Fatia 8 |
-| Um profissional pode existir em mais de uma clínica? (regra nova, ADR-003) | Modelo de vínculo profissional↔clínica e convite | Antes da Fatia 10 |
+| Pacote tem validade? Renovar? | ✅ **Resolvido:** sem validade (D6); **sem renovação**, total editável (+/−) a qualquer momento ([ADR-011](00-decisoes.md)) | — |
+| Cancelamento libera a vaga para a fila automaticamente? | ✅ **Resolvido:** motivo opcional + libera automático (D4) | — |
+| TTL e prioridade da fila de espera | ✅ **Resolvido:** TTL 10 min; prioridade + ordem de chegada (D8/D9) | — |
+| Presença individual em turma confirma-se como requisito? | ✅ **Resolvido:** sim, por participante (D10) | — |
+| Turma multi-pacote: ajuste em massa afeta todos ou só o âncora? | ✅ **Resolvido:** **não existe "pacote de turma"** — ajuste sempre por (paciente, pacote) (D11) | — |
+| Quais papéis leem quais campos do prontuário? Retenção? | ⚠️ **Revisado ([ADR-013](00-decisoes.md)):** v1 não tem prontuário, só ficha (todos veem, profissional só lê). Sub-decisões da ficha abertas: médico/CRM, cifra do CPF, `fila.obs` | Antes da ficha / Fatia 4 |
+| Ao mudar horário, futuros conflitantes bloqueados/remarcados/sinalizados? | ✅ **Resolvido:** bloqueiam a mudança (D12 — já é o do protótipo) | — |
+| Timezone muda após agendamentos? Feriado admite exceção por profissional? | ✅ **Resolvido:** timezone só Brasília, imutável (D13); feriado = bloqueio absoluto (D14) | — |
+| Um profissional pode existir em mais de uma clínica? | ✅ **Resolvido:** um por clínica na v1 ([ADR-012](00-decisoes.md)); multi-clínica → v2 | — |
 | Salas/equipamentos como recurso com capacidade | Forma da exclusion constraint (por profissional → por recurso); é a mudança de schema mais cara | v2 — **não** decidir por palpite na v1 |
 | Preço por convênio/particular/reembolso; há repasse ao profissional? | Subdomínio de faturamento e repasse; os campos banco/PIX/remuneração ([`:3140`](../interface/Movimento.dc.html#L3140)) hoje coletados e não lidos | v2 |
 | Multi-unidade dentro da mesma clínica | Modelo de filial (horários/salas por unidade) | v2 |

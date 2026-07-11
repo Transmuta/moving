@@ -257,15 +257,22 @@ Os seis status são verificados em `statusMeta` ([`:810`](../interface/Movimento
 transições `complete`/`no_show`/`cancel`/`justify_absence` disparam o efeito de pacote da
 [seção 2.2](#22-o-caso-que-prova-a-regra-consumo-de-sessão-de-pacote).
 
-**Turma (atendimento em grupo).** O protótipo funde participantes num mesmo bloco quando o
-tipo é `grupo` e há capacidade (`createAppt`, [`:1048`](../interface/Movimento.dc.html#L1048);
-`cap = tp.cap || settings.capPilates || 4`, [`:341`](../interface/Movimento.dc.html#L341)).
+**Turma (atendimento em grupo).** Quando o tipo é `grupo`, o protótipo **funde** o participante
+num bloco já existente sempre que há um bloco compatível (mesmo `profId`/`date`/`start`/`typeId`,
+não cancelado) — `createAppt` ([`:1056`](../interface/Movimento.dc.html#L1056)) e `createPacote`
+([`:350`](../interface/Movimento.dc.html#L350)) —, **sem checar capacidade na fusão** (o merge só
+deduplica `patientIds`). A capacidade (`cap = tp.cap || settings.capPilates || 4`, definida em
+`createPacote`, [`:341`](../interface/Movimento.dc.html#L341), e no preview,
+[`:702`](../interface/Movimento.dc.html#L702)) só limita o fluxo na pré-visualização `occIssue`
+([`:703`](../interface/Movimento.dc.html#L703)) e no drawer da turma
+([`:1827`](../interface/Movimento.dc.html#L1827)), e é um teto **soft** — contornável via "encaixe"
+([`:1997`](../interface/Movimento.dc.html#L1997)).
 Participação individual em turma é modelada como recurso `attendance`, não como campo do
 agendamento:
 
 | Método | Rota | Ação Ash | Papéis | Corpo → Resposta | Erros |
 |---|---|---|---|---|---|
-| POST | `/appointments/:id/participants` | `:add_participant` | admin, membro, profissional(próprio) | `{patient_id, package_id?}` → `attendance` | `409` turma cheia; `422` paciente já na turma |
+| POST | `/appointments/:id/participants` | `:add_participant` | admin, membro, profissional(próprio) | `{patient_id, package_id?}` → `attendance` | `422` turma cheia; `422` paciente já na turma |
 | DELETE | `/appointments/:id/participants/:patient_id` | `:remove_participant` | idem | — → `204` | — |
 
 Cada `attendance` liga `appointment` ↔ `patient` **e carrega o `package_id` daquele
@@ -282,10 +289,16 @@ participante** — ver a [subseção 3.1.1](#311-turma-multi-pacote-cada-partici
 Faltava, na versão anterior, ligar o `attendance` ao `pkgOf` do protótipo. É uma lacuna
 concreta, não estética: no protótipo, um bloco de grupo carrega `patientIds` **e** um mapa
 `pkgOf` que associa **cada participante ao seu próprio pacote** (`pkgOf:{...(g.pkgOf||{}),[d.patientId]:pkId}`,
-[`:350`](../interface/Movimento.dc.html#L350)). A resolução "de qual pacote esta sessão debita,
-e de quem" é `apptPkg` ([`:1110`](../interface/Movimento.dc.html#L1110)), que, para um bloco com
-`patientIds`, **itera `pkgOf`** e devolve `{pk, patient, ownerId, pkgId}` por participante — não
-há um "pacote do agendamento", há **um pacote por presença**.
+[`:350`](../interface/Movimento.dc.html#L350)). É esse mapa `pkgOf` — um pacote por participante —
+que sustenta a modelagem: **não há um "pacote do agendamento", há um pacote por presença**. A
+resolução "de qual pacote esta sessão debita, e de quem" é `apptPkg`
+([`:1110`](../interface/Movimento.dc.html#L1110)), que **itera `pkgOf`** mas faz `return` **dentro**
+do laço ([`:1113`](../interface/Movimento.dc.html#L1113)): devolve **uma única** tupla
+`{pk, patient, ownerId, pkgId}` — o **primeiro** participante cujo `pkgId` existe em
+`patient.pacotes` —, não uma por participante. A varredura completa por participante/pacote ocorre
+nas funções de agregação do pacote (`pkgUsadas`/`pkgAppts`,
+[`:326`](../interface/Movimento.dc.html#L326)/[`:330`](../interface/Movimento.dc.html#L330)), não
+em `apptPkg`.
 
 Consequência de modelagem: o `package_id` é atributo do **`attendance`**, nunca do
 `appointment`. O `attendance` é a materialização de uma entrada de `pkgOf`. Isso muda três
@@ -323,7 +336,7 @@ coisas no contrato:
    - **remarcar** (mudar profissional/horário da sessão daquele pacote) ⇒ **destaca** a presença
      do bloco antigo e a reinsere no bloco novo (fundindo com uma turma existente naquele
      horário/tipo se houver capacidade, ou criando um bloco novo) — exatamente o `join`/`push`
-     de `createAppt` ([`:350`](../interface/Movimento.dc.html#L350)), agora por presença.
+     de `createPacote` ([`:350`](../interface/Movimento.dc.html#L350)), agora por presença.
 
    Endpoints afetados, portanto, **não** ganham rota nova: são os mesmos
    `POST /packages/:id/bulk_adjust` e `POST /packages/:id/bulk_cancel` da
@@ -388,33 +401,37 @@ protótipo:
 | Método | Rota | Ação Ash | Origem no protótipo | Efeito |
 |---|---|---|---|---|
 | POST | `/packages` | `:create_with_series` | `computeSerie` [`:1081`](../interface/Movimento.dc.html#L1081) | Gera a série de N sessões pela grade (dows+horários), pulando feriados |
-| POST | `/packages/:id/renew` | `:renew` | `confirmRenovar` [`:590`](../interface/Movimento.dc.html#L590) | Acrescenta N sessões após a última data, mesma grade; `total += N` |
 | POST | `/packages/:id/pause` | `:pause` | `pkgPause` [`:553`](../interface/Movimento.dc.html#L553) | Marca `pausado`; sessões futuras saem da agenda (`pkgHold`), continuam no pacote |
 | POST | `/packages/:id/resume` | `:resume` | `pkgResume` [`:561`](../interface/Movimento.dc.html#L561) | Marca `ativo`; sessões voltam à agenda |
 | POST | `/packages/:id/cancel` | `:cancel` | `cancelarPkg` [`:568`](../interface/Movimento.dc.html#L568) | Marca `cancelado`; sessões futuras viram `cancelado` |
 | PATCH | `/packages/:id/grade` | `:adjust_grade` | `pkgSaveGrade` [`:578`](../interface/Movimento.dc.html#L578) | Remarca todas as sessões futuras para a nova grade (profissional/dows/horários) |
 | POST | `/packages/:id/bulk_adjust` | `:bulk_adjust` | `applyMassaPacote` [`:1149`](../interface/Movimento.dc.html#L1149) | Muda profissional e/ou horário de um escopo de sessões (`esta`/`proximas`/`todas`) |
 | POST | `/packages/:id/bulk_cancel` | `:bulk_cancel` | `cancelarMassaPacote` [`:1174`](../interface/Movimento.dc.html#L1174) | Cancela o escopo de sessões |
-| POST | `/packages/:id/sessions` | `:add_session` | (grade+1) | Acrescenta uma sessão avulsa à série |
+| POST | `/packages/:id/sessions` | `:add_session` | (grade+1) | Acrescenta uma sessão avulsa à série; reativa o pacote se estava `concluido` |
 | DELETE | `/packages/:id/sessions/:appointment_id` | `:remove_session` | — | Remove uma sessão da série |
+| POST | `/packages/:id/archive` | `:archive` | `archivePkg` [`:576`](../interface/Movimento.dc.html#L576) | Marca `concluido` e arquiva no histórico (habilitado quando `done`) |
 
 Papéis: admin e membro em tudo; `profissional` restrito aos pacotes de seus pacientes.
 
 Estados do pacote — a fonte real é `pkgStatusMeta`
 ([`:334`](../interface/Movimento.dc.html#L334)), não o seed (a linha `:117` é um único
-registro `status:'ativo'` e não prova o enum). `pkgStatusMeta` ramifica sobre quatro
-valores **persistidos** de `status`: `ativo`, `pausado`, `renovado`, `cancelado`. Os rótulos
-"Concluído" e "Acabando" **não** são valores de `status` gravados — são estados **derivados**,
-computados por `pkgDone(pk)` e `pkgEnding(pk)` a partir de sessões usadas/total e da data da
-última sessão, e só aparecem no rótulo quando nenhum dos quatro `status` explícitos casa. No
-domínio Ash isto vira: um atributo enum `status` com os quatro valores persistidos, e
-`concluido`/`acabando` como **calculations**, não como membros do enum.
+registro `status:'ativo'` e não prova o enum). O `status` **persistido** de produção tem quatro
+valores: `ativo`, `pausado`, `cancelado` e `concluido` (o `renovado` do protótipo **foi removido**
+— não há renovação, [ADR-011](00-decisoes.md)). O `concluido` **é gravado**, não derivado: aparece
+no seed ([`:108`](../interface/Movimento.dc.html#L108), [`:123`](../interface/Movimento.dc.html#L123),
+[`:124`](../interface/Movimento.dc.html#L124)), é escrito pela ação `:archive` (`archivePkg`,
+[`:576`](../interface/Movimento.dc.html#L576)) e é lido por `add_session`
+([`:541`](../interface/Movimento.dc.html#L541)) para reativar o pacote (`concluido → ativo`). Só o
+rótulo "Acabando" **não** é um valor de `status` gravado — é um estado **derivado**, computado por
+`pkgEnding(pk)` a partir de sessões usadas/total e da data da última sessão, e só aparece quando
+nenhum dos quatro `status` explícitos casa. No domínio Ash isto vira: um atributo enum `status` com
+os quatro valores persistidos, e `acabando` como **calculation**, não como membro do enum.
 
 Notas de contrato que vêm direto do protótipo:
-- **`pause` define uma data de retomada sugerida** (`retomaEm`, hoje "+21 dias",
-  [`:554`](../interface/Movimento.dc.html#L554)). Isso é palpite do protótipo; "pausar
-  estende a validade por quanto?" está em aberto ([00-decisoes.md](00-decisoes.md#decisões-ainda-em-aberto)).
-  A ação `:pause` aceita `resume_at?` opcional em vez de embutir a constante.
+- **`pause` pode aceitar uma data de retomada sugerida** (`resume_at?` opcional, no lugar do
+  `retomaEm` "+21" hardcoded do protótipo, [`:554`](../interface/Movimento.dc.html#L554)).
+  **Não há validade de pacote ([ADR-013](00-decisoes.md)/D6):** pausar não estende validade
+  nenhuma — só tira as sessões futuras da agenda (`pkgHold`).
 - **`resume` no protótipo devolve as sessões nas datas originais, já no passado**
   ([`:561`](../interface/Movimento.dc.html#L561), catalogado como job de reprojeção em
   [04-arquitetura §11](04-arquitetura.md#11-jobs-em-background-oban)). No contrato,
@@ -423,10 +440,11 @@ Notas de contrato que vêm direto do protótipo:
 - **`bulk_adjust` carrega o `escopo`** (`esta` | `proximas` | `todas`) e flags
   `aplicar_profissional`/`aplicar_horario`, exatamente os campos de `applyMassaPacote`
   ([`:1149`](../interface/Movimento.dc.html#L1149)).
-- **`renew` é ambíguo no protótipo** — coexistem "continuar o mesmo pacote" e "criar
-  sucessor" ([00-decisoes.md](00-decisoes.md#decisões-ainda-em-aberto)). `confirmRenovar`
-  incrementa `total` do mesmo pacote ([`:590`](../interface/Movimento.dc.html#L590)); o
-  contrato segue essa (continuar o mesmo) até haver decisão de produto.
+- **Não há `renew` ([ADR-011](00-decisoes.md)).** O protótipo era ambíguo (sucessor via
+  `renovadoDe` [`:362`](../interface/Movimento.dc.html#L362) **e** `total += N` no mesmo pacote,
+  `confirmRenovar` [`:590`](../interface/Movimento.dc.html#L590)); a produção **elimina a
+  renovação**. O `total` é ajustado a qualquer momento por `add_session`/`remove_session`, sempre
+  no mesmo pacote.
 
 ### 3.5 Profissionais, tipos, horário, feriados
 
@@ -1036,8 +1054,10 @@ ou contra os ADRs.
 4. **Proveniência ausente, corrigida.** (a) TTL do hold "5 min" / "expira em 4 min" reetiquetado
    como **parâmetro de design a validar**, não fato do protótipo (§6.2). (b) Estados do pacote:
    a fonte real é `pkgStatusMeta` ([`:334`](../interface/Movimento.dc.html#L334)) — quatro valores
-   **persistidos** (`ativo`, `pausado`, `renovado`, `cancelado`); "Concluído" e "Acabando" são
-   **derivados** (`pkgDone`/`pkgEnding`), não `status` gravado. A `:117` (seed) não prova o enum
+   **persistidos** (`ativo`, `pausado`, `cancelado`, `concluido`; o `renovado` do protótipo foi
+   removido, [ADR-011](00-decisoes.md)); só "Acabando" é **derivado** (`pkgEnding`), enquanto
+   `concluido` **é gravado** (seed, `archivePkg` [`:576`](../interface/Movimento.dc.html#L576), lido
+   por `add_session` [`:541`](../interface/Movimento.dc.html#L541)). A `:117` (seed) não prova o enum
    (§3.4). (c) Prioridade da fila: a fonte é `prioMeta` ([`:2511`](../interface/Movimento.dc.html#L2511)),
    com **quatro** níveis — `urgente`, `alta`, `normal`, `baixa` (a `:163` só exibe `urgente`) (§3.6).
 

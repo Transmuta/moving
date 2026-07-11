@@ -32,10 +32,15 @@ de casos, reconciliados com [07-estrategia-de-testes.md](07-estrategia-de-testes
 
 ### 1.1 Agenda e slots
 
-- **RN-01.** Um agendamento é `{profId, typeId, start, dur, date, status}`, com `start` e
-  `dur` em **minutos desde a meia-noite** e `date` como string `YYYY-MM-DD`
+- **RN-01.** Um agendamento carrega ao menos `{id, profId, typeId, start, dur, date, status}`,
+  com `start` e `dur` em **minutos desde a meia-noite** e `date` como string `YYYY-MM-DD`
   ([`:150`](../interface/Movimento.dc.html#L150), [`:152`](../interface/Movimento.dc.html#L152)).
-  A produção troca `start`/`dur`/`date` por um intervalo com fuso (ver Parte 3), mas a
+  Os mesmos objetos-semente carregam também a ligação com o paciente — `patientId` (individual,
+  [`:152`](../interface/Movimento.dc.html#L152)) ou `patientIds` (turma,
+  [`:150`](../interface/Movimento.dc.html#L150); ver RN-33) — e a marca `encaixe` (default
+  `false`), que é *load-bearing* no conflito ([`:835`](../interface/Movimento.dc.html#L835),
+  [`:837`](../interface/Movimento.dc.html#L837); ver RN-12). A enumeração de campos **não** é
+  exaustiva. A produção troca `start`/`dur`/`date` por um intervalo com fuso (ver Parte 3), mas a
   unidade lógica de tempo permanece o minuto.
 - **RN-02.** A duração padrão de um agendamento é a **duração do tipo de atendimento**
   (`type.dur`), não um valor da agenda: `t1..t3` e `t4` duram 50 min, `t5` (Reavaliação)
@@ -153,6 +158,10 @@ Referência: `checkConflict` ([`:834`](../interface/Movimento.dc.html#L834)), `c
   verifica sobreposição. As duas checagens são independentes e ambas são necessárias antes de
   aceitar um agendamento — o protótipo **não** aplica as duas em todo caminho de escrita (ver
   GAP-03).
+- **Nota (grupo não passa por conflito).** Para tipos `grupo`, o fluxo de criação **não** chama
+  `checkConflict` (o modal tem o gate `!isGroup`, [`:1978`](../interface/Movimento.dc.html#L1978)):
+  a sobreposição no mesmo slot/tipo é resolvida por **merge** (RN-33), não por conflito, e a
+  capacidade (RN-36) é a única barreira.
 
 ### 1.4 Impacto retroativo — `futureConflicts`
 
@@ -185,9 +194,17 @@ futureConflicts(afterFn, filterFn):
 
 - **RN-16.** `futureConflicts` **compõe** `dayPeriods`: `before` vem de `dayPeriods` com o
   horário atual e `after` de `dayPeriods` com o rascunho
-  ([`:874`](../interface/Movimento.dc.html#L874)–[`:875`](../interface/Movimento.dc.html#L875);
-  `hourConflicts` em [`:884`](../interface/Movimento.dc.html#L884); guarda em `saveProf`,
-  [`:1198`](../interface/Movimento.dc.html#L1198)). Um erro em §1.2 propaga para cá.
+  ([`:874`](../interface/Movimento.dc.html#L874)–[`:875`](../interface/Movimento.dc.html#L875)).
+  Tem **três** consumidores: `hourConflicts` ([`:884`](../interface/Movimento.dc.html#L884)), o
+  guarda de `saveProf` ([`:1198`](../interface/Movimento.dc.html#L1198)) e `addHoliday`
+  ([`:1220`](../interface/Movimento.dc.html#L1220)) — este último guarda a criação de uma
+  **exceção de data da clínica** (abre o modal `horarioConflitos`, `scope:'excecao'`,
+  [`:1221`](../interface/Movimento.dc.html#L1221)). O `simulate` de `addHoliday` carrega uma
+  **precedência** própria: na data afetada, uma exceção de data já existente do **profissional**
+  mantém prioridade sobre a nova exceção da clínica sendo simulada
+  ([`:1216`](../interface/Movimento.dc.html#L1216)–[`:1217`](../interface/Movimento.dc.html#L1217))
+  e, só na ausência dela, o tipo da nova exceção decide o `after`
+  ([`:1218`](../interface/Movimento.dc.html#L1218)). Um erro em §1.2 propaga para cá.
 - **RN-17.** A saída é ordenada por data e depois por `start`
   ([`:881`](../interface/Movimento.dc.html#L881)) — ordenação é comportamento observável.
 
@@ -220,7 +237,15 @@ de verdade ([`:210`](../interface/Movimento.dc.html#L210)–[`:212`](../interfac
   `computeSerie` ([`:1081`](../interface/Movimento.dc.html#L1081)), a partir de uma grade
   `{dows, horarios, profId}` ([`:358`](../interface/Movimento.dc.html#L358)). Cada sessão vira
   um agendamento `agendado` com o `pkgId` do pacote
-  ([`:355`](../interface/Movimento.dc.html#L355)).
+  ([`:355`](../interface/Movimento.dc.html#L355)). Antes de gravar, a criação **valida cada
+  ocorrência** por `occIssue` ([`:703`](../interface/Movimento.dc.html#L703)), com os desfechos
+  `fora`/`cheia`/`join`/`conflito`; o salvamento fica **bloqueado** salvo `!issues.length||d.forcar`
+  ([`:754`](../interface/Movimento.dc.html#L754)) e o checkbox "Agendar mesmo assim (encaixe)"
+  ([`:750`](../interface/Movimento.dc.html#L750)) grava as sessões conflitantes como `encaixe`.
+  O tratamento de código diverge entre turma (`encaixe: bad && forcar`,
+  [`:352`](../interface/Movimento.dc.html#L352)) e individual (`encaixe: bad`,
+  [`:355`](../interface/Movimento.dc.html#L355)), mas o *save-gate* torna o efeito prático
+  equivalente no fluxo da UI — inconsistência latente a corrigir na reimplementação.
 - **RN-19. Feriado pula e ESTENDE a série.** `computeSerie` empurra um slot para a saída
   **sempre** que o dia bate com `dows`, mas só incrementa o contador de sessões úteis
   (`count`) se o dia **não** for feriado ([`:1088`](../interface/Movimento.dc.html#L1088)–[`:1092`](../interface/Movimento.dc.html#L1092)).
@@ -235,11 +260,13 @@ de verdade ([`:210`](../interface/Movimento.dc.html#L210)–[`:212`](../interfac
   começam depois" (renovação, `inclusive == false`) **pulam** o dia-âncora
   ([`:1083`](../interface/Movimento.dc.html#L1083)). A válvula `guard < 400`
   ([`:1086`](../interface/Movimento.dc.html#L1086)) impede laço infinito com `dows` vazio.
-- **RN-22. Renovação.** Renovar marca o pacote anterior como `renovado` e cria um **sucessor**
-  com `renovadoDe` apontando para ele ([`:362`](../interface/Movimento.dc.html#L362),
-  [`:358`](../interface/Movimento.dc.html#L358)). **Atenção:** o protótipo faz *renovação como
-  sucessor*, mas o vocabulário de "renovar" coexiste com "continuar o mesmo pacote" — é uma
-  ambiguidade de produto não resolvida (ver Parte 4).
+- **RN-22. Renovação (protótipo) → sem renovação (produção).** No protótipo, renovar marca o
+  pacote anterior como `renovado` e cria um **sucessor** com `renovadoDe`
+  ([`:362`](../interface/Movimento.dc.html#L362), [`:358`](../interface/Movimento.dc.html#L358)).
+  **Divergência deliberada da produção ([ADR-011](00-decisoes.md), 2026-07-10):** não há
+  renovação nem sucessor — o `total` de sessões é **editável (+/−) a qualquer momento** no mesmo
+  pacote (via `add_session`/`remove_session`). A produção **não** reproduz o `renovadoDe`, a ação
+  `:renew` nem o status `:renovado`.
 - **RN-23. Pausa.** Pausar um pacote marca suas sessões futuras (`date >= hoje`, `agendado` ou
   `confirmado`) com `pkgHold` — elas somem da agenda (RN-05) — e grava `status:'pausado'` com
   um `retomaEm` **fixo em +21 dias** ([`:554`](../interface/Movimento.dc.html#L554)–[`:557`](../interface/Movimento.dc.html#L557)).
@@ -252,8 +279,17 @@ de verdade ([`:210`](../interface/Movimento.dc.html#L210)–[`:212`](../interfac
   `agendado`/`confirmado`/`pkgHold`) como `cancelado`, liberando-as da agenda, e o pacote como
   `cancelado` ([`:568`](../interface/Movimento.dc.html#L568)–[`:574`](../interface/Movimento.dc.html#L574)).
   Sessões já passadas não são tocadas.
-- **RN-26. Ajuste de grade.** Editar a grade de um pacote (`openPkgGrade`,
-  [`:577`](../interface/Movimento.dc.html#L577)) altera `dows`/`horarios`/`profId` do pacote.
+- **RN-26. Ajuste de grade.** Editar a grade de um pacote (`pkgSaveGrade`,
+  [`:578`](../interface/Movimento.dc.html#L578)–[`:588`](../interface/Movimento.dc.html#L588);
+  `openPkgGrade`, [`:577`](../interface/Movimento.dc.html#L577), só abre o modal) **não** é mera
+  atualização de metadados: além de gravar `dows`/`horarios`/`profId` na grade, ele **remarca a
+  série**. Coleta as sessões futuras não resolvidas (`date >= hoje`,
+  `agendado`/`confirmado`/`pkgHold`, via `pkgAppts`), **remove-as** (`removeIds`,
+  [`:586`](../interface/Movimento.dc.html#L586)) e **regenera** `nCount` novas sessões a partir de
+  hoje conforme a nova grade, pulando feriados ([`:585`](../interface/Movimento.dc.html#L585)) e
+  preservando `pkgHold` quando `anyHold`. O toast confirma "N sessões remarcadas na agenda"
+  ([`:588`](../interface/Movimento.dc.html#L588)) e o modal avisa que trocar dia/horário/profissional
+  remarca o paciente na agenda ([`:668`](../interface/Movimento.dc.html#L668)).
 - **RN-27. Ajuste em massa.** `applyMassaPacote` ([`:1149`](../interface/Movimento.dc.html#L1149))
   reaplica profissional e/ou horário às sessões futuras de um pacote conforme um escopo
   (`esta` / `proximas` / todas, [`:1144`](../interface/Movimento.dc.html#L1144)), atualizando
@@ -298,6 +334,14 @@ Referência: `wouldConsume` ([`:1104`](../interface/Movimento.dc.html#L1104)), `
   `patientIds` ([`:1057`](../interface/Movimento.dc.html#L1057)), rotulado "…em grupo" na UI
   ([`:1815`](../interface/Movimento.dc.html#L1815)). Participantes entram/saem por
   `addParticipant`/`removeParticipant` ([`:1068`](../interface/Movimento.dc.html#L1068)–[`:1069`](../interface/Movimento.dc.html#L1069)).
+  **Merge idempotente na criação:** criar um agendamento/pacote de grupo num slot onde já existe
+  uma turma não-cancelada com o mesmo `profId`+`date`+`start`+`typeId` **ADICIONA** o(s)
+  paciente(s) ao `patientIds` daquele bloco — não cria um segundo bloco (`createAppt`,
+  [`:1055`](../interface/Movimento.dc.html#L1055)–[`:1056`](../interface/Movimento.dc.html#L1056);
+  `createPacote`, que também grava `pkgOf[patientId]`,
+  [`:349`](../interface/Movimento.dc.html#L349)–[`:350`](../interface/Movimento.dc.html#L350)). A
+  citação [`:1057`](../interface/Movimento.dc.html#L1057) acima é o ramo de criação de bloco novo
+  (quando não há coincidência).
 - **RN-34. Presença é da turma, não do participante.** O agendamento de turma tem **um único
   `status`** compartilhado por todos os participantes. Marcar a turma como `concluido`/`faltou`
   aplica o estado ao bloco inteiro; não existe presença individual por participante (ver GAP-06).
@@ -357,14 +401,23 @@ corpo: `TODAY='2026-06-25', NOW=702, DUR=50, DAYS=14, STEP=30, CAP=50`
 
 ### 1.9 Faltas
 
-- **RN-44. Contador do paciente.** `patient.faltas` é um contador exibido na ficha, mutado à mão
-  por `justificarFalta` (`±1`, [`:1126`](../interface/Movimento.dc.html#L1126)) e semeado
-  diretamente ([`:112`](../interface/Movimento.dc.html#L112)). É **denormalizado** e pode
-  divergir do histórico real de sessões (GAP-09).
+- **RN-44. Contador do paciente.** `patient.faltas` é um contador **denormalizado** exibido na
+  ficha. O **gravador principal** é `setStatus`: marcar uma sessão como `faltou` faz **+1** e sair
+  de um `faltou` **não justificado** faz **−1** (via `delta=(isFalta?1:0)-(wasFalta?1:0)`, com
+  `Math.max(0,…)`, [`:1038`](../interface/Movimento.dc.html#L1038)–[`:1041`](../interface/Movimento.dc.html#L1041)).
+  `justificarFalta` apenas **ajusta por cima** (`±1`, [`:1126`](../interface/Movimento.dc.html#L1126))
+  e o seed define os valores iniciais ([`:112`](../interface/Movimento.dc.html#L112)). Por ser
+  denormalizado, ainda pode divergir do histórico real de sessões (GAP-09).
 - **RN-45. "Faltou" abre o buscador de quem cabe.** Marcar falta numa sessão **já iniciada**
   abre o fluxo de oferta da vaga que se abriu (`quemCabe`,
   [`:1046`](../interface/Movimento.dc.html#L1046)) — conectando falta → fila. "Já iniciada" aqui
-  usa `a.start <= 702` (ver Parte 3 para a definição precisa).
+  usa `a.start <= 702` (ver Parte 3 para a definição precisa). **Casamento mais frouxo:** a seleção
+  de candidatos de `modalQuemCabe` ([`:2252`](../interface/Movimento.dc.html#L2252)) filtra **SÓ**
+  por profissional preferido (`!ids.length||ids.includes(d.profId)`), ignorando
+  janela/regras/horário — um segundo match, mais frouxo que o motor `filaVagas`
+  ([`:2531`](../interface/Movimento.dc.html#L2531), que os docs modelam como `find_slots`): pode
+  oferecer a vaga liberada a pacientes da fila cuja janela/regras/horário **não** batem, apesar do
+  rótulo "compatíveis" ([`:2254`](../interface/Movimento.dc.html#L2254)).
 
 ### 1.10 Relatórios
 
@@ -375,18 +428,28 @@ Referência: `reports2` ([`:3334`](../interface/Movimento.dc.html#L3334)); dispa
 - **RN-46. Métricas.** O relatório de período agrega total, concluídas, faltas, canceladas,
   futuras, **taxa de falta** (`falta/(concl+falta)`, [`:3345`](../interface/Movimento.dc.html#L3345)),
   distribuição por tipo, por profissional e por dia
-  ([`:3352`](../interface/Movimento.dc.html#L3352)–[`:3361`](../interface/Movimento.dc.html#L3361)).
+  ([`:3352`](../interface/Movimento.dc.html#L3352)–[`:3361`](../interface/Movimento.dc.html#L3361)),
+  o **dia mais movimentado** (`busiest`, [`:3363`](../interface/Movimento.dc.html#L3363)), exibido
+  como "Pico" no cabeçalho ([`:3452`](../interface/Movimento.dc.html#L3452)), e o **ticket médio**
+  (`fat/concl`, [`:3347`](../interface/Movimento.dc.html#L3347)) — este **computado mas NÃO
+  exibido** na UI (valor morto no objeto de retorno, [`:3364`](../interface/Movimento.dc.html#L3364)).
 - **RN-47. Faturamento é estimado por tabela hardcoded.** O faturamento usa um preço fixo por
   tipo embutido no código (`{t1:180,t2:120,t3:130,t4:70,t5:90}`, fallback 100,
   [`:3339`](../interface/Movimento.dc.html#L3339), [`:3346`](../interface/Movimento.dc.html#L3346)).
   Não há modelo de preço, convênio ou repasse (GAP-10; faturamento é v2, ver Parte 4).
-- **RN-48. Ocupação tem definições divergentes.** O protótipo calcula ocupação de **três**
+- **RN-48. Ocupação tem definições divergentes.** O protótipo calcula ocupação de **quatro**
   formas incompatíveis: `occupancy` usa capacidade = soma dos **minutos reais de expediente**
   dos profissionais ativos (`profDayMinutes`, [`:908`](../interface/Movimento.dc.html#L908)–[`:915`](../interface/Movimento.dc.html#L915));
-  `colLoad` usa **9 h fixas** por coluna (`used/(9*60)`, [`:1575`](../interface/Movimento.dc.html#L1575));
-  e `reports2` usa **9 slots fixos** por profissional-dia (`openDays*activeProfs*9`, contando
-  agendamentos, não minutos, [`:3350`](../interface/Movimento.dc.html#L3350)–[`:3351`](../interface/Movimento.dc.html#L3351)).
-  A produção precisa de **uma** definição canônica (GAP-11).
+  `profLoad` usa os **minutos reais de expediente** de **um** profissional (`profDayMinutes`,
+  [`:916`](../interface/Movimento.dc.html#L916)–[`:923`](../interface/Movimento.dc.html#L923)),
+  exibida como % na sidebar de Profissionais ([`:1424`](../interface/Movimento.dc.html#L1424),
+  [`:1431`](../interface/Movimento.dc.html#L1431)); `colLoad` usa **9 h fixas** por coluna
+  (`used/(9*60)`, [`:1575`](../interface/Movimento.dc.html#L1575)), exibida no cabeçalho da coluna
+  ([`:1627`](../interface/Movimento.dc.html#L1627)); e `reports2` usa **9 slots fixos** por
+  profissional-dia (`openDays*activeProfs*9`, contando agendamentos, não minutos,
+  [`:3350`](../interface/Movimento.dc.html#L3350)–[`:3351`](../interface/Movimento.dc.html#L3351)).
+  Para o mesmo profissional no mesmo dia, `profLoad` (minutos reais) e `colLoad` (9 h fixas)
+  mostram números diferentes. A produção precisa de **uma** definição canônica (GAP-11).
 
 ### 1.11 Papéis
 
@@ -416,9 +479,10 @@ catalogar aqui.
 - **Sintoma.** `hoje()` retorna a **string literal** `'2026-06-25'`
   ([`:1098`](../interface/Movimento.dc.html#L1098)) e o "agora" é a constante `NOW = 702`
   (11:42), copiada à mão no seed ([`:130`](../interface/Movimento.dc.html#L130)), em `filaVagas`
-  ([`:2533`](../interface/Movimento.dc.html#L2533)), no gate de ação
-  ([`:828`](../interface/Movimento.dc.html#L828), [`:1804`](../interface/Movimento.dc.html#L1804))
-  e em `futureConflicts` ([`:865`](../interface/Movimento.dc.html#L865)).
+  ([`:2533`](../interface/Movimento.dc.html#L2533)) e no gate de ação
+  ([`:828`](../interface/Movimento.dc.html#L828), [`:1804`](../interface/Movimento.dc.html#L1804)).
+  `futureConflicts` congela o "hoje" pelo **mesmo mecanismo** de `hoje()` — o literal de data
+  `'2026-06-25'` ([`:865`](../interface/Movimento.dc.html#L865)) — e **não** usa o valor 702.
 - **Impacto.** Toda regra que depende de passado/futuro (destravar Concluir/Faltou, debitar
   sessão, expirar regra de fila, cortar o passado do dia nas vagas, filtrar `futureConflicts`)
   quebra fora de 25/06/2026. Portar literalmente leva a produção a um sistema que "funciona" só
@@ -509,12 +573,13 @@ catalogar aqui.
 
 - **Sintoma.** Numa turma, cada participante pode ter um pacote distinto em `pkgOf`
   ([`:350`](../interface/Movimento.dc.html#L350), [`:352`](../interface/Movimento.dc.html#L352)).
-  Mas `apptPkg` ([`:1110`](../interface/Movimento.dc.html#L1110)) **itera e retorna o primeiro
-  pacote encontrado** ([`:1113`](../interface/Movimento.dc.html#L1113)); e `massaAffected`
-  ([`:1145`](../interface/Movimento.dc.html#L1145)) — base do ajuste em massa (RN-27) e da
-  identificação de pacote no débito (`apptPkgDebitado`, [`:1119`](../interface/Movimento.dc.html#L1119))
-  — opera apenas sobre esse `info.pk`. Os demais pacotes da mesma turma são **ignorados em
-  silêncio**.
+  Mas `apptPkg` ([`:1110`](../interface/Movimento.dc.html#L1110)) **itera e retorna só o primeiro
+  pacote** (`info.pk`, [`:1113`](../interface/Movimento.dc.html#L1113)) — e dele leem, de forma
+  **independente**, tanto `massaAffected` ([`:1145`](../interface/Movimento.dc.html#L1145)), base
+  do ajuste em massa (RN-27), quanto `apptPkgDebitado` ([`:1119`](../interface/Movimento.dc.html#L1119)),
+  a identificação de pacote no débito, que chama `apptPkg` direto (**não** deriva de
+  `massaAffected`; são rotinas irmãs, com base comum em `apptPkg`). Os demais pacotes da mesma
+  turma são **ignorados em silêncio**.
 - **Impacto.** Um ajuste em massa disparado a partir de uma sessão de turma move/cancela as
   sessões do pacote de **um** participante e não toca os outros, sem aviso. A trilha e o débito de
   pacote dos demais participantes divergem da agenda. Como o contador `pkgUsadas` (RN-28)
@@ -547,8 +612,12 @@ catalogar aqui.
   [`:1126`](../interface/Movimento.dc.html#L1126)) e semeado direto
   ([`:112`](../interface/Movimento.dc.html#L112)), enquanto as faltas reais vivem no histórico de
   sessões/agendamentos.
-- **Impacto.** Duas fontes de verdade para "quantas faltas o paciente tem". Qualquer caminho que
-  crie/edite uma falta sem passar por `justificarFalta` faz o contador divergir do histórico.
+- **Impacto.** Duas fontes de verdade para "quantas faltas o paciente tem". Os dois caminhos
+  normais **mantêm** o contador em sincronia — `setStatus` (+1/−1 ao marcar/reverter `faltou`,
+  [`:1038`](../interface/Movimento.dc.html#L1038)–[`:1041`](../interface/Movimento.dc.html#L1041))
+  e `justificarFalta` (`±1`, [`:1126`](../interface/Movimento.dc.html#L1126)) —, mas o valor
+  continua denormalizado: o seed inicial pode não bater com o histórico e qualquer caminho que
+  altere uma falta por fora desses dois faz o contador divergir das sessões reais.
 - **Correção.** Derivar faltas do histórico (agregado/`count` Ash empurrado ao SQL,
   [ADR-002](00-decisoes.md)), não guardar contador. Se por desempenho for preciso materializar,
   que seja um agregado mantido pelo servidor, nunca por escrita de UI.
@@ -568,14 +637,17 @@ catalogar aqui.
   note a divergência de classificação com [00-decisoes.md](00-decisoes.md), discutida na Parte 4).
 - **Onde mora.** Produto (v1 vs v2) + backend (modelo de preço, se v1).
 
-### GAP-11 — Duas (três) definições divergentes de ocupação
+### GAP-11 — Quatro definições divergentes de ocupação
 
-- **Sintoma.** Ver RN-48: `occupancy` usa expediente real em minutos
-  ([`:908`](../interface/Movimento.dc.html#L908)); `colLoad` usa 9 h fixas
-  ([`:1575`](../interface/Movimento.dc.html#L1575)); `reports2` usa 9 slots fixos por
-  profissional-dia ([`:3350`](../interface/Movimento.dc.html#L3350)).
-- **Impacto.** "Ocupação" significa três números diferentes em três telas. A gestão não consegue
-  confiar no indicador.
+- **Sintoma.** Ver RN-48: são **quatro** cálculos. `occupancy` usa expediente real em minutos de
+  todos os ativos ([`:908`](../interface/Movimento.dc.html#L908)); `profLoad` usa expediente real
+  em minutos de **um** profissional, na sidebar ([`:916`](../interface/Movimento.dc.html#L916),
+  [`:1424`](../interface/Movimento.dc.html#L1424)/[`:1431`](../interface/Movimento.dc.html#L1431));
+  `colLoad` usa 9 h fixas ([`:1575`](../interface/Movimento.dc.html#L1575)); `reports2` usa 9 slots
+  fixos por profissional-dia ([`:3350`](../interface/Movimento.dc.html#L3350)).
+- **Impacto.** "Ocupação" significa números diferentes em telas diferentes — e para o mesmo
+  profissional/dia a % da sidebar (`profLoad`) diverge da barra de carga da coluna (`colLoad`,
+  9 h fixas). A gestão não consegue confiar no indicador.
 - **Correção.** Uma definição canônica única — ocupação = tempo agendado ÷ capacidade real de
   expediente (a de `occupancy`, que respeita a disponibilidade calculada) — usada em toda a UI. A
   definição precisa é uma decisão de produto (Parte 4).
@@ -753,7 +825,7 @@ de [08 §8](08-roadmap.md), e as divergências entre os três estão apontadas a
 | # | Pergunta | O que muda | Quando (fatia) |
 |---|---|---|---|
 | P-01 | Pacote tem **validade** real? Pausar estende a validade — por quanto? (hoje o `retomaEm` é +21 fixo e decorativo, [`:554`](../interface/Movimento.dc.html#L554)) | Tabela de pacote; reprojeção da série na retomada (GAP-08) | Antes da Fatia 3 |
-| P-02 | **"Renovar"** é continuar o mesmo pacote ou criar um **sucessor**? Hoje coexistem: o protótipo faz sucessor (`renovadoDe`, [`:358`](../interface/Movimento.dc.html#L358)), mas o vocabulário sugere continuidade | Tabela de pacote; semântica de débito acumulado | Antes da Fatia 3 |
+| ~~P-02~~ | ✅ **RESOLVIDO ([ADR-011](00-decisoes.md)):** não há renovação — o `total` é editável (+/−) a qualquer momento; sem `renovado_de`, `:renew` ou `:renovado` | — | — |
 | P-03 | **Presença individual em turma** confirma-se como requisito? | Schema de turma: participação um-para-muitos, presença e débito por participante (GAP-06, GAP-07) | Antes da Fatia 5 |
 | P-04 | Quais **papéis leem quais campos** do prontuário? Retenção por tipo de dado? | `field_policies`, `AshCloak`, política de purga ([06](06-seguranca-e-lgpd.md)) | Antes da Fatia 6 (Gate G1) |
 | P-05 | **Salas/equipamentos** como recurso com capacidade? | Forma da exclusion constraint: de "por profissional" para "por recurso" — a mudança mais cara (GAP-15, [04 §13](04-arquitetura.md)) | **v2 — não decidir por palpite** |
@@ -767,7 +839,7 @@ de [08 §8](08-roadmap.md), e as divergências entre os três estão apontadas a
 | P-08 | Quem enxerga a agenda de quem? `profissional` vê só a própria ou a da clínica? | Policy de leitura da agenda (RN-49; [06 §6](06-seguranca-e-lgpd.md)) | Antes da Fatia 1 |
 | P-09 | Qual papel pode criar um **encaixe** (sobreposição deliberada, RN-12)? | Policy da ação de criar encaixe | Antes da Fatia 1 |
 | P-10 | **Cancelamento** libera a vaga para a fila automaticamente? Cancelar exige motivo? Remarcar para o passado é permitido? | Fluxo entre transição e fila; ação de cancelar/remarcar | Antes da Fatia 2 (fila na Fatia 4) |
-| P-11 | **TTL** e **prioridade** da fila de espera (o TTL de 5 min é chute de desenho; `prio` existe mas não ordena, [`:163`](../interface/Movimento.dc.html#L163)) | Regra do `SlotHold` e ordenação da fila (GAP-16) | Antes da Fatia 4 |
+| P-11 | **TTL** e **prioridade** da fila de espera (o TTL de 5 min é chute de desenho; `prio` existe [`:163`](../interface/Movimento.dc.html#L163) e **já ordena** a exibição da fila — `renderFila` [`:2836`](../interface/Movimento.dc.html#L2836)/[`:2838`](../interface/Movimento.dc.html#L2838) — e a lista "quem cabe" — `modalQuemCabe` [`:2252`](../interface/Movimento.dc.html#L2252) —, MAS **não** influencia o motor de casamento de vagas `filaVagas` [`:2591`](../interface/Movimento.dc.html#L2591), que ordena por vaga-que-abriu/data/hora; falta regra de TTL/`SlotHold` e desempate documentados) | Regra do `SlotHold` e ordenação da fila (GAP-16) | Antes da Fatia 4 |
 | P-12 | Ao mudar horário, agendamentos futuros conflitantes são **bloqueados, remarcados ou apenas sinalizados**? (hoje `saveProf` bloqueia o salvamento, [`:1198`](../interface/Movimento.dc.html#L1198)) | Comportamento de escrita de `futureConflicts` (RN-15) | Antes da Fatia 7 |
 | P-13 | Definição **canônica de ocupação** (expediente real, 9 h fixas ou 9 slots)? (GAP-11) | Indicador de relatório e de carga por coluna | Antes da Fatia 9 |
 | P-14 | Quais **métricas** de relatório importam, e em que granularidade? | Escopo do snapshot de métricas (GAP-14) | Antes da Fatia 9 |

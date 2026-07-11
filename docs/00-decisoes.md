@@ -165,16 +165,81 @@ Dark mode continua por `data-theme` (`@custom-variant dark`), não por `class` n
 
 ---
 
+## ADR-011 — Não há renovação de pacote; o total de sessões é ajustável a qualquer momento
+
+**Status:** Aceita (2026-07-10) · **Reconcilia:** decisão de produto **D7** ([10-decisoes-de-produto-v1.md](10-decisoes-de-produto-v1.md)) × comportamento do protótipo (RN-22, [02 §1.5](02-regras-e-lacunas.md))
+
+**Contexto.** O único fluxo de "Renovar" **alcançável pela UI** — `openRenovar` ([`:336`](../interface/Movimento.dc.html#L336)) → `modalRenovar` ([`:606`](../interface/Movimento.dc.html#L606)) → `confirmRenovar` ([`:590`](../interface/Movimento.dc.html#L590)) — **adiciona sessões ao mesmo pacote**: soma ao `total` e mantém o status `ativo` ([`:600`](../interface/Movimento.dc.html#L600); texto do modal em [`:629`](../interface/Movimento.dc.html#L629), toast em [`:601`](../interface/Movimento.dc.html#L601)) — ou seja, já corresponde ao lado "aumentar" da Decisão. O mecanismo de **pacote-sucessor** — criar um novo pacote com `renovadoDe` e marcar o anterior como `renovado` ([`:358`](../interface/Movimento.dc.html#L358), [`:362`](../interface/Movimento.dc.html#L362); RN-22) — é **código vestigial e inalcançável**: nenhuma UI seta `renovadoDe` e, no único ponto do seed em que ele aparece ([`:108`](../interface/Movimento.dc.html#L108)), o predecessor fica `concluido`, nunca `renovado`. O documento de domínio [01 §4.4](01-dominio-ash.md) modelou esse ramo morto — relação `renovado_de` e o valor `:renovado` no enum `PackageStatus`. A real novidade da operação da clínica não é o acréscimo no mesmo pacote (que o protótipo já faz), e sim a capacidade de **diminuir (−)** o total: o total de sessões de um pacote é simplesmente **editável, para mais ou para menos, a qualquer momento**.
+
+**Decisão.** **Não existe renovação.** Um pacote tem um `total` de sessões que pode ser **aumentado ou diminuído a qualquer momento**, sobre o mesmo registro. Aumentar materializa novas sessões na série (via `computeSerie`, [02 §1.5](02-regras-e-lacunas.md)); diminuir remove sessões futuras ainda não consumidas. O débito acumula sempre no mesmo pacote.
+
+**Consequências.**
+- `PackageStatus` perde o valor `:renovado` → fica `[:ativo, :pausado, :cancelado, :concluido]`.
+- O `Package` perde a relação `belongs_to :renovado_de` ([01 §4.4](01-dominio-ash.md) a ser corrigido).
+- **Não há ação `:renew`.** O ajuste do total vira `add_session`/`remove_session` (individuais ou em lote) sobre o mesmo pacote; `total` é editável enquanto o pacote está `:ativo`. Diminuir só alcança sessões **futuras e não consumidas** — sessões já concluídas/faltadas não são apagadas.
+- **Divergência deliberada do [ADR-001](#adr-001--o-protótipo-é-a-especificação-de-origem)** (o protótipo é a spec). Registrada como tal: a produção **não** reproduz o sucessor do protótipo. Catalogar em [02](02-regras-e-lacunas.md) como GAP de renovação.
+
+---
+
+## ADR-012 — Profissional pertence a uma única clínica na v1
+
+**Status:** Aceita (2026-07-10) · **Restringe:** [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) (RN-52) · **Reconcilia:** decisão de produto **D15**
+
+**Contexto.** O [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) abriu explicitamente a porta para um **profissional existir em mais de uma clínica** (RN-52, [02 §3.1](02-regras-e-lacunas.md)) — uma regra nova, sem precedente no protótipo. Isso tornaria o vínculo profissional↔clínica um relacionamento, com agenda, disponibilidade e repasse **por vínculo**, não por pessoa.
+
+**Decisão.** Na **v1**, um profissional pertence a **uma única clínica**. O multi-clínica de profissional fica para a **v2**.
+
+**Justificativa.** Combina com a estratégia de tenancy escolhida — `strategy :context`, schema-por-tenant ([01 §2](01-dominio-ash.md)): um profissional vive dentro do schema do seu tenant, e `Membership.professional_id` permanece um UUID mole por clínica, sem FK entre schemas. Suportar a mesma pessoa em vários schemas exigiria um modelo de identidade de profissional global — custo que não se paga na v1.
+
+**Consequências.**
+- **Não anula o [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit):** o SaaS continua multi-clínica no nível de **tenant/organização**; apenas a cláusula "profissional em várias clínicas" é adiada.
+- RN-52 passa a ser **v2**. O vínculo profissional↔clínica é simples (um por profissional).
+- A exclusion constraint de não-sobreposição não precisa carregar `clinic_id` (já garantido pelo schema-por-tenant, [01 §2](01-dominio-ash.md)).
+
+---
+
+## ADR-013 — Prontuário clínico (LGPD Art. 11) é v2; a v1 tem apenas a ficha do paciente
+
+**Status:** Aceita (2026-07-10) · **Restringe:** [ADR-007](#adr-007--dado-de-saúde-é-tratado-como-categoria-especial-da-lgpd) · **Reconcilia:** decisão de produto **D16**
+
+**Contexto.** O [ADR-007](#adr-007--dado-de-saúde-é-tratado-como-categoria-especial-da-lgpd) trata o prontuário completo como requisito da v1: tags clínicas (diagnóstico), anexos (laudos/exames), encaminhamento, consentimento versionado — tudo LGPD Art. 11, com AshCloak, AshPaperTrail, field policies e purga (o Gate G1 do [08 §6](08-roadmap.md)). A decisão de produto **D16** reduz o escopo: **a v1 não tem prontuário — só a ficha do paciente** (dados cadastrais). Todos os papéis **visualizam** o paciente; o **profissional é somente-leitura** na ficha.
+
+**Decisão.** O **prontuário clínico é v2**. A v1 modela apenas a **ficha** (identificação e contato do paciente). Ficam **fora da v1**: `ClinicalTag`, `Attachment`, `Consent` versionado, e o mapa fino campo×papel de leitura de dado clínico.
+
+**⚠️ Consequência que corrige um exagero anterior — a LGPD encolhe, não desaparece.** Mesmo "só a ficha" carrega, no modelo do [01 §4.6](01-dominio-ash.md), dado **pessoal e alguns sensíveis**: CPF, RG, telefone, e-mail e — se mantidos — **médico/CRM** (encaminhamento revela tratamento) e **convênio/carteirinha**. E a fila de espera tem `obs` = **queixa clínica**. Portanto **não** se pode concluir que "sem prontuário ⇒ sem proteção LGPD". As proteções que **ainda podem valer na v1** dependem das sub-decisões abaixo.
+
+**Sub-decisões que este ADR deixa explicitamente em aberto** (a resolver antes das fatias indicadas):
+1. A ficha v1 inclui **médico/CRM/convênio** (sensível) ou **só nome + contato**? — antes de modelar a ficha.
+2. **CPF** precisa de cifra (`AshCloak`) + **índice cego** para a busca por documento (`byDoc`, [01 §4.6](01-dominio-ash.md)) na v1? — antes de modelar a ficha.
+3. **`fila.obs`**: vira observação **operacional** (não-clínica, sem proteção especial) ou **recebe field policy/cifra**? — antes da Fatia 4.
+
+**Consequências.**
+- O domínio `Movimento.Records` ([01 §4.6](01-dominio-ash.md)) encolhe para `Patient` (ficha); `Attachment`/`ClinicalTag`/`Consent` são v2.
+- O **Gate G1** ([08 §6](08-roadmap.md)) perde a maior parte do peso na v1, mas **não** é eliminado: o que sobra depende das sub-decisões 1–3.
+- A **Fatia 6** do roadmap ([08 §4](08-roadmap.md)) deixa de ser "prontuário completo" e passa a ser "ficha do paciente"; o prontuário migra para v2.
+- Não anula o [ADR-007](#adr-007--dado-de-saúde-é-tratado-como-categoria-especial-da-lgpd): quando o prontuário entrar (v2), o ADR-007 volta a valer integralmente.
+
+---
+
 ## Decisões ainda em aberto
 
 Estas **não** estão travadas e precisam de resposta antes de fatias específicas. A lista completa e priorizada está em [02-regras-e-lacunas.md](02-regras-e-lacunas.md), Parte 4.
 
-| Tema | Bloqueia |
-|---|---|
-| Salas / equipamentos como recurso com capacidade (hoje conflito é só por profissional) | Schema |
-| Preço varia por convênio/particular/reembolso? Há repasse ao profissional? | Schema |
-| Pacote tem validade real? Pausar estende por quanto? | Schema |
-| Presença individual em turma (a correção proposta) confirma-se como requisito? | Schema |
-| "Renovar" é continuar o mesmo pacote ou criar sucessor? Hoje coexistem os dois | Schema |
-| Faturamento, guias de convênio, nota fiscal | v2 |
-| Multi-unidade dentro da mesma clínica | v2 |
+**Já resolvidas** (2026-07-10, ver [10-decisoes-de-produto-v1.md](10-decisoes-de-produto-v1.md) e ADRs 011–013):
+- ~~Pacote tem validade real? Pausar estende?~~ → **D6: sem validade.**
+- ~~Presença individual em turma confirma-se?~~ → **D10: sim, por participante.**
+- ~~"Renovar" é continuar ou criar sucessor?~~ → **[ADR-011](#adr-011--não-há-renovação-de-pacote-o-total-de-sessões-é-ajustável-a-qualquer-momento): não há renovação; total editável a qualquer momento.**
+- ~~Profissional em mais de uma clínica?~~ → **[ADR-012](#adr-012--profissional-pertence-a-uma-única-clínica-na-v1): um por clínica na v1.**
+- ~~Prontuário/LGPD Art. 11 na v1?~~ → **[ADR-013](#adr-013--prontuário-clínico-lgpd-art-11-é-v2-a-v1-tem-apenas-a-ficha-do-paciente): v2; v1 só a ficha.**
+
+**Ainda em aberto:**
+
+| Tema | Bloqueia | Quando |
+|---|---|---|
+| Ficha v1 inclui médico/CRM/convênio (sensível) ou só nome+contato? CPF precisa de cifra + índice cego? | Schema da ficha ([ADR-013](#adr-013--prontuário-clínico-lgpd-art-11-é-v2-a-v1-tem-apenas-a-ficha-do-paciente)) | Antes da ficha |
+| `fila.obs` (queixa clínica): observação operacional ou campo protegido? | Schema/policy da fila ([ADR-013](#adr-013--prontuário-clínico-lgpd-art-11-é-v2-a-v1-tem-apenas-a-ficha-do-paciente)) | Antes da Fatia 4 |
+| Salas / equipamentos como recurso com capacidade (hoje conflito é só por profissional) | Schema | v2 |
+| Preço varia por convênio/particular/reembolso? Há repasse ao profissional? | Subdomínio faturamento | v2 |
+| Faturamento, guias de convênio, nota fiscal | Subdomínio faturamento | v2 |
+| Multi-unidade dentro da mesma clínica | Modelo de filial | v2 |
+| Profissional em mais de uma clínica (reaberto na v2) | Vínculo prof↔clínica ([ADR-012](#adr-012--profissional-pertence-a-uma-única-clínica-na-v1)) | v2 |

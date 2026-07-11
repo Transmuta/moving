@@ -161,17 +161,23 @@ defmodule Movimento.Scheduling.AttendanceStatus do
   use Ash.Type.Enum, values: [:prevista, :concluida, :faltou, :cancelada]
 end
 
-# Estado do pacote. 5 valores: ativo/pausado/concluido nos dados-semente [:117],
-# 'renovado' setado em [:362] e exibido em pkgStatusMeta [:334], 'cancelado' em cancelarPkg.
+# Estado do pacote. 4 valores PERSISTIDOS: ativo/pausado/concluido nos dados-semente
+# [:117]-[:124], 'cancelado' em cancelarPkg. 'concluido' NÃO é derivado — além dos dados-semente,
+# é produzido em runtime por archivePkg [:576] (ação :archive, §4.4). O 'renovado' do protótipo
+# ([:362]) NÃO existe na produção:
+# não há renovação — o total de sessões é editável a qualquer momento (ADR-011).
 defmodule Movimento.Packages.PackageStatus do
-  use Ash.Type.Enum, values: [:ativo, :pausado, :renovado, :cancelado, :concluido]
+  use Ash.Type.Enum, values: [:ativo, :pausado, :cancelado, :concluido]
 end
 
 # Estado de uma sessão dentro da série do pacote.
-# 5 valores verificados nos dados-semente [:117]-[:120]:
+# 6 valores. Cinco verificados nos dados-semente [:117]-[:121]:
 # concluida, feriado, falta, proxima, segurada (segurada = pacote pausado, fora da agenda).
+# :agendada é DERIVADO por pkgSessions [:391] (fallback de toda sessão futura agendada/confirmada
+# após a próxima; renderizado em pkgDot [:400] e na legenda [:642]). :feriado só vem das arrays
+# de seed, não da derivação — o conjunto real é a união (6), igual ao mapa de pkgEstadoLabel [:385].
 defmodule Movimento.Packages.SessionState do
-  use Ash.Type.Enum, values: [:proxima, :concluida, :falta, :feriado, :segurada]
+  use Ash.Type.Enum, values: [:proxima, :agendada, :concluida, :falta, :feriado, :segurada]
 end
 
 # Tipo de atendimento comercial do paciente. Verificado no seletor [:2146]
@@ -180,9 +186,10 @@ defmodule Movimento.Records.AttendanceType do
   use Ash.Type.Enum, values: [:particular, :reembolso, :convenio]
 end
 
-# Prioridade na fila de espera. Verificado no seed [:163]-[:166] e no <select> [:2230].
+# Prioridade na fila de espera. 4 valores no <select> de cadastro [:2230] e no filtro da fila
+# [:1457]; os seeds [:163]-[:166] exercitam apenas 3 (baixa não aparece na semente).
 defmodule Movimento.Waitlist.Priority do
-  use Ash.Type.Enum, values: [:urgente, :alta, :normal]
+  use Ash.Type.Enum, values: [:urgente, :alta, :normal, :baixa]
 end
 
 # Janela de preferência de horário na fila. Verificado no seed [:163]-[:165].
@@ -207,7 +214,7 @@ defmodule Movimento.Accounts.MemberStatus do
 end
 
 # Tipo de exceção de data (feriado da clínica OU folga do profissional — correção f).
-# 2 valores verificados: holidays [:169]-[:170] e prof.exc [:66]-[:67] usam
+# 2 valores verificados: holidays [:169]-[:170] e prof.exc [:66]-[:68] usam
 # tipo 'fechado' (dia inteiro fechado) | 'horario' (horário especial via `periods`).
 defmodule Movimento.Scheduling.ExceptionKind do
   use Ash.Type.Enum, values: [:fechado, :horario]
@@ -238,7 +245,7 @@ subentendido em todos. Ações são **nomeadas de domínio**, casando com o cat�
 
 Separado de `Professional`: o seed distingue "membros da organização (acesso/login)" de
 "profissionais", e nota que Thiago (p4) e Carla (p5) são profissionais **sem** acesso
-([`:198`](../interface/Movimento.dc.html#L198)). Login é global porque uma pessoa pode ser
+([`:201`](../interface/Movimento.dc.html#L201)). Login é global porque uma pessoa pode ser
 membro de mais de uma clínica (ADR-003).
 
 ```elixir
@@ -335,6 +342,16 @@ defmodule Movimento.Accounts.Membership do
 end
 ```
 
+> **`acesso` (último acesso) — não modelado como atributo de domínio.** Cada membro do seed
+> carrega um `acesso` (string de "último acesso"/login,
+> [`:203`](../interface/Movimento.dc.html#L203)-[`:207`](../interface/Movimento.dc.html#L207);
+> `saveMembro` o inicializa `acesso:null`, [`:2504`](../interface/Movimento.dc.html#L2504)) que
+> **não** é persistido nem em `User` nem em `Membership`. É dado apresentacional/vestigial —
+> nunca lido nem renderizado na UI — e conceitualmente um dado global de sessão/autenticação. Se
+> mantido, mora no `User` como `:ultimo_acesso`/`last_sign_in_at` (atualizado pela estratégia de
+> sessão do AshAuthentication), **nunca** no `Membership` (que é o vínculo por-clínica). A
+> afirmação "Corresponde a `membros`" acima omite deliberadamente este único campo da semente.
+
 ### 4.2 `Movimento.Directory`
 
 #### `Professional`
@@ -349,20 +366,49 @@ defmodule Movimento.Directory.Professional do
   attributes do
     uuid_primary_key :id
     attribute :nome, :string, allow_nil?: false
+    # Identificação pessoal (renderProfForm seção 'ident' [:3007], inputs [:3076]-[:3084]).
+    attribute :nome_exibicao, :string           # como aparece na agenda (nomeExib [:3076])
+    attribute :nascimento, :date                # nasc [:3078]
+    attribute :cpf, :string, sensitive?: true   # PII cifrado — mesmo tratamento do Patient (§6)
+    attribute :rg, :string, sensitive?: true    # PII cifrado (§6)
+    attribute :estado_civil, :string            # [:3084]
+    # Contato & localização (seção 'contato' [:3008], inputs [:3090]-[:3107]); seed [:53]-[:57].
+    attribute :tel, :string                     # [:3090]
+    attribute :email, :string, sensitive?: true # usuário de login do sistema [:3091]
+    attribute :cep, :string
+    attribute :endereco, :string
+    attribute :numero, :string
+    attribute :complemento, :string
+    attribute :bairro, :string
+    attribute :cidade, :string                  # localização — distinto de registro_uf (conselho)
+    attribute :uf, :string
+    # Contato de emergência do profissional (dado de TERCEIRO, [:3106]-[:3107]).
+    attribute :emergencia_nome, :string, sensitive?: true
+    attribute :emergencia_tel, :string, sensitive?: true
+    # Profissão/formação (seção 'tecnicos' [:3009], select [:3114]); seed profissao [:53].
+    attribute :profissao, :string
     attribute :sub, :string          # especialidade curta ("Ortopedia")
     attribute :crefito, :string, allow_nil?: false
     attribute :registro_uf, :string
     attribute :ano_conclusao, :string
     attribute :especialidades, {:array, :string}, default: []
     attribute :vinculo, Movimento.Directory.ContractType
+    # Índice de cor da agenda (ci) — editável e persistido na seção "Cor & status" (savePayload
+    # [:3055]); consumido por profColor. Coerente com 06 §1.1 (público) e 03 §4.5.
+    attribute :cor_indice, :integer             # ci [:53]/[:3012]
     attribute :ativo, :boolean, allow_nil?: false, default: true
     # correção g: booleano explícito que decide o SIGNIFICADO das horas semanais (§4.3).
     attribute :segue_horario_clinica, :boolean, allow_nil?: false, default: true
+    # Dados PJ (seção 'contrato' [:3010], inputs [:3127]/[:3128]/[:3137]); condicionais a vínculo=PJ.
+    attribute :razao_social, :string                 # razaoSocial [:3127]
+    attribute :cnpj, :string, sensitive?: true       # PII PJ / segredo (06 §1.4)
+    attribute :conta_tipo, :string, sensitive?: true # contaTipo [:3137] — segredo bancário (06 §1.4)
     # Segredos bancários (ADR-007, cifrados — ver §6).
     attribute :banco, :string, sensitive?: true
     attribute :agencia, :string, sensitive?: true
     attribute :conta, :string, sensitive?: true
     attribute :pix, :string, sensitive?: true
+    # remuneracao [:3140] NÃO modelada: repasse ao profissional é escopo v2 (00-decisoes).
   end
 
   relationships do
@@ -382,7 +428,7 @@ end
 
 #### `AppointmentType` — **sem `preco`** (correção a)
 
-Seed [`:69`](../interface/Movimento.dc.html#L69)-[`:73`](../interface/Movimento.dc.html#L73):
+Seed [`:69`](../interface/Movimento.dc.html#L69)-[`:74`](../interface/Movimento.dc.html#L74):
 `{id, nome, dur, cor, icon, grupo, cap, sigla}`. **Não há campo de preço no tipo.** O preço
 está *hardcoded no relatório*: `const price={t1:180,t2:120,t3:130,t4:70,t5:90};`, verificado
 em [`:3339`](../interface/Movimento.dc.html#L3339). Modelamos preço com histórico de
@@ -552,7 +598,7 @@ defmodule Movimento.Scheduling.Attendance do
   attributes do
     uuid_primary_key :id
     attribute :status, Movimento.Scheduling.AttendanceStatus, allow_nil?: false, default: :prevista
-    # substitui a.faltaJustificada [:1122] — agora por participante, não por bloco.
+    # substitui a.faltaJustificada [:1123] — agora por participante, não por bloco.
     attribute :falta_justificada, :boolean, allow_nil?: false, default: false
   end
 
@@ -697,7 +743,7 @@ end
 #### `SlotHold` — reserva de vaga com TTL (recurso novo; `04` §7.2)
 
 Corrige a corrida `offerVaga → createAppt` sem reserva (ADR-004; `offerVaga` só pré-preenche
-um modal hoje, [`:2598`](../interface/Movimento.dc.html#L2598)). **Atenção à regra de DDL:**
+um modal hoje, [`:2596`](../interface/Movimento.dc.html#L2596)). **Atenção à regra de DDL:**
 `now()` é `STABLE`, não `IMMUTABLE`; a exclusion constraint de holds **não** pode ter
 `WHERE expires_at > now()` (o Postgres recusa) — a expiração vive na DML, nunca na
 constraint (`04` §7.2, item corrigido).
@@ -740,7 +786,7 @@ ALTER TABLE slot_holds
 
 ### 4.4 `Movimento.Packages`
 
-#### `Package` — máquina de estados; `usadas` é aggregate (correção c); validade real (i)
+#### `Package` — máquina de estados; `usadas` é aggregate (correção c); sem validade, sem renovação
 
 Seed [`:117`](../interface/Movimento.dc.html#L117). A coluna `usadas` é **vestigial**: o
 protótipo já deriva o consumo em `pkgUsadas`
@@ -749,10 +795,13 @@ this.pkgAppts(pk).reduce((n,a)=>n+(this.wouldConsume(a,a.status,pk)?1:0),0); }`)
 `pkgRemaining` ([`:327`](../interface/Movimento.dc.html#L327)). Logo `usadas` vira
 **aggregate**, não coluna.
 
-Validade: a UI promete "validade estendida enquanto pausado", mas **não existe campo** — o
-`pkgPause` inventa `retomaEm = hoje + 21 dias` (hardcoded,
-[`:554`](../interface/Movimento.dc.html#L554): `rd.setDate(rd.getDate()+21)`). Modelamos
-`validade_ate` real e a extensão por pausa (a constante +21 é palpite de produto — Apêndice B).
+**Sem validade ([ADR-013](00-decisoes.md)/D6) e sem renovação ([ADR-011](00-decisoes.md)).** O
+protótipo não tem validade real (o `pkgPause` inventa um `retomaEm = hoje + 21 dias` decorativo,
+[`:554`](../interface/Movimento.dc.html#L554)), e a produção também não terá: o pacote vale até
+as sessões acabarem. E **não há renovação**: o `total` de sessões é **editável, para mais ou
+para menos, a qualquer momento** (via `add_session`/`remove_session`), sempre sobre o mesmo
+pacote. Somem, em relação ao desenho anterior, o campo `validade_ate`, a relação `renovado_de` e
+a ação `:renew`.
 
 ```elixir
 defmodule Movimento.Packages.Package do
@@ -764,16 +813,15 @@ defmodule Movimento.Packages.Package do
     attribute :status, Movimento.Packages.PackageStatus, allow_nil?: false, default: :ativo
     # falta punitiva do pacote (pkgPunitivo [:1103]); nil ⇒ cai no default da clínica.
     attribute :falta_punitiva, :boolean, allow_nil?: true
-    # correção i: validade real (o protótipo não tinha).
-    attribute :validade_ate, :date, allow_nil?: true
-    attribute :pausado_em, :date, allow_nil?: true       # p/ estender validade ao retomar
-    attribute :retoma_em, :date, allow_nil?: true         # sugestão (retomaEm [:554])
+    # base do código legível SIGLA-AAMM (pkgBaseCode [:379]). No protótipo `criado` [:117] é a
+    # data da 1ª sessão não-feriado, NÃO o created_at da linha — por isso coluna própria, não inserted_at.
+    attribute :data_inicio, :date, allow_nil?: true
+    # SEM validade (ADR-013/D6) e SEM renovado_de/renew (ADR-011): total editável a qualquer momento.
   end
 
   relationships do
     belongs_to :patient, Movimento.Records.Patient, allow_nil?: false
     belongs_to :appointment_type, Movimento.Directory.AppointmentType, allow_nil?: false
-    belongs_to :renovado_de, Movimento.Packages.Package, allow_nil?: true  # renovadoDe [:117]
     has_one :schedule, Movimento.Packages.PackageSchedule                  # a "grade"
     has_many :appointments, Movimento.Scheduling.Appointment               # a série
   end
@@ -781,6 +829,11 @@ defmodule Movimento.Packages.Package do
   aggregates do
     # correção c: usadas derivado. Conta sessões que consomem (concluída sempre;
     # falta só se punitiva e não justificada) — a regra de wouldConsume [:1104] em SQL.
+    # SIMPLIFICAÇÃO: quando falta_punitiva é nil, wouldConsume/pkgPunitivo [:1103] cai no default
+    # da clínica (settings.noShowConsome ⇒ falta_consome_padrao). Esse ramo de fallback NÃO está
+    # expresso abaixo — referenciar um setting de nível-clínica dentro do filtro de um aggregate é
+    # não-trivial no modelo schema-por-tenant; a reconciliar ao scaffoldar (senão usadas é
+    # subcontado quando falta_punitiva=nil e a clínica é punitiva).
     count :usadas, :appointments do
       filter expr(
         status == :concluido or
@@ -791,22 +844,30 @@ defmodule Movimento.Packages.Package do
   end
 
   calculations do
-    calculate :restantes, :integer, expr(total - usadas)   # pkgRemaining [:327]
+    # clamp em 0, espelhando Math.max(0, total-usadas) de pkgRemaining [:327].
+    calculate :restantes, :integer, expr(if total - usadas > 0 do total - usadas else 0 end)
     calculate :acabando, :boolean, expr(status == :ativo and restantes > 0 and restantes <= 2)
+    # código legível SIGLA-AAMM: pkgSigla [:378] + AAMM de data_inicio (pkgBaseCode [:379]), com
+    # desambiguação "·N" por paciente (pkgCode [:380]). É a chave da busca de pacotes [:2677].
+    calculate :codigo, :string, Movimento.Packages.Calculations.PkgCode
   end
 
   actions do
     defaults [:read]
     create :create_with_series   # 09: POST /packages ← computeSerie [:1081]
-    update :renew                # 09: /renew ← confirmRenovar [:590] (total += N; predecessor → :renovado [:362])
+    # SEM :renew (ADR-011). Ajustar o total é add_session/remove_session (abaixo), a qualquer momento.
     update :pause                # 09: /pause ← pkgPause [:553]; sessões futuras → segurada (fora da agenda)
     update :resume               # 09: /resume ← pkgResume [:561] (reprojeta p/ o futuro — correção do 09)
     update :cancel               # 09: /cancel ← cancelarPkg [:568]
+    update :archive              # ← archivePkg [:576]; status → :concluido, habilitada quando done (pkgDone [:329])
     update :adjust_grade         # 09: PATCH /packages/:id/grade ← pkgSaveGrade [:578]
     update :bulk_adjust          # 09: /bulk_adjust ← applyMassaPacote [:1149] (escopo esta|proximas|todas)
     update :bulk_cancel          # 09: /bulk_cancel ← cancelarMassaPacote [:1174]
-    update :add_session          # 09: POST /packages/:id/sessions
-    destroy :remove_session      # 09: DELETE /packages/:id/sessions/:appointment_id
+    # aumenta o total (materializa 1 sessão na próxima data da grade, pulando feriados);
+    # REATIVA pacote concluído (concluido → ativo, inverso de archivePkg [:541]); se pausado,
+    # materializa a nova sessão já com pkgHold.
+    update :add_session          # 09: POST /packages/:id/sessions ← pkgAddSession [:541]
+    destroy :remove_session      # 09: DELETE /packages/:id/sessions/:appointment_id — diminui (só futura não consumida)
   end
 end
 ```
@@ -824,7 +885,7 @@ A `grade` do protótipo (`{dows, horarios, profId}`,
 [`:117`](../interface/Movimento.dc.html#L117)) é o insumo de `computeSerie`
 ([`:1081`](../interface/Movimento.dc.html#L1081)): gera N sessões pulando feriados
 (`this.state.holidays.some(h=>h.data===ds && h.tipo!=='horario')`,
-[`:1091`](../interface/Movimento.dc.html#L1091)) e estendendo a série até completar N.
+[`:1090`](../interface/Movimento.dc.html#L1090)) e estendendo a série até completar N.
 
 ```elixir
 defmodule Movimento.Packages.PackageSchedule do
@@ -868,6 +929,11 @@ defmodule Movimento.Waitlist.WaitlistEntry do
     has_many :holds, Movimento.Scheduling.SlotHold
   end
 
+  identities do
+    # "no máximo um item de fila por paciente" — addFila faz upsert-por-paciente [:1189].
+    identity :one_entry_per_patient, [:patient_id]
+  end
+
   calculations do
     # correção h: dias na fila derivado, não digitado.
     calculate :dias_na_fila, :integer, expr(date_diff(today(), fragment("date(?)", inserted_at), :day))
@@ -876,12 +942,15 @@ defmodule Movimento.Waitlist.WaitlistEntry do
 
   actions do
     defaults [:read]
-    create :enqueue          # 09: POST /waitlist ← addFila
+    create :enqueue do       # 09: POST /waitlist ← addFila (upsert-por-paciente [:1187]-[:1192])
+      upsert? true
+      upsert_identity :one_entry_per_patient
+    end
     update :update           # 09: PATCH /waitlist/:id
     destroy :dequeue         # 09: DELETE /waitlist/:id ← [:1186]
     # 09: GET /waitlist/:id/slots — ação genérica (motor filaVagas [:2531]).
     action :find_slots, {:array, :map}
-    update :offer            # 09: POST /waitlist/:id/offer ← cria SlotHold (offerVaga [:2598])
+    update :offer            # 09: POST /waitlist/:id/offer ← cria SlotHold (offerVaga [:2596])
     update :convert_to_appointment  # 09: /convert ← createAppt com _fromFila [:1062]
   end
 end
@@ -892,7 +961,7 @@ end
 > [`:2533`](../interface/Movimento.dc.html#L2533)), casa `janela` + `regras`, e **prioriza
 > vagas que abriram** por cancelamento/falta (`freed`): o `sort` final põe `freed` primeiro
 > (`out.sort((a,b)=> (b.freed?1:0)-(a.freed?1:0) || …)`,
-> [`:2589`](../interface/Movimento.dc.html#L2589)). Por isso `:find_slots` é ação genérica
+> [`:2591`](../interface/Movimento.dc.html#L2591)). Por isso `:find_slots` é ação genérica
 > com ordem embutida (concorda com `09` §3.6).
 
 #### `AvailabilityRule` — regra de disponibilidade da fila
@@ -927,8 +996,8 @@ end
 Seed [`:96`](../interface/Movimento.dc.html#L96)-[`:110`](../interface/Movimento.dc.html#L110).
 A coluna `faltas` é **denormalizada** — o protótipo a mantém à mão em `justificarFalta`
 (`faltas:Math.max(0,(p.faltas||0)+(next?-1:1))`,
-[`:1124`](../interface/Movimento.dc.html#L1124)) e a semeia fixa
-(`patients[4].faltas=2`, [`:113`](../interface/Movimento.dc.html#L113)). Vira **aggregate**
+[`:1126`](../interface/Movimento.dc.html#L1126)) e a semeia fixa
+(`patients[4].faltas=2`, [`:112`](../interface/Movimento.dc.html#L112)). Vira **aggregate**
 sobre `Attendance`.
 
 ```elixir
@@ -971,7 +1040,11 @@ defmodule Movimento.Records.Patient do
     # encaminhamento médico — SENSÍVEL (revela tratamento; dado de terceiro), 06 §1.1
     attribute :medico, :string, sensitive?: true
     attribute :crm, :string, sensitive?: true
+    # canal de aquisição (comoConheceu [:107], comoPool [:88]) — NÃO sensível (marketing, não LGPD Art. 11).
+    attribute :como_conheceu, :string
     attribute :prefs, {:array, :uuid}, default: []     # profissionais preferidos
+    # índice de cor categórica na agenda (ci [:109]); 06 §1.1 classifica público.
+    attribute :cor_indice, :integer
   end
 
   identities do
@@ -1104,7 +1177,7 @@ end
 
 Não introduz entidade de escrita nova. Expõe **uma ação genérica de agregação**
 correspondente a `GET /reports/summary` (`09` §3.8), alimentada pelos KPIs verificados em
-`renderRelatorios` ([`:3339`](../interface/Movimento.dc.html#L3339) em diante: `ativos`,
+`reports2` (chamada por `renderRelatorios`) ([`:3339`](../interface/Movimento.dc.html#L3339) em diante: `ativos`,
 `concluídos`, `taxa de falta`, `cancelamentos`). O preço deixa de ser o literal
 [`:3339`](../interface/Movimento.dc.html#L3339) e passa a vir de `PriceVersion` (correção a).
 
@@ -1132,15 +1205,15 @@ Todas verificáveis no protótipo. As linhas foram abertas.
 | # | Correção | Origem no protótipo (verificada) | Onde no schema |
 |---|---|---|---|
 | a | `preco` não existe no tipo; tabela hardcoded no relatório | `const price={t1:180,t2:120,t3:130,t4:70,t5:90};` [`:3339`](../interface/Movimento.dc.html#L3339) | `PriceVersion` (§4.2), com histórico de vigência |
-| b | `patient.faltas` denormalizada | somada à mão em `justificarFalta` [`:1124`](../interface/Movimento.dc.html#L1124); semeada [`:113`](../interface/Movimento.dc.html#L113) | aggregate `Patient.faltas` (§4.6) |
+| b | `patient.faltas` denormalizada | gravada por `setStatus` [`:1038`](../interface/Movimento.dc.html#L1038) (±1 ao marcar/reverter `faltou`) e ajustada em `justificarFalta` [`:1126`](../interface/Movimento.dc.html#L1126); semeada [`:112`](../interface/Movimento.dc.html#L112) | aggregate `Patient.faltas` (§4.6) |
 | c | `package.usadas` vestigial | derivada em `pkgUsadas` [`:326`](../interface/Movimento.dc.html#L326) | aggregate `Package.usadas` (§4.4) |
 | d | presença por participante (turma pune todos) | status único no bloco; `justificarFalta` percorre `patientIds` [`:1123`](../interface/Movimento.dc.html#L1123) | recurso `Attendance` (§4.3) |
 | e | `pkgOf` — pacotes distintos na mesma turma; `apptPkg` pega o primeiro | laço `for` que retorna no 1º acerto [`:1113`](../interface/Movimento.dc.html#L1113) | `Attendance.package_id` dissolve o mapa (§4.3) |
 | f | `ScheduleException` unificado (feriado ≡ folga) | mesma forma em `holidays` [`:169`](../interface/Movimento.dc.html#L169) e `prof.exc` [`:66`](../interface/Movimento.dc.html#L66) | 1 recurso, `professional_id` nulo/preenchido (§4.3) |
 | g | `prof.avail` com dois sentidos | `profWeek` [`:840`](../interface/Movimento.dc.html#L840); `followClinic=false` + grade cheia [`:64`](../interface/Movimento.dc.html#L64) | `segue_horario_clinica` + `ProfessionalHours.modo` (§4.2/§4.3) |
 | h | `fila.dias` digitado | `dias:8` [`:163`](../interface/Movimento.dc.html#L163) | calculation `dias_na_fila` (§4.5) |
-| i | pacote sem validade real; pausa +21 hardcoded | `rd.setDate(rd.getDate()+21)` [`:554`](../interface/Movimento.dc.html#L554) | `Package.validade_ate`/`pausado_em` (§4.4) |
-| j | `SlotHold` novo; sem `now()` na constraint | `offerVaga` só abre modal [`:2598`](../interface/Movimento.dc.html#L2598); DDL em `04` §7.2 | recurso `SlotHold` (§4.3) |
+| i | pacote sem validade real; pausa +21 hardcoded | `rd.setDate(rd.getDate()+21)` [`:554`](../interface/Movimento.dc.html#L554) | **produção também sem validade** ([ADR-013](00-decisoes.md)/D6): não vira campo; pausa não estende (§4.4) |
+| j | `SlotHold` novo; sem `now()` na constraint | `offerVaga` só abre modal [`:2596`](../interface/Movimento.dc.html#L2596); DDL em `04` §7.2 | recurso `SlotHold` (§4.3) |
 
 ---
 
@@ -1186,7 +1259,7 @@ decide. Resumo operacional:
 
   ```elixir
   field_policies do
-    field_policy [:banco, :agencia, :conta, :pix] do
+    field_policy [:banco, :agencia, :conta, :conta_tipo, :pix, :cnpj] do
       authorize_if actor_attribute_equals(:papel, :admin)
       authorize_if Movimento.Checks.IsSelfProfessional   # o próprio profissional
     end
@@ -1261,12 +1334,13 @@ de forma/entrada → validation Ash** (atômica quando possível, `.claude/rules
 | disponibilidade do prof ⊆ horário da clínica | comentário [`:63`](../interface/Movimento.dc.html#L63); grade de Thiago [`:64`](../interface/Movimento.dc.html#L64) | validation Ash em `ProfessionalHours` (períodos custom ⊆ `ClinicHours[dow]`) |
 | não-sobreposição por profissional | `checkConflict` [`:834`](../interface/Movimento.dc.html#L834) | **exclusion constraint** `appointments_no_overlap` (banco, 04 §7.1) |
 | exceção do encaixe | `if(encaixe) return null` [`:835`](../interface/Movimento.dc.html#L835); `!b.encaixe` [`:837`](../interface/Movimento.dc.html#L837) | predicado parcial `WHERE (encaixe=false AND status<>'cancelado')` (04 §7.1) |
-| `patientId` XOR `patientIds` | `apptPkg` ramifica em `a.patientIds`/`a.pkgId` [`:1112`](../interface/Movimento.dc.html#L1112)/[`:1115`](../interface/Movimento.dc.html#L1115) | **eliminado** pela correção d: sempre há `Attendance`(s); não há dois campos |
+| `patientId` XOR `patientIds` | `apptPkg` ramifica em `a.patientIds`/`a.pkgId` [`:1112`](../interface/Movimento.dc.html#L1112)/[`:1116`](../interface/Movimento.dc.html#L1116) | **eliminado** pela correção d: sempre há `Attendance`(s); não há dois campos |
 | `retomaEm` só se pausado | `pkgResume` [`:561`](../interface/Movimento.dc.html#L561) | validation Ash (`retoma_em` presente ⇒ `status == :pausado`) |
 | convênio/carteirinha só se `atendTipo=convenio` | seed condicional `conv?…:''` [`:107`](../interface/Movimento.dc.html#L107) | validation Ash em `Patient` (`present(:carteirinha) where atend_tipo == :convenio`) |
-| `cap` só se `type.grupo` | tipo `t4` é o único `grupo:true, cap:4` [`:72`](../interface/Movimento.dc.html#L72) | validation em `AppointmentType` (§4.2) |
+| `cap` só se `type.grupo` | tipo `t4` é o único `grupo:true, cap:4` [`:73`](../interface/Movimento.dc.html#L73) | validation em `AppointmentType` (§4.2) |
 | não-sobreposição de holds | `04` §7.2 | exclusion constraint `slot_holds_no_overlap` (SEM `now()`, §4.3) |
 | CPF único (sobre índice cego) | `byDoc` [`:999`](../interface/Movimento.dc.html#L999) | `identity :unique_cpf [:cpf_hash]` + unique index (§9) |
+| um item de fila por paciente | `addFila` faz upsert-por-paciente [`:1189`](../interface/Movimento.dc.html#L1189) | `identity :one_entry_per_patient [:patient_id]` + unique index (§9) |
 
 ---
 
@@ -1292,6 +1366,7 @@ CREATE INDEX patients_nome_trgm ON patients USING gin (nome gin_trgm_ops);  -- i
 
 -- Fila e holds.
 CREATE INDEX waitlist_prio ON waitlist_entries (prio);
+CREATE UNIQUE INDEX waitlist_one_per_patient ON waitlist_entries (patient_id);  -- upsert addFila [:1189]
 CREATE INDEX slot_holds_expires ON slot_holds (expires_at);   -- coletor DML/Oban (04 §7.2)
 ```
 
@@ -1326,12 +1401,16 @@ ALTER TABLE appointments
    de rota — há uma decisão de produto pendente ("presença individual em turma", em aberto no
    `00`) que este schema já suporta.
 
-2. **Estados do pacote.** O `09` §3.4 lista `ativo, pausado, renovado, cancelado, concluido`.
-   Confirmado no protótipo: `renovado` é setado em `confirmRenovar`
-   ([`:362`](../interface/Movimento.dc.html#L362)) e exibido em `pkgStatusMeta`
-   ([`:334`](../interface/Movimento.dc.html#L334)); os demais no seed
-   [`:117`](../interface/Movimento.dc.html#L117). `PackageStatus` (§3) reproduz os cinco.
-   **Sem divergência** — apenas registro de que `renovado` foi verificado, não presumido.
+2. **Estados do pacote.** O `09` §3.4 lista `ativo, pausado, renovado, cancelado, concluido`. O
+   `renovado` é verificado no protótipo (setado em `createPacote`, no ramo `d.renovadoDe`,
+   [`:362`](../interface/Movimento.dc.html#L362); exibido em `pkgStatusMeta`,
+   [`:334`](../interface/Movimento.dc.html#L334); note que `confirmRenovar`
+   [`:590`](../interface/Movimento.dc.html#L590)/[`:600`](../interface/Movimento.dc.html#L600) é o
+   fluxo distinto "continuar a mesma grade", que só acrescenta sessões e mantém `status:'ativo'`),
+   mas **a produção o descarta**: por
+   [ADR-011](00-decisoes.md) **não há renovação**, então `PackageStatus` (§3) tem **quatro**
+   valores (`:renovado` removido). **Divergência deliberada** do protótipo, registrada no ADR-011;
+   o `09` §3.4 precisa ser alinhado.
 
 3. **`resume` reprojeta para o futuro.** O `09` §3.4 declara isso como "correção deliberada,
    não o espelho do protótipo" (o `pkgResume`, [`:561`](../interface/Movimento.dc.html#L561),
@@ -1346,7 +1425,7 @@ ALTER TABLE appointments
 
 5. **`professional_ids` na fila.** O `09` §3.6 fala em `profIds` preferidos. Modelado como
    `{:array, :uuid}` em `WaitlistEntry` (§4.5), coerente com o seed
-   [`:163`](../interface/Movimento.dc.html#L163) (`profIds:['p4','p1']`). Sem divergência.
+   [`:164`](../interface/Movimento.dc.html#L164) (`profIds:['p4','p1']`). Sem divergência.
 
 ---
 
@@ -1361,25 +1440,21 @@ comportamento das ações, mas as **colunas**:
    `PriceSplit`/`Repasse` ligado a `Professional`. **Bloqueia** a forma final de
    `PriceVersion`.
 
-2. **Validade real do pacote e extensão por pausa.** `Package.validade_ate`/`pausado_em`
-   existem, mas a **regra** de extensão (o `+21` de [`:554`](../interface/Movimento.dc.html#L554)
-   é palpite) depende de decisão. Se "pausar estende a validade pela duração da pausa",
-   `resume` calcula `validade_ate += (hoje − pausado_em)`. Se for prazo fixo, vira `setting`
-   da clínica. **Bloqueia** o cálculo de `resume`, não as colunas.
+2. ~~**Validade real do pacote e extensão por pausa.**~~ **RESOLVIDO ([ADR-013](00-decisoes.md)/D6):**
+   pacote **não tem validade**; `validade_ate`/`pausado_em` **não existem**. Pausar não estende
+   nada; `resume` apenas reprojeta a série restante para o futuro (§4.4).
 
 3. **Salas / equipamentos como recurso com capacidade.** Hoje o conflito é **só por
-   profissional** (`checkConflict` filtra `a.profId===b.profId`,
-   [`:832`](../interface/Movimento.dc.html#L832)). Se sala/equipamento virar recurso com
+   profissional** (`checkConflict` filtra `b.profId===profId`,
+   [`:834`](../interface/Movimento.dc.html#L834)). Se sala/equipamento virar recurso com
    capacidade, entra `Room`/`Resource` e a exclusion constraint da agenda ganha uma **segunda**
    dimensão (`room_id WITH =`), ou uma constraint irmã. **Bloqueia** a modelagem de
    `Scheduling` e o DDL de `04` §7.1.
 
-4. **Renovar = continuar o mesmo pacote ou criar sucessor?** Hoje **coexistem**: `total += N`
-   no mesmo pacote **e** `renovado_de` apontando um predecessor (`confirmRenovar`
-   [`:590`](../interface/Movimento.dc.html#L590), predecessor → `renovado`
-   [`:362`](../interface/Movimento.dc.html#L362)). O schema suporta os dois (`renovado_de` +
-   `renew` que incrementa). A decisão define **qual** a ação `:renew` faz por padrão.
-   **Bloqueia** a semântica de `:renew`, não as colunas.
+4. ~~**Renovar = continuar o mesmo pacote ou criar sucessor?**~~ **RESOLVIDO
+   ([ADR-011](00-decisoes.md)):** **não há renovação**. Sem `renovado_de`, sem ação `:renew`, sem
+   status `:renovado`. O `total` de sessões é **editável (+/−) a qualquer momento** via
+   `add_session`/`remove_session`, sempre no mesmo pacote (§4.4).
 
 5. **Presença individual em turma como requisito firme** (ver Apêndice A, item 1). Se
    confirmada, `complete`/`no_show` migram de vez para `Attendance` e o slot perde `concluido`/
