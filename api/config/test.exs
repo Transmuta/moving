@@ -1,6 +1,6 @@
 import Config
 
-config :movimento, Movimento.Repo,
+config :api, Api.Repo,
   username: System.get_env("DATABASE_USER", "postgres"),
   password: System.get_env("DATABASE_PASSWORD", "postgres"),
   hostname: System.get_env("DATABASE_HOST", "localhost"),
@@ -12,7 +12,7 @@ config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
-config :movimento, MovimentoWeb.Endpoint,
+config :api, ApiWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "PL3h8Fw6FJ+TW9GXy2eNCjXw4jZxBKqMVkVfP59oxXFrjshPnJKBIwJJlMWf4WeB",
   server: false

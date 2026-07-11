@@ -1,12 +1,12 @@
-defmodule MovimentoWeb do
+defmodule ApiWeb do
   @moduledoc """
   The entrypoint for defining your web interface, such
   as controllers, components, channels, and so on.
 
   This can be used in your application as:
 
-      use MovimentoWeb, :controller
-      use MovimentoWeb, :html
+      use ApiWeb, :controller
+      use ApiWeb, :html
 
   The definitions below will be executed for every controller,
   component, etc, so keep them short and clean, focused
@@ -39,7 +39,7 @@ defmodule MovimentoWeb do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
 
-      use Gettext, backend: MovimentoWeb.Gettext
+      use Gettext, backend: ApiWeb.Gettext
 
       import Plug.Conn
 
@@ -50,9 +50,9 @@ defmodule MovimentoWeb do
   def verified_routes do
     quote do
       use Phoenix.VerifiedRoutes,
-        endpoint: MovimentoWeb.Endpoint,
-        router: MovimentoWeb.Router,
-        statics: MovimentoWeb.static_paths()
+        endpoint: ApiWeb.Endpoint,
+        router: ApiWeb.Router,
+        statics: ApiWeb.static_paths()
     end
   end
 

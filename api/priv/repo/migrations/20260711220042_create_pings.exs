@@ -1,4 +1,4 @@
-defmodule Movimento.Repo.Migrations.CreatePings do
+defmodule Api.Repo.Migrations.CreatePings do
   @moduledoc """
   Updates resources based on their most recent snapshots.
 

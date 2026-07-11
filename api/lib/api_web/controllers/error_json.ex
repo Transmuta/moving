@@ -1,4 +1,4 @@
-defmodule MovimentoWeb.ErrorJSON do
+defmodule ApiWeb.ErrorJSON do
   @moduledoc """
   This module is invoked by your endpoint in case of errors on JSON requests.
 

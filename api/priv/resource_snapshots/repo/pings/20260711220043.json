@@ -62,7 +62,7 @@
     "global": null,
     "strategy": null
   },
-  "repo": "Elixir.Movimento.Repo",
+  "repo": "Elixir.Api.Repo",
   "schema": null,
   "table": "pings"
 }

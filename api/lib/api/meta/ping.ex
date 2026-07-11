@@ -1,7 +1,7 @@
-defmodule Movimento.Meta.Ping do
+defmodule Api.Meta.Ping do
   use Ash.Resource,
-    otp_app: :movimento,
-    domain: Movimento.Meta,
+    otp_app: :api,
+    domain: Api.Meta,
     extensions: [AshJsonApi.Resource],
     data_layer: AshPostgres.DataLayer
 
@@ -11,7 +11,7 @@ defmodule Movimento.Meta.Ping do
 
   postgres do
     table "pings"
-    repo Movimento.Repo
+    repo Api.Repo
   end
 
   actions do

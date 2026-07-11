@@ -1,4 +1,4 @@
-defmodule Movimento.Application do
+defmodule Api.Application do
   # See https://elixir.hexdocs.pm/Application.html
   # for more information on OTP Applications
   @moduledoc false
@@ -8,19 +8,19 @@ defmodule Movimento.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      MovimentoWeb.Telemetry,
-      {DNSCluster, query: Application.get_env(:movimento, :dns_cluster_query) || :ignore},
-      Movimento.Repo,
-      {Phoenix.PubSub, name: Movimento.PubSub},
-      # Start a worker by calling: Movimento.Worker.start_link(arg)
-      # {Movimento.Worker, arg},
+      ApiWeb.Telemetry,
+      {DNSCluster, query: Application.get_env(:api, :dns_cluster_query) || :ignore},
+      Api.Repo,
+      {Phoenix.PubSub, name: Api.PubSub},
+      # Start a worker by calling: Api.Worker.start_link(arg)
+      # {Api.Worker, arg},
       # Start to serve requests, typically the last entry
-      MovimentoWeb.Endpoint
+      ApiWeb.Endpoint
     ]
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Movimento.Supervisor]
+    opts = [strategy: :one_for_one, name: Api.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
@@ -28,7 +28,7 @@ defmodule Movimento.Application do
   # whenever the application is updated.
   @impl true
   def config_change(changed, _new, removed) do
-    MovimentoWeb.Endpoint.config_change(changed, removed)
+    ApiWeb.Endpoint.config_change(changed, removed)
     :ok
   end
 end

@@ -1,5 +1,5 @@
-defmodule MovimentoWeb.Router do
-  use MovimentoWeb, :router
+defmodule ApiWeb.Router do
+  use ApiWeb, :router
 
   pipeline :api do
     plug :accepts, ["json"]
@@ -12,10 +12,12 @@ defmodule MovimentoWeb.Router do
       path: "/api/json/open_api",
       default_model_expand_depth: 4
 
-    forward "/", MovimentoWeb.AshJsonApiRouter
+    forward "/", ApiWeb.AshJsonApiRouter
   end
 
-  scope "/api", MovimentoWeb do
+  scope "/api", ApiWeb do
     pipe_through :api
+
+    get "/health", HealthController, :show
   end
 end

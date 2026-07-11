@@ -1,9 +1,9 @@
-defmodule Movimento.MixProject do
+defmodule Api.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :movimento,
+      app: :api,
       version: "0.1.0",
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule Movimento.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Movimento.Application, []},
+      mod: {Api.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end

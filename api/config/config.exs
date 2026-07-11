@@ -62,20 +62,20 @@ config :spark,
     ]
   ]
 
-config :movimento,
+config :api,
   generators: [timestamp_type: :utc_datetime],
-  ecto_repos: [Movimento.Repo],
-  ash_domains: [Movimento.Meta]
+  ecto_repos: [Api.Repo],
+  ash_domains: [Api.Meta]
 
 # Configure the endpoint
-config :movimento, MovimentoWeb.Endpoint,
+config :api, ApiWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [json: MovimentoWeb.ErrorJSON],
+    formats: [json: ApiWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Movimento.PubSub,
+  pubsub_server: Api.PubSub,
   live_view: [signing_salt: "9DW1AgFi"]
 
 # Configure Elixir's Logger

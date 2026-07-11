@@ -1,6 +1,6 @@
 import Config
 
-config :movimento, Movimento.Repo,
+config :api, Api.Repo,
   username: System.get_env("DATABASE_USER", "postgres"),
   password: System.get_env("DATABASE_PASSWORD", "postgres"),
   hostname: System.get_env("DATABASE_HOST", "localhost"),
@@ -16,7 +16,7 @@ config :ash, policies: [show_policy_breakdowns?: true]
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :movimento, MovimentoWeb.Endpoint,
+config :api, ApiWeb.Endpoint,
   # Bind to all interfaces so the container port is reachable from the host.
   http: [ip: {0, 0, 0, 0}, port: String.to_integer(System.get_env("PORT", "4000"))],
   check_origin: false,
@@ -49,7 +49,7 @@ config :movimento, MovimentoWeb.Endpoint,
 # different ports.
 
 # Enable dev routes for dashboard and mailbox
-config :movimento, dev_routes: true
+config :api, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

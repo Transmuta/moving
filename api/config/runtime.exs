@@ -12,15 +12,15 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/movimento start
+#     PHX_SERVER=true bin/api start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :movimento, MovimentoWeb.Endpoint, server: true
+  config :api, ApiWeb.Endpoint, server: true
 end
 
-config :movimento, MovimentoWeb.Endpoint,
+config :api, ApiWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
@@ -38,9 +38,9 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
-  config :movimento, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :api, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :movimento, MovimentoWeb.Endpoint,
+  config :api, ApiWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -58,7 +58,7 @@ if config_env() == :prod do
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
-  config :movimento, Movimento.Repo,
+  config :api, Api.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
 
@@ -67,7 +67,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :movimento, MovimentoWeb.Endpoint,
+  #     config :api, ApiWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -89,7 +89,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :movimento, MovimentoWeb.Endpoint,
+  #     config :api, ApiWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.

@@ -1,4 +1,4 @@
-# Dev image for the Movimento API (Phoenix + Ash). Runtime only —
+# Dev image for the Api API (Phoenix + Ash). Runtime only —
 # source is bind-mounted and deps/_build live in named volumes (see compose).
 FROM elixir:1.18.4-otp-27
 

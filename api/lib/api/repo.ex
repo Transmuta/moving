@@ -1,5 +1,5 @@
-defmodule Movimento.Repo do
-  use AshPostgres.Repo, otp_app: :movimento
+defmodule Api.Repo do
+  use AshPostgres.Repo, otp_app: :api
 
   def min_pg_version do
     %Version{major: 16, minor: 0, patch: 0}
