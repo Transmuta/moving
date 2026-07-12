@@ -39,6 +39,9 @@ config :spark,
     remove_parens?: true,
     "Ash.Resource": [
       section_order: [
+        :authentication,
+        :token,
+        :user_identity,
         :json_api,
         :postgres,
         :resource,
@@ -65,7 +68,11 @@ config :spark,
 config :api,
   generators: [timestamp_type: :utc_datetime],
   ecto_repos: [Api.Repo],
-  ash_domains: [Api.Meta, Api.Accounts, Api.Directory]
+  ash_domains: [Api.Meta, Api.Accounts, Api.Directory],
+  ash_authentication: [return_error_on_invalid_magic_link_token?: true]
+
+# Magic link sem página de interação: o callback GET assina a sessão direto (09 §8).
+config :ash_authentication, bypass_require_interaction_for_magic_link?: true
 
 # Configure the endpoint
 config :api, ApiWeb.Endpoint,
@@ -85,6 +92,12 @@ config :logger, :default_formatter,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+# Mailer (Swoosh). Default: adapter Local (caixa em memória, dev). Sobrescrito por
+# env em test.exs/runtime.exs. Sem cliente HTTP externo (magic link só precisa de
+# Local/Test/SMTP); adapters de API ficam para quando houver provedor real.
+config :api, Api.Mailer, adapter: Swoosh.Adapters.Local
+config :swoosh, :api_client, false
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

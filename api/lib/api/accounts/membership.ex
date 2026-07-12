@@ -9,7 +9,8 @@ defmodule Api.Accounts.Membership do
   use Ash.Resource,
     otp_app: :api,
     domain: Api.Accounts,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    authorizers: [Ash.Policy.Authorizer]
 
   # Global: o vínculo vive no schema público (liga entidades globais User<->Clinic),
   # sem bloco `multitenancy`. FKs para users e clinics (ambos públicos).
@@ -25,6 +26,22 @@ defmodule Api.Accounts.Membership do
 
   actions do
     defaults [:read]
+
+    # Memberships ATIVOS de um usuário (para o seletor de clínica e o scope da sessão).
+    # Chamado na resolução de identidade (authorize?: false) pelo plug de scope.
+    read :active_for_user do
+      argument :user_id, :uuid, allow_nil?: false
+      filter expr(user_id == ^arg(:user_id) and status == :ativo)
+      prepare build(load: [:clinic], sort: [inserted_at: :asc])
+    end
+
+    # O membership ativo de um usuário numa clínica (valida a troca de tenant, 09 §8).
+    read :active_for_user_and_clinic do
+      argument :user_id, :uuid, allow_nil?: false
+      argument :clinic_id, :uuid, allow_nil?: false
+      get? true
+      filter expr(user_id == ^arg(:user_id) and clinic_id == ^arg(:clinic_id) and status == :ativo)
+    end
 
     # Convite: cria pendente; ativa no primeiro acesso (magic link/Google, ADR-015).
     create :invite do
@@ -48,6 +65,43 @@ defmodule Api.Accounts.Membership do
 
     destroy :revoke_access do
       require_atomic? false
+    end
+  end
+
+  # ADR-016 — RBAC por tenant. As leituras de sistema do scope (active_for_user*) rodam
+  # com authorize?: false e não passam por aqui.
+  policies do
+    # Você vê o próprio vínculo; owner/admin da clínica veem todos os vínculos dela.
+    policy action_type(:read) do
+      authorize_if expr(user_id == ^actor(:id))
+
+      authorize_if expr(
+                     exists(
+                       clinic.memberships,
+                       user_id == ^actor(:id) and papel in [:owner, :admin] and status == :ativo
+                     )
+                   )
+    end
+
+    # Convidar: owner/admin da clínica alvo (clinic_id vem como argumento do convite).
+    policy action(:invite) do
+      authorize_if {Api.Accounts.Checks.HasClinicRole,
+                    roles: [:owner, :admin], clinic_from: {:argument, :clinic_id}}
+    end
+
+    # Aceitar convite: só o próprio convidado (primeiro acesso via magic link).
+    policy action(:accept_invite) do
+      authorize_if expr(user_id == ^actor(:id))
+    end
+
+    # Alterar papel / revogar acesso: owner/admin da clínica do vínculo.
+    policy action([:update, :revoke_access]) do
+      authorize_if expr(
+                     exists(
+                       clinic.memberships,
+                       user_id == ^actor(:id) and papel in [:owner, :admin] and status == :ativo
+                     )
+                   )
     end
   end
 

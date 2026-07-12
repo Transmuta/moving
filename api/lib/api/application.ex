@@ -15,7 +15,8 @@ defmodule Api.Application do
       # Start a worker by calling: Api.Worker.start_link(arg)
       # {Api.Worker, arg},
       # Start to serve requests, typically the last entry
-      ApiWeb.Endpoint
+      ApiWeb.Endpoint,
+      {AshAuthentication.Supervisor, [otp_app: :api]}
     ]
 
     # See https://elixir.hexdocs.pm/Supervisor.html

@@ -39,6 +39,10 @@ services:
       DATABASE_APP_USER: movimento_app
       DATABASE_APP_PASSWORD: movimento_app
       PORT: "4000"
+      # Google OAuth (ADR-015) — valores vêm do .env (gitignored), não daqui.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/auth/google/callback}
     ports:
       # Host 4010 (4000 já usado por outro stack) -> Phoenix do container.
       - "4010:4000"

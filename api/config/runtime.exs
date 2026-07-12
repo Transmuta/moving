@@ -22,6 +22,14 @@ end
 
 config :api, ApiWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Google OAuth (ADR-015) — lido no boot em TODOS os ambientes (dev/test/prod), então basta
+# setar as envs e reiniciar (sem recompilar). O `Api.Secrets` lê deste `:google_oauth`.
+config :api, :google_oauth,
+  client_id: System.get_env("GOOGLE_CLIENT_ID"),
+  client_secret: System.get_env("GOOGLE_CLIENT_SECRET"),
+  # BASE — o AshAuthentication anexa "/user/google/callback".
+  redirect_uri: System.get_env("GOOGLE_REDIRECT_URI") || "http://localhost:5173/auth"
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
@@ -60,6 +68,17 @@ if config_env() == :prod do
   config :api, Api.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+
+  config :api,
+    token_signing_secret:
+      System.get_env("TOKEN_SIGNING_SECRET") ||
+        raise("Missing environment variable `TOKEN_SIGNING_SECRET`!")
+
+  # Destino do redirect pós-login (BFF SvelteKit). O :google_oauth é setado acima (todos os envs).
+  config :api, :web_app_url, System.get_env("WEB_APP_URL") || "https://#{host}"
+
+  # Mailer de produção: configure aqui o adapter real (ex.: Swoosh.Adapters.Mailgun/SMTP)
+  # via env quando houver provedor. Sem isso, o adapter Local do config.exs é usado.
 
   # ## SSL Support
   #

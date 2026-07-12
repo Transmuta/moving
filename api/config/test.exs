@@ -1,5 +1,8 @@
 import Config
 
+config :api, token_signing_secret: "ZF5ezrg8Ok6/UlQajfAaSey6CAGa15cn"
+config :bcrypt_elixir, log_rounds: 1
+
 config :api, Api.Repo,
   username: System.get_env("DATABASE_USER", "postgres"),
   password: System.get_env("DATABASE_PASSWORD", "postgres"),
@@ -9,6 +12,9 @@ config :api, Api.Repo,
   pool_size: 10
 
 config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
+
+# E-mails vão para a caixa de teste (Swoosh.Adapters.Test); assert com Swoosh.TestAssertions.
+config :api, Api.Mailer, adapter: Swoosh.Adapters.Test
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

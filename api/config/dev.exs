@@ -49,7 +49,25 @@ config :api, ApiWeb.Endpoint,
 # different ports.
 
 # Enable dev routes for dashboard and mailbox
-config :api, dev_routes: true
+config :api, dev_routes: true, token_signing_secret: "9uIyeEY0MK4xmavsej/di4bTKfYSN6Hh"
+
+# URL pública da API no host (o container escuta 4000, publicado em 4010). Usada para
+# gerar links de magic link clicáveis fora do container.
+config :api, ApiWeb.Endpoint, url: [host: "localhost", port: 4010, scheme: "http"]
+
+# Google OAuth (ADR-015). Sem credenciais reais em dev por padrão — o fluxo Google só
+# funciona setando GOOGLE_CLIENT_ID/SECRET. Magic link funciona sem isso.
+config :api, :google_oauth,
+  client_id: System.get_env("GOOGLE_CLIENT_ID", ""),
+  client_secret: System.get_env("GOOGLE_CLIENT_SECRET", ""),
+  redirect_uri:
+    System.get_env(
+      "GOOGLE_REDIRECT_URI",
+      "http://localhost:4010/api/auth/strategy/user/google/callback"
+    )
+
+# Frontend (BFF SvelteKit) — destino do redirect após login bem-sucedido.
+config :api, :web_app_url, System.get_env("WEB_APP_URL", "http://localhost:5173")
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

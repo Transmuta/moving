@@ -14,7 +14,8 @@ defmodule Api.Directory.Professional do
   use Ash.Resource,
     otp_app: :api,
     domain: Api.Directory,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    authorizers: [Ash.Policy.Authorizer]
 
   postgres do
     table "professionals"
@@ -30,6 +31,20 @@ defmodule Api.Directory.Professional do
 
     update :update do
       accept [:nome]
+    end
+  end
+
+  # ADR-016: leitura para qualquer membro ativo do tenant; escrita só owner/admin. O
+  # `clinic_id` vem do tenant ativo (escopo), nunca do corpo. Isolamento entre clínicas
+  # já é garantido pelo filtro por atributo + RLS (ADR-017/018); a policy adiciona o RBAC.
+  policies do
+    policy action_type(:read) do
+      authorize_if {Api.Accounts.Checks.HasClinicRole, roles: :any, clinic_from: :tenant}
+    end
+
+    policy action_type([:create, :update, :destroy]) do
+      authorize_if {Api.Accounts.Checks.HasClinicRole,
+                    roles: [:owner, :admin], clinic_from: :tenant}
     end
   end
 
