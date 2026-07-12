@@ -1,5 +1,12 @@
 # Decisões de produto — v1 (fechadas em 2026-07-10)
 
+> **Revisão de 2026-07-11 — modelo de identidade estilo Vercel.** Uma sessão posterior
+> **reverteu D15** e adicionou as decisões de **identidade, tenant e acesso** (bloco no fim
+> deste doc): `User` global multi-tenant, profissional/owner **multi-clínica**, papéis
+> `owner·admin·profissional·recepcao` com capabilities embarcadas, e login por **Google +
+> Magic Link** (sem senha). Ver [ADR-014/015/016](00-decisoes.md). Onde este doc ainda disser
+> "membro", leia **`recepcao`** (mesmo papel); `owner` é o novo papel no topo.
+
 Este documento fixa as **decisões de produto que estavam em aberto** em
 [00-decisoes.md](00-decisoes.md) (seção "Decisões ainda em aberto") e nas seções
 "Perguntas de produto ANTES" de cada fatia do [08-roadmap.md](08-roadmap.md). Foram
@@ -121,10 +128,41 @@ Cada decisão marca a fatia que ela destrava e a consequência de schema/policy.
 
 ## Fatia 10 — Equipe
 
-- **D15 · Profissional multi-clínica.** **Não** — cada profissional pertence a uma **única
-  clínica**.
-  → Vínculo profissional ↔ clínica **simples**, tenancy direta. A regra nova hipotética do
-  ADR-003 (profissional em mais de uma clínica) fica **fora da v1**.
+- **D15 · Profissional multi-clínica.** ~~**Não** — cada profissional pertence a uma única
+  clínica.~~ **REVERTIDA (2026-07-11) → SIM.** Um profissional pode atender em **mais de uma
+  clínica** e uma dona pode ter **mais de uma unidade** (modelo Vercel, [ADR-014](00-decisoes.md)).
+  → Vínculo profissional ↔ clínica é **por-`Membership`**: 1 `User` global → N memberships → N
+  registros `Professional` (um por schema). `strategy :context` **mantida**. Ver o bloco
+  **"Identidade, tenant e acesso"** abaixo.
+
+---
+
+## Identidade, tenant e acesso  🆕 (2026-07-11)
+
+Decisões do modelo Vercel, que destravam a fatia de identidade/tenant e alimentam
+[ADR-014/015/016](00-decisoes.md).
+
+- **D20 · Identidade global multi-tenant.** Um `User` é global e pertence a **vários** tenants,
+  com **papel isolado por tenant**. Troca entre clínicas com um seletor (estilo Vercel).
+  → `User` no schema público; `Membership` por-tenant carrega o papel; tenant ativo na sessão
+  ([ADR-014](00-decisoes.md)).
+
+- **D21 · "Unidade" = tenant próprio.** Cada unidade de uma mesma dona é uma **clínica/tenant
+  isolado** (pacientes, equipe e catálogo separados); ela tem um `owner` em cada e troca entre
+  elas. **Sem visão consolidada cross-tenant na v1** (relatório/faturamento agregando unidades
+  → v2). Multi-unidade *dentro* de um mesmo tenant (endereços que compartilham dados) também é v2.
+
+- **D22 · Papéis com capabilities embarcadas.** Quatro perfis **fixos**:
+  `owner · admin · profissional · recepcao`. Não há papéis customizados; o mapa
+  papel→o-que-pode é fixo em código ([ADR-016](00-decisoes.md)).
+
+- **D23 · Owner obrigatório.** Todo tenant tem **≥1 owner**. O criador da clínica vira owner;
+  só owner gerencia owners, faturamento e exclusão da clínica; **não se remove/rebaixa o último
+  owner** ([ADR-016](00-decisoes.md)).
+
+- **D24 · Login sem senha: Google + Magic Link.** Só **Google OAuth** e **Magic Link**; sem
+  `hashed_password`, sem reset/política de senha. Convite de membro = magic link para um
+  `Membership` pendente ([ADR-015](00-decisoes.md)).
 
 ---
 

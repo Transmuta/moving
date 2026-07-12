@@ -56,14 +56,17 @@ outra coisa**: renovar cria um **pacote-sucessor** com `renovadoDe` e marca o an
 [ADR-011](00-decisoes.md), que remove o status `:renovado`, a relação `renovado_de` e a ação
 `:renew`. Docs `01` e `08` já sincronizados.
 
-### 1.4 "Profissional em 1 clínica só" restringe o ADR-003 na v1  ✅ resolvido em [ADR-012](00-decisoes.md)
+### 1.4 Profissional multi-clínica — identidade global estilo Vercel  ✅ resolvido em [ADR-014](00-decisoes.md) (reverte ADR-012)
 
-Decisão **D15**: cada profissional pertence a uma única clínica. O **ADR-003 (travado)** diz
-explicitamente que "um profissional pode existir em mais de uma clínica" (RN-52). A decisão
-**simplifica** (e combina melhor com o schema-por-tenant do `01`) e está **resolvida no
-[ADR-012](00-decisoes.md)**: registrada como **escopo v1**, com o multi-clínica de profissional
-(RN-52) adiado para a **v2**. O ADR-003 continua valendo no nível de tenant/organização — só a
-cláusula "profissional em várias clínicas" é adiada.
+**Revisado em 2026-07-11.** A decisão **D15** original ("cada profissional em uma única
+clínica", [ADR-012](00-decisoes.md)) foi **revertida**: adotamos o **modelo de identidade
+estilo Vercel** ([ADR-014](00-decisoes.md)). Um `User` global pertence a **vários** tenants,
+com papel isolado em cada; um profissional atende em **mais de uma clínica** e uma dona tem
+**mais de uma unidade**, trocando entre elas por um seletor. A RN-52 **volta para a v1**. O
+`strategy :context` do `01` **sobrevive** porque a identidade global é o `User` (schema
+público), não o `Professional` (por-schema, ligado via `Membership.professional_id`). Junto
+vieram [ADR-015](00-decisoes.md) (login Google + Magic Link, sem senha) e
+[ADR-016](00-decisoes.md) (papéis `owner·admin·profissional·recepcao`, ≥1 owner por tenant).
 
 ### 1.5 Bloquear conflito futuro já é o que o protótipo faz  ✅ alinhado
 
@@ -112,8 +115,9 @@ As 16 decisões fechadas, reconciliadas com as perguntas canônicas `P-01…P-20
 | D12 | Conflito futuro bloqueia a mudança de horário | P-12 | já é RN-15 |
 | D13 | Timezone só Brasília, imutável | P-16 | default do 01 |
 | D14 | Feriado (fechado) = bloqueio absoluto, sem exceção por profissional | P-16 | bate c/ RN-08 |
-| D15 | Profissional pertence a uma única clínica | P-06 | ADR-012 (multi-clínica → v2) |
+| D15 | ~~Profissional em uma única clínica~~ → **multi-clínica SIM** (revisado 2026-07-11) | P-06 | **ADR-014** (reverte ADR-012; modelo Vercel) |
 | D16 | v1 sem prontuário; só ficha; todos veem, profissional só lê | P-04 | ADR-013 (prontuário → v2) |
+| D20–D24 | Identidade global multi-tenant; unidade=tenant; papéis+owner; login Google/Magic Link | — | **ADR-014/015/016** |
 
 ---
 
@@ -125,7 +129,8 @@ Travadas — só mudam por um novo ADR. Fonte: [00-decisoes.md](00-decisoes.md).
 |---|---|
 | 001 | **O protótipo é a spec de origem.** Toda regra cita a linha do protótipo; divergências viram GAP-nn. Protótipo congelado; 79 screenshots são baseline de QA. |
 | 002 | **Backend Elixir + Ash 3.x** sobre Phoenix, exposto como **AshJsonApi**. Ganha policies, field policies, AshCloak, AshPaperTrail, agregados no SQL. |
-| 003 | **SaaS multi-clínica** desde o 1º commit; toda entidade escopada a um tenant. Diz que um profissional pode estar em várias clínicas — **restrito na v1 por [ADR-012](00-decisoes.md)** (multi-clínica de profissional → v2). |
+| 003 | **SaaS multi-clínica** desde o 1º commit; toda entidade escopada a um tenant. Um profissional pode estar em várias clínicas — **confirmado na v1 pelo [ADR-014](00-decisoes.md)** (identidade global estilo Vercel; ADR-012 revertido). |
+| 014/015/016 | **Modelo de identidade Vercel:** `User` global multi-tenant, profissional/owner multi-clínica ([014](00-decisoes.md)); login **Google + Magic Link**, sem senha ([015](00-decisoes.md)); papéis `owner·admin·profissional·recepcao` c/ capabilities embarcadas e **≥1 owner por tenant** ([016](00-decisoes.md)). |
 | 004 | **Agenda em tempo real** via Phoenix Channels + PubSub alimentado por notificações do Ash. Cliente Svelte usa o pacote `phoenix` direto. |
 | 005 | **SvelteKit como BFF**, nunca cliente de banco. `load`/`actions` chamam a API Phoenix portando o cookie de sessão. |
 | 006 | **Svelte 5 (runes) + TypeScript**, adapter-node. Port React→Svelte não é mecânico. |
@@ -193,8 +198,8 @@ Fonte: [02 §2](02-regras-e-lacunas.md). A fatia que fecha cada uma está no roa
 | 09 | `patient.faltas` denormalizado → agregado derivado do histórico |
 | 10 | Preço hardcoded no relatório → v2 (faturamento); v1 no máximo preço simples |
 | 11 | Três definições de ocupação → uma canônica (tempo agendado ÷ expediente real) |
-| 12 | RBAC não aplicado → `Ash.Policy.Authorizer` + field policies |
-| 13 | Sem autenticação (botão Entrar só navega) → AshAuthentication, sessão por cookie |
+| 12 | RBAC não aplicado → `Ash.Policy.Authorizer` + field policies; papéis `owner·admin·profissional·recepcao` (ADR-016) |
+| 13 | Sem autenticação (botão Entrar só navega) → AshAuthentication **Google OAuth + Magic Link** (sem senha, ADR-015), sessão por cookie |
 | 14 | Relatório sobre histórico sintético → snapshot noturno sobre dados reais |
 | 15 | Sem salas/recursos (conflito só por prof) → v2, mudança de constraint mais cara |
 | 16 | Sem reserva de vaga (corrida entre atendentes) → `SlotHold` com TTL (= D8) |
@@ -205,8 +210,14 @@ Fonte: [02 §2](02-regras-e-lacunas.md). A fatia que fecha cada uma está no roa
 
 O que ainda precisa de decisão antes de virar schema/código.
 
-**Já reconciliado por ADR (2026-07-10):** ADR-011 (sem renovação), ADR-012 (prof 1 clínica na
-v1), ADR-013 (prontuário = v2, v1 só ficha). Docs `00`, `01` e `08` sincronizados.
+**Já reconciliado por ADR (2026-07-10):** ADR-011 (sem renovação), ~~ADR-012 (prof 1 clínica na
+v1)~~ **revertido por ADR-014**, ADR-013 (prontuário = v2, v1 só ficha). Docs `00`, `01` e `08`
+sincronizados.
+
+**Reconciliado em 2026-07-11 (modelo Vercel):** ADR-014 (identidade global multi-tenant;
+profissional/owner multi-clínica), ADR-015 (Google + Magic Link, sem senha), ADR-016
+(papéis + owner obrigatório). Docs `00`, `01`, `06`, `09`, `10`, `11`, `12`, `04`, `08`
+sincronizados.
 
 **Ainda em aberto:**
 

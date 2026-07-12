@@ -84,7 +84,7 @@ Legenda de severidade: **alta** = enganaria quem for implementar; **média** = i
 - `GAP‑01 (02:423)` lista `futureConflicts [:865]` entre os lugares onde "`NOW=702` é copiada à mão" — mas `[:865]` é `const today='2026-06-25'` (congela por **data**, não usa 702).
 
 **Resumo consolidado (`11`) — contradições internas:**
-- `11:16/29/51` + tabela `D15/D16` (`:104/:105`) + `:117/:121` ainda tratam D15/D16 como **conflitos abertos**, enquanto a §6 (`:197`) e `ADR‑012`/`ADR‑013` (ambos "Aceita 2026‑07‑10") já os reconciliaram. Sincronizar.
+- `11:16/29/51` + tabela `D15/D16` (`:104/:105`) + `:117/:121` ainda tratam D15/D16 como **conflitos abertos**, enquanto a §6 (`:197`) e `ADR‑012`/`ADR‑013` (ambos "Aceita 2026‑07‑10") já os reconciliaram. Sincronizar. **Atualização 2026‑07‑11:** D15 foi **revertida** por `ADR‑014` (profissional multi‑clínica = SIM na v1, modelo Vercel); o `11` já reflete isso na §1.4 e nas tabelas.
 - `11:73‑75` diz que a "correção i" do `01` propunha adicionar `validade_ate` e que D6 a cancela — mas a correção i vigente (`01:1142`) já diz "produção também sem validade"; `validade_ate` pertence ao "desenho anterior" descartado (`01:758`). D6 **confirma**, não cancela.
 
 ### A.3 Omissões de regra/comportamento (protótipo faz, doc não documenta)
@@ -153,9 +153,10 @@ O protótipo faz de um jeito; os docs, conscientemente, modelam de outro e **reg
 | **Reserva de vaga** | `offerVaga [:2596]` só abre o modal (sem hold) | `SlotHold` com TTL (recurso novo) | ADR‑004; `01:698` |
 | **`dias` na fila** | valor estático digitado no seed | calculation `date_diff(inserted_at)` | "correção h", `01:848` |
 | **Retomar pacote** | `pkgResume [:561]` só tira `pkgHold` (datas originais) | `:resume` reprojeta a série p/ o futuro | "nota 3", `01:803`/`:1337` |
-| **1 clínica por profissional** | protótipo é clínica‑única (singletons globais) | v1 escopo único; multi‑clínica (RN‑52) → v2 | ADR‑012 (restringe ADR‑003) |
+| **Profissional multi‑clínica** | protótipo é clínica‑única (singletons globais) | **v1 SIM** (modelo Vercel): `User` global → N `Membership` → N `Professional` por schema | **ADR‑014** (reverte ADR‑012; RN‑52 volta p/ v1) |
 | **Prontuário / dados clínicos** | tags de diagnóstico, anexos, médico/CRM | adiado p/ v2; v1 só a ficha | ADR‑013 (restringe ADR‑007) |
-| **Autenticação** | login mock; seed `membros` sem senha/token | `User` + AshAuthentication | `NAO‑VERIFICADO`, `01:246` |
+| **Autenticação** | login mock; seed `membros` sem senha/token | `User` + AshAuthentication **Google OAuth + Magic Link** (sem senha) | **ADR‑015**, `01:§Accounts` |
+| **Papéis / owner** | `roleMeta` = 3 rótulos sem enforcement | `owner·admin·profissional·recepcao`, capabilities embarcadas, ≥1 owner/tenant | **ADR‑016**, `01:§3/§7` |
 | **D6/D7/D11** | (retomada / renovação / pacote de turma) | decisões de produto que redefinem os GAPs | `10` (produto v1) |
 
 > Nota de acompanhamento apontada pelos próprios docs: `01:1335` sinaliza que `09 §3.4` **ainda lista `renovado`** e "precisa ser alinhado" — o que se confirma nas contradições de A.2 sobre o `09`.

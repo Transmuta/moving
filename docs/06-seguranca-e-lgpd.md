@@ -416,41 +416,48 @@ Hoje não existe. `saveMembro` ([`:2497`](../interface/Movimento.dc.html#L2497))
 muda o estado local; o "convite" é um `input type="email"`
 ([`:2485`](../interface/Movimento.dc.html#L2485)) que não manda e-mail nenhum.
 
-**`AshAuthentication`** provê o backend. Decisões concretas, alinhadas com
+**`AshAuthentication`** provê o backend. **Sem senha** (ADR-015): as estratégias da v1 são
+**Google OAuth** e **Magic Link**. Decisões concretas, alinhadas com
 [04-arquitetura.md §5](04-arquitetura.md):
 
+- **Duas estratégias, zero senha (ADR-015):** `oauth2`/`google` e `magic_link`. Não há
+  `hashed_password`, reset de senha, política de senha nem verificação contra listas de
+  vazamento — toda essa superfície **sai** da v1. Google delega 2FA à conta Google; magic
+  link é fator de **posse** do e-mail.
 - **Sessão por cookie** `HttpOnly`, `Secure`, `SameSite=Lax`. `HttpOnly` para o JS
   nunca ler o token (defesa contra XSS roubar sessão); `Secure` para só trafegar em
   HTTPS; `SameSite=Lax` como base anti-CSRF ([§8](#8-owasp-aplicado-a-este-sistema)).
 - **BFF porta o cookie:** o SvelteKit (`adapter-node`, ADR-005) repassa o cookie de
   sessão nas chamadas server-to-server à API. O browser nunca vê um token de API de
   longa duração.
+- **Tenant ativo na sessão (ADR-014):** a sessão guarda qual clínica está ativa; `actor.papel`
+  e `actor.professional_id` derivam do `Membership` ativo. Trocar de clínica troca o membership
+  ativo (ver [09 §8](09-contrato-api.md)) — nunca por `clinic_id` vindo do cliente.
 - **WebSocket com token efêmero:** o BFF emite um `Phoenix.Token` de vida curta
-  (minutos) entregue ao cliente no `load`, usado só para abrir o Channel. O cookie de
-  sessão não vai para o JS ([04-arquitetura.md §5, Autenticação](04-arquitetura.md)).
-- **Convite de membro por e-mail:** substitui o `saveMembro` fake. Fluxo real:
-  criar convite → gerar **token de convite de uso único, com expiração** (ex.: 72 h)
-  → enviar por e-mail → aceite define senha → conta ativa vinculada ao papel e (se
-  `profissional`) ao registro da agenda escolhido no formulário
+  (minutos) entregue ao cliente no `load`, usado só para abrir o Channel. Carrega o tenant
+  **ativo**; o cookie de sessão não vai para o JS ([04-arquitetura.md §5](04-arquitetura.md)).
+- **Convite de membro por magic link (ADR-015):** substitui o `saveMembro` fake. Fluxo real:
+  criar **`Membership` pendente** → enviar **magic link de uso único, com expiração** (ex.: 72 h)
+  → primeiro acesso (magic link ou Google) **vincula/cria o `User`** e ativa o vínculo, com o
+  papel e (se `profissional`) o registro da agenda escolhido no formulário
   ([`:2489`](../interface/Movimento.dc.html#L2489)–[`:2493`](../interface/Movimento.dc.html#L2493)).
   Convite expirado ou já usado é rejeitado.
-- **MFA obrigatório para o papel `admin`.** O admin vê dados bancários e o log de
-  auditoria — comprometer um admin é comprometer tudo. Segundo fator (TOTP) exigido no
-  login de quem tem papel `admin`; recomendado, não obrigatório, para os demais na v1.
-- Política de senha (comprimento mínimo, verificação contra listas de senhas
-  vazadas), bloqueio progressivo após tentativas falhas, e sessão com expiração
-  absoluta e por inatividade.
+- **MFA — opcional na v1 (revisado por ADR-015).** Sem senha, o app não gerencia segundo
+  fator: contas Google trazem seu próprio 2FA e o magic link já é posse. TOTP no app fica como
+  reforço **opcional** (não obrigatório) — a exigência de MFA-para-admin do texto anterior cai.
+- Sessão com **expiração absoluta e por inatividade**; bloqueio progressivo de reenvio de
+  magic link por e-mail/IP (anti-abuso), no lugar do antigo bloqueio por tentativa de senha.
 
 ```elixir
-# NAO-VERIFICADO: confirmar contra hexdocs ao scaffoldar
-# AshAuthentication: estratégias (password, magic_link) + tokens.
+# NAO-VERIFICADO: confirmar contra hexdocs ao scaffoldar (ADR-015 — sem password)
 # authentication do
 #   strategies do
-#     password :password do ... end
+#     magic_link :magic_link do ... identity_field :email ... end
+#     oauth2 :google do ... end
 #   end
 #   tokens do enabled? true; ... end
 # end
-# Convite e MFA (TOTP) são add-ons da extensão — confirmar nomes exatos.
+# Convite = magic link para um Membership pendente. Sem estratégia :password.
 ```
 
 ---
@@ -458,38 +465,46 @@ muda o estado local; o "convite" é um `input type="email"`
 ## 6. AuthZ: RBAC e field policies
 
 Este é o buraco mais gritante do protótipo. `roleMeta`
-([`:2408`](../interface/Movimento.dc.html#L2408)) define três papéis como **texto
-descritivo puro**, sem nenhum enforcement:
+([`:2408`](../interface/Movimento.dc.html#L2408)) define os papéis como **texto
+descritivo puro**, sem nenhum enforcement. Viram **4 perfis fixos com capabilities
+embarcadas** (ADR-016), do mais forte ao mais fraco:
 
+- **`owner`** (novo, modelo Vercel) — a dona: tudo, **mais** faturamento, exclusão/renome da
+  clínica e gestão de owners. Todo tenant tem **≥1 owner** ([§8](#8-owasp-aplicado-a-este-sistema)).
 - `admin` — "Acesso total — configurações, equipe, todas as agendas e relatórios"
-  ([`:2411`](../interface/Movimento.dc.html#L2411));
+  ([`:2411`](../interface/Movimento.dc.html#L2411)); gerencia membros **exceto owners**; **não**
+  toca faturamento nem exclui a clínica.
 - `profissional` — "Gerencia a própria agenda e seus pacientes"
   ([`:2412`](../interface/Movimento.dc.html#L2412));
-- `membro` — "Opera a agenda de todos, sem configurações sensíveis"
+- `recepcao` (o `membro` do protótipo) — "Opera a agenda de todos, sem configurações sensíveis"
   ([`:2413`](../interface/Movimento.dc.html#L2413)).
 
 São `label`/`desc`/`ícone`. Nada no protótipo impede um `membro` de fazer o que um
-`admin` faz — porque não há servidor. O texto vira contrato de policy real no Ash.
+`admin` faz — porque não há servidor. O texto vira contrato de policy real no Ash, com o mapa
+papel→capabilities fixo em código (`Movimento.Accounts.Capabilities`, [01 §3](01-dominio-ash.md)).
 
 ### 6.1 Policies de recurso (quem pode a ação)
 
 `Ash.Policy.Authorizer` em todo recurso sensível. Padrão-base: **tenant primeiro,
-papel depois.** Toda policy começa filtrando pela clínica do ator
-([§8](#8-owasp-aplicado-a-este-sistema), IDOR), e o `admin` é bypass **dentro da sua
-clínica**, jamais global.
+papel depois.** O tenant é o **schema do escopo** (`strategy :context`, [01 §2](01-dominio-ash.md)):
+a query já roda dentro da clínica ativa (ADR-014), então não há linha de outra clínica
+alcançável — o papel vem do `Membership` ativo, nunca de `clinic_id` do cliente. `owner` e
+`admin` são bypass **dentro da própria clínica**, jamais global.
 
 ```elixir
 # NAO-VERIFICADO: confirmar contra hexdocs ao scaffoldar
 # policies do
-#   # admin da PRÓPRIA clínica pode tudo dentro dela
-#   bypass actor_attribute_equals(:role, :admin) do
-#     authorize_if MovimentoChecks.SameClinic   # nunca global
+#   # owner/admin da PRÓPRIA clínica (schema do escopo) podem tudo dentro dela
+#   bypass actor_attribute_in(:papel, [:owner, :admin]) do
+#     authorize_if always()   # tenant já garantido pelo schema (:context)
 #   end
 #
 #   policy action_type(:read) do
-#     authorize_if MovimentoChecks.SameClinic and MovimentoChecks.OwnScope
+#     authorize_if actor_attribute_equals(:papel, :recepcao)  # agenda de todos
+#     authorize_if MovimentoChecks.OwnScope                   # profissional: só o próprio
 #   end
 # end
+# Capabilities exclusivas de owner (faturamento, delete_clinic, manage_owners): policy própria.
 ```
 
 A regra "profissional vê só a própria agenda e seus pacientes"
@@ -657,8 +672,9 @@ padrão ([§7](#7-anexos-storage-privado-e-url-assinada)); telemetria OTel sem d
 sensível ([§3.2](#32-gestao-de-chaves-e-rotacao)).
 
 **A07 — Identification & Authentication Failures.** Cobertos em
-[§5](#5-autenticacao-authn): senha forte, MFA para admin, convite de uso único com
-expiração, sessão `HttpOnly`/`Secure`, token efêmero de WS, bloqueio por tentativas.
+[§5](#5-autenticacao-authn): sem senha (Google OAuth + magic link, ADR-015), convite/magic
+link de uso único com expiração, sessão `HttpOnly`/`Secure`, token efêmero de WS, anti-abuso
+de reenvio de link.
 
 **A08 — Software & Data Integrity.** Locking otimista em remarcação e exclusion
 constraint de agenda ([04-arquitetura.md §7](04-arquitetura.md)) protegem integridade
@@ -691,8 +707,8 @@ entrar no sistema.
 
 - [ ] **Tenant resolvido só da sessão.** Existe teste que prova que injetar
   `clinic_id` no corpo/URL não vaza dado de outra clínica (A01/IDOR).
-- [ ] **AuthN real ligada.** Sessão `HttpOnly`/`Secure`/`SameSite`, login com senha
-  forte, sem rota anônima que leia prontuário ([§5](#5-autenticacao-authn)).
+- [ ] **AuthN real ligada.** Sessão `HttpOnly`/`Secure`/`SameSite`, login por Google OAuth
+  + magic link (sem senha, ADR-015), sem rota anônima que leia prontuário ([§5](#5-autenticacao-authn)).
 - [ ] **RBAC com enforcement**, não rótulo. Policies e FilterChecks de
   [§6](#6-authz-rbac-e-field-policies) ativas; teste prova que `profissional` não lê
   paciente alheio e que `membro` não lê `tags`/anexos/dado bancário.
@@ -721,9 +737,9 @@ entrar no sistema.
   entre clínicas; rate limit na busca (anti-enumeração).
 - **Fatia "anexos":** os seis itens de [§7](#7-anexos-storage-privado-e-url-assinada),
   todos; download é evento auditado.
-- **Fatia "equipe & acessos":** convite real com token expirável
-  ([§5](#5-autenticacao-authn)); MFA de admin; papel definido no servidor, nunca
-  aceito do cliente.
+- **Fatia "equipe & acessos":** convite real por magic link expirável
+  ([§5](#5-autenticacao-authn)); troca de tenant estilo Vercel (ADR-014); ≥1 owner por tenant
+  (ADR-016); papel definido no servidor a partir do `Membership` ativo, nunca aceito do cliente.
 - **Fatia "profissional/repasse":** dados bancários cifrados e restritos a `admin`
   (field policy de [§6.2](#62-field-policies-quais-campos)).
 - **Fatia "direitos do titular":** dossiê de acesso/portabilidade e fluxo de

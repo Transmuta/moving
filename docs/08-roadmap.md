@@ -113,10 +113,11 @@ O repositório hoje não tem projeto Elixir nem SvelteKit. O andaime cria os doi
    npm create svelte@latest movimento_web
    ```
 
-5. **Autenticação, esqueleto.** `AshAuthentication` com sessão por cookie (`HttpOnly`,
-   `Secure`, `SameSite=Lax`), e o repasse de cookie server-to-server do BFF, conforme
-   [04-arquitetura.md](04-arquitetura.md) §3. No andaime basta uma sessão de serviço que
-   prove o fluxo; o RBAC de verdade estreia na Fatia 1.
+5. **Autenticação, esqueleto.** `AshAuthentication` **sem senha** — **Google OAuth + Magic
+   Link** (ADR-015) — com sessão por cookie (`HttpOnly`, `Secure`, `SameSite=Lax`) e o repasse
+   de cookie server-to-server do BFF, conforme [04-arquitetura.md](04-arquitetura.md) §5. No
+   andaime basta uma sessão que prove o fluxo (ex.: magic link em dev); o RBAC de verdade e a
+   troca de tenant (ADR-014) estreiam na fatia de identidade/Fatia 1.
 
 6. **CI e deploy até produção.** Dois apps Fly na região `gru`, Postgres gerenciado, seguindo
    ADR-008. Pipeline de CI que roda `mix test` / `mix credo` / build do SvelteKit, e um
@@ -149,11 +150,12 @@ só com leitura + criação, exercita de uma vez quase todo o encanamento de ris
   do usuário logado, resolvida pela sessão, nunca por `clinic_id` vindo do cliente
   ([04-arquitetura.md](04-arquitetura.md) §3).
 
-- **RBAC** (ADR-002 via `Ash.Policy.Authorizer`): quem é `membro`, quem é `profissional` e
-  quem é `admin` vê e cria coisas diferentes. Os três papéis existem no protótipo
-  (`papel:'admin'`, `papel:'profissional'`, `papel:'membro'`, verificados em
-  [`Movimento.dc.html:203`](../interface/Movimento.dc.html#L203) e seguintes). A policy nasce
-  aqui, na primeira tela, não numa "fase de segurança" que nunca chega.
+- **RBAC** (ADR-002 via `Ash.Policy.Authorizer`): quem é `recepcao`, quem é `profissional` e
+  quem é `admin`/`owner` vê e cria coisas diferentes. Três papéis vêm do protótipo
+  (`papel:'admin'`, `papel:'profissional'`, `papel:'membro'`→`recepcao`, verificados em
+  [`Movimento.dc.html:203`](../interface/Movimento.dc.html#L203) e seguintes); o **`owner`** é
+  acréscimo do modelo Vercel ([ADR-016](00-decisoes.md)). A policy nasce aqui, na primeira tela,
+  não numa "fase de segurança" que nunca chega.
 
 - **`dayPeriods` — disponibilidade por precedência de 4 camadas**
   ([`Movimento.dc.html:854`](../interface/Movimento.dc.html#L854) —
@@ -464,12 +466,14 @@ atribuir papel (`admin`/`profissional`/`membro`). A tela de membro existe no pro
 convidar e gerenciar papéis. Enquanto isso, a equipe pode ser seedada. Baixo risco, e nenhuma
 outra fatia depende dele — por isso vai para o fim sem prejudicar o programa.
 
-**Critério de pronto.** Um `admin` convida alguém por e-mail; o convidado aceita, recebe papel,
-e o papel é imediatamente respeitado pelas policies de todas as fatias.
+**Critério de pronto.** Um `owner`/`admin` convida alguém por **magic link**; o convidado aceita
+(magic link/Google), recebe papel, e o papel é imediatamente respeitado pelas policies de todas
+as fatias. O usuário com mais de um `Membership` **troca de clínica** e o escopo muda com ele.
 
-**Perguntas de produto ANTES.** Um `profissional` pode existir em mais de uma clínica (ADR-003
-diz que é uma regra nova, sem precedente no protótipo)? O convite expira? Quem pode convidar —
-só `admin`?
+**Perguntas de produto — RESOLVIDAS (2026-07-11).** Profissional multi-clínica: **SIM** (modelo
+Vercel, [ADR-014](00-decisoes.md)). Login: **Google + Magic Link, sem senha** ([ADR-015](00-decisoes.md));
+o convite/magic link expira (ex.: 72 h). Quem convida: **`owner` e `admin`** ([ADR-016](00-decisoes.md));
+gestão de owners e "≥1 owner por tenant" são exclusivas de `owner`.
 
 ---
 
@@ -493,8 +497,12 @@ Cortar escopo é uma decisão de projeto, não um esquecimento. Fica de fora da 
   exclusion constraint deixa de ser "por profissional" e vira "por recurso" — é a mudança de
   schema mais cara da lista ([04-arquitetura.md](04-arquitetura.md) §8). Não fazer por palpite.
 
-- **Multi-unidade dentro da mesma clínica.** Diferente de multi-clínica (que é v1, ADR-003):
-  aqui é a mesma pessoa jurídica com filiais de horários e salas próprios. v2.
+- **Multi-unidade *dentro* de um mesmo tenant.** Diferente de multi-clínica (que é v1: cada
+  unidade é um tenant **isolado**, [ADR-014](00-decisoes.md)): aqui seria a mesma pessoa jurídica
+  com filiais **compartilhando** pacientes/equipe sob um único schema. v2.
+- **Visão consolidada cross-tenant.** Um `owner` com várias unidades vê/opera **uma de cada vez**
+  (troca de tenant estilo Vercel). Relatório/faturamento agregando várias unidades atravessaria
+  schemas ([ADR-014](00-decisoes.md)) — v2.
 
 Nada disso significa "nunca". Significa que a v1 entrega uma clínica que agenda, atende,
 debita pacote, gerencia fila e prontuário com conformidade — e para por aí, de propósito.
@@ -581,7 +589,8 @@ expresso em fatia, não em data.
 | Quais papéis leem quais campos do prontuário? Retenção? | ⚠️ **Revisado ([ADR-013](00-decisoes.md)):** v1 não tem prontuário, só ficha (todos veem, profissional só lê). Sub-decisões da ficha abertas: médico/CRM, cifra do CPF, `fila.obs` | Antes da ficha / Fatia 4 |
 | Ao mudar horário, futuros conflitantes bloqueados/remarcados/sinalizados? | ✅ **Resolvido:** bloqueiam a mudança (D12 — já é o do protótipo) | — |
 | Timezone muda após agendamentos? Feriado admite exceção por profissional? | ✅ **Resolvido:** timezone só Brasília, imutável (D13); feriado = bloqueio absoluto (D14) | — |
-| Um profissional pode existir em mais de uma clínica? | ✅ **Resolvido:** um por clínica na v1 ([ADR-012](00-decisoes.md)); multi-clínica → v2 | — |
+| Um profissional pode existir em mais de uma clínica? | ✅ **Resolvido (revisado 2026-07-11):** **SIM na v1** — identidade global multi-tenant estilo Vercel ([ADR-014](00-decisoes.md), reverte ADR-012) | — |
+| Estratégia de login? Papéis? Owner? | ✅ **Resolvido:** Google + Magic Link, sem senha ([ADR-015](00-decisoes.md)); papéis `owner·admin·profissional·recepcao`, ≥1 owner/tenant ([ADR-016](00-decisoes.md)) | — |
 | Salas/equipamentos como recurso com capacidade | Forma da exclusion constraint (por profissional → por recurso); é a mudança de schema mais cara | v2 — **não** decidir por palpite na v1 |
 | Preço por convênio/particular/reembolso; há repasse ao profissional? | Subdomínio de faturamento e repasse; os campos banco/PIX/remuneração ([`:3140`](../interface/Movimento.dc.html#L3140)) hoje coletados e não lidos | v2 |
 | Multi-unidade dentro da mesma clínica | Modelo de filial (horários/salas por unidade) | v2 |
@@ -599,7 +608,7 @@ fechado pela fatia indicada (§3 e §4). "Evidência" cita linhas conferidas com
 
 | GAP | Protótipo (o que existe hoje) → produção (o que a fatia estabelece) | Evidência | Fatia que fecha |
 |---|---|---|---|
-| **GAP-01** | Clínica única sem tenant nem autorização → tenancy por clínica + RBAC via policy | ADR-003; papéis em [`:203`](../interface/Movimento.dc.html#L203) | Fatia 1 |
+| **GAP-01** | Clínica única, login mock, sem tenant nem autorização → **identidade global multi-tenant** (`User`↔N `Membership`, troca de tenant), Google+Magic Link, RBAC via policy (`owner·admin·profissional·recepcao`) | ADR-003/014/015/016; papéis em [`:203`](../interface/Movimento.dc.html#L203) | Fatia 1 |
 | **GAP-02** | `checkConflict` roda em memória sobre lista local → exclusion constraint no Postgres (garantia final de não-sobreposição por profissional) | [`:834`](../interface/Movimento.dc.html#L834); [04 §7.1](04-arquitetura.md) | Fatia 1 |
 | **GAP-03** | Relógio congelado: `hoje()`='2026-06-25', `NOW=702` → relógio injetável, timezone por clínica | [`:1098`](../interface/Movimento.dc.html#L1098), [`:130`](../interface/Movimento.dc.html#L130), [`:2533`](../interface/Movimento.dc.html#L2533); ADR-009 | Fatia 0 (padrão) · Fatia 2 (consequência) |
 | **GAP-04** | Remarcação sem controle de concorrência → locking otimista por `version`, `409` no perdedor | [04 §7.3](04-arquitetura.md) | Fatia 2 |

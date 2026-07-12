@@ -183,18 +183,84 @@ Dark mode continua por `data-theme` (`@custom-variant dark`), não por `class` n
 
 ## ADR-012 — Profissional pertence a uma única clínica na v1
 
-**Status:** Aceita (2026-07-10) · **Restringe:** [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) (RN-52) · **Reconcilia:** decisão de produto **D15**
+**Status:** ~~Aceita (2026-07-10)~~ · **SUPERSEDIDA por [ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel) (2026-07-11)** · **Restringia:** [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) (RN-52) · **Reconciliava:** decisão de produto **D15**
 
-**Contexto.** O [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) abriu explicitamente a porta para um **profissional existir em mais de uma clínica** (RN-52, [02 §3.1](02-regras-e-lacunas.md)) — uma regra nova, sem precedente no protótipo. Isso tornaria o vínculo profissional↔clínica um relacionamento, com agenda, disponibilidade e repasse **por vínculo**, não por pessoa.
+> **⚠️ Revertida.** A decisão de produto mudou: adotamos o **modelo de identidade estilo Vercel** — um `User` global pode pertencer a **vários** tenants, com papel isolado em cada, e um profissional **pode** trabalhar em mais de uma clínica. Isso é o [ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel). A **RN-52 volta para a v1**. O texto abaixo fica como registro histórico.
 
-**Decisão.** Na **v1**, um profissional pertence a **uma única clínica**. O multi-clínica de profissional fica para a **v2**.
+**Contexto (histórico).** O [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) abriu explicitamente a porta para um **profissional existir em mais de uma clínica** (RN-52, [02 §3.1](02-regras-e-lacunas.md)) — uma regra nova, sem precedente no protótipo. Isso tornaria o vínculo profissional↔clínica um relacionamento, com agenda, disponibilidade e repasse **por vínculo**, não por pessoa.
 
-**Justificativa.** Combina com a estratégia de tenancy escolhida — `strategy :context`, schema-por-tenant ([01 §2](01-dominio-ash.md)): um profissional vive dentro do schema do seu tenant, e `Membership.professional_id` permanece um UUID mole por clínica, sem FK entre schemas. Suportar a mesma pessoa em vários schemas exigiria um modelo de identidade de profissional global — custo que não se paga na v1.
+**Decisão (revertida).** ~~Na **v1**, um profissional pertence a **uma única clínica**. O multi-clínica de profissional fica para a **v2**.~~
+
+**Justificativa (histórica).** Combinava com `strategy :context`, schema-por-tenant ([01 §2](01-dominio-ash.md)); supunha-se que suportar a mesma pessoa em vários schemas exigiria um modelo de identidade de profissional global — "custo que não se paga na v1". O [ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel) mostra que esse custo **não** existe: a identidade global é o **`User`** (no schema público), não o `Professional`; o profissional continua por-schema e é ligado por `Membership.professional_id`. Logo `:context` **sobrevive** e o multi-clínica cabe na v1.
+
+---
+
+## ADR-014 — Identidade global multi-tenant (modelo Vercel)
+
+**Status:** Aceita (2026-07-11) · **Supersede:** [ADR-012](#adr-012--profissional-pertence-a-uma-única-clínica-na-v1) · **Estende:** [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit) · **Reconcilia:** decisão de produto **D15** (revertida)
+
+**Contexto.** O produto adota o modelo de identidade do Vercel: uma **conta de pessoa** (`User`) é global e pode pertencer a **vários** espaços (tenants), com **papel isolado por espaço**, trocando entre eles com um seletor. Traduzido para o domínio: uma dona pode ter **mais de uma unidade** (cada unidade é uma clínica/tenant próprio) e um **profissional pode atender em mais de uma clínica**. Isso reabre a RN-52, que o [ADR-012](#adr-012--profissional-pertence-a-uma-única-clínica-na-v1) havia adiado.
+
+**Decisão.**
+1. **`User` é a identidade global** e vive no schema público (recurso global de `Accounts`, [01 §2](01-dominio-ash.md)). Uma pessoa = **um** `User`, independentemente de quantas clínicas ela acessa.
+2. **`Membership` é o vínculo por-tenant** e carrega o **papel** ([ADR-016](#adr-016--papel-owner-obrigatório-e-perfis-com-capabilities-embarcadas)). A mesma pessoa tem **N memberships** (um por clínica), com papéis possivelmente diferentes em cada.
+3. **`Professional` continua por-schema.** Uma profissional que atende em 2 clínicas é **2 registros `Professional`** (um em cada schema), ligados ao mesmo `User` **através do `Membership`** (`Membership.professional_id`, UUID mole por clínica). Agenda, disponibilidade e preço são **por-clínica** — o que é correto, pois variam de fato entre unidades.
+4. **Tenant ativo na sessão.** A sessão guarda qual clínica está ativa. O `tenant` do Ash, o `actor.papel` e o `actor.professional_id` derivam **todos** do `Membership` ativo. Trocar de clínica = trocar o membership ativo (ver [09 §8](09-contrato-api.md)).
+
+**Justificativa.** A objeção do ADR-012 era o custo de "identidade de profissional global entre schemas". Ela **desaparece** quando a identidade global é o `User` (público) e o `Professional` permanece por-schema: não há FK entre schemas, não há dado de saúde compartilhado, e `strategy :context` fica **intacta** com todas as suas vantagens de isolamento LGPD ([01 §2](01-dominio-ash.md)). O modelo Vercel resolve, de brinde, a resolução de escopo do actor.
 
 **Consequências.**
-- **Não anula o [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit):** o SaaS continua multi-clínica no nível de **tenant/organização**; apenas a cláusula "profissional em várias clínicas" é adiada.
-- RN-52 passa a ser **v2**. O vínculo profissional↔clínica é simples (um por profissional).
-- A exclusion constraint de não-sobreposição não precisa carregar `clinic_id` (já garantido pelo schema-por-tenant, [01 §2](01-dominio-ash.md)).
+- **RN-52 volta para a v1.** O vínculo profissional↔clínica passa a ser **por-membership**, não por-pessoa.
+- **`strategy :context` mantida** ([01 §2](01-dominio-ash.md)); a exclusion constraint da agenda continua sem `clinic_id` (cada schema tem sua tabela `appointments`).
+- **`/auth/me` devolve a lista de memberships/tenants + o tenant ativo**, e existe um endpoint de **troca de tenant** ([09 §8](09-contrato-api.md)).
+- **Sem visão consolidada cross-tenant na v1.** Relatórios/faturamento agregando várias unidades de uma mesma dona atravessariam schemas — fica para a **v2** (ver "Decisões ainda em aberto").
+- **Multi-unidade *dentro* de um único tenant** (uma clínica com vários endereços que compartilham pacientes/equipe) continua **v2** e é coisa diferente: aqui cada unidade é um tenant **isolado**.
+
+---
+
+## ADR-015 — Autenticação por Google OAuth + Magic Link (sem senha)
+
+**Status:** Aceita (2026-07-11) · **Supera as premissas de senha em:** [01 §Accounts](01-dominio-ash.md), [06 §5](06-seguranca-e-lgpd.md), [09 §8](09-contrato-api.md)
+
+**Contexto.** O login do protótipo é decorativo (campos de e-mail/senha e um botão **Entrar** que só navega, [`:671`](02-regras-e-lacunas.md)). Ao materializar o AshAuthentication, a pergunta é qual(is) estratégia(s). Senha própria arrasta política de senha, verificação contra listas de vazamento, reset por e-mail, bloqueio por tentativas e MFA — superfície e custo altos.
+
+**Decisão.** A v1 tem **duas** estratégias, **sem senha**:
+- **Google OAuth** (`oauth2`/`google` do AshAuthentication);
+- **Magic Link** (link de uso único por e-mail).
+
+**Não há** estratégia de senha: sem `hashed_password`, sem reset de senha, sem política de senha/breach-list.
+
+**Justificativa.** Elimina a maior parte da superfície de AuthN (senha vazada, reforço de política, reset). Google traz 2FA delegado; magic link é fator de **posse** do e-mail. O convite de membro deixa de "definir senha" e passa a ser um magic link para um `Membership` pendente.
+
+**Consequências.**
+- `User` perde `hashed_password`; as ações passam a `:sign_in_with_magic_link` / `:register_with_magic_link` e o fluxo OAuth Google ([01 §Accounts](01-dominio-ash.md)).
+- **[06 §5](06-seguranca-e-lgpd.md) encolhe:** saem política de senha, breach-list e reset. **MFA-obrigatório-para-admin** vira **nota opcional** (Google já faz 2FA; magic link é posse).
+- O convite ([06 §5](06-seguranca-e-lgpd.md), `saveMembro`) vira "criar membership pendente → magic link → primeiro acesso vincula o `User`".
+- **[09 §8](09-contrato-api.md):** `POST /auth/sign_in {email,password}` some; entram request de magic link + callback e o callback OAuth do Google.
+
+---
+
+## ADR-016 — Papel `owner` obrigatório e perfis com capabilities embarcadas
+
+**Status:** Aceita (2026-07-11) · **Estende:** [ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel) · **Reconcilia:** RBAC do [06 §6](06-seguranca-e-lgpd.md)
+
+**Contexto.** O protótipo tem 3 papéis como rótulos puros (`admin`, `profissional`, `membro`, [`roleMeta:2408`](../interface/Movimento.dc.html#L2408)), sem enforcement. O modelo Vercel pede um **owner** por espaço, e as permissões devem ser **simples e fixas** — perfis embarcados de "o que pode / o que não pode", não um sistema de papéis customizáveis por tenant.
+
+**Decisão.**
+1. **Quatro perfis fixos**, do mais forte ao mais fraco: **`owner` · `admin` · `profissional` · `recepção`** (o `membro` do protótipo = `recepção`). O enum é fechado; não há papéis customizados.
+2. **Capabilities embarcadas:** cada papel mapeia, **em código** (um módulo de capabilities, não dado de tenant), para um conjunto fixo de ações permitidas. As policies leem esse mapa.
+3. **Invariante do owner:** todo tenant tem **≥1 owner** a todo momento. O `onboard` da clínica torna o criador `owner`. Só `owner` promove/rebaixa owner, mexe em faturamento e exclui/renomeia a clínica. **Não é possível rebaixar nem revogar o último owner** (validação no `Membership`).
+
+**Fronteiras de papel.**
+- **owner:** tudo, incluindo faturamento, exclusão/renome da clínica e gestão de owners.
+- **admin:** configurações, equipe (convida/remove **exceto** owners), todas as agendas e relatórios. **Não** toca faturamento nem exclui a clínica.
+- **profissional:** só a **própria** agenda e seus pacientes (FilterCheck, [06 §6](06-seguranca-e-lgpd.md)).
+- **recepção:** opera a agenda de **todos**, sem configurações sensíveis.
+
+**Consequências.**
+- O enum `Movimento.Accounts.Role` ([01 §3](01-dominio-ash.md)) passa a `[:owner, :admin, :profissional, :recepcao]`.
+- As policies ([01 §7](01-dominio-ash.md), [06 §6](06-seguranca-e-lgpd.md)) ganham `owner` (bypass acima de `admin`) e derivam o papel do **`Membership` do tenant ativo** ([ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel)).
+- Nova invariante em [01 §8](01-dominio-ash.md): "≥1 owner por tenant".
 
 ---
 
@@ -229,7 +295,9 @@ Estas **não** estão travadas e precisam de resposta antes de fatias específic
 - ~~Pacote tem validade real? Pausar estende?~~ → **D6: sem validade.**
 - ~~Presença individual em turma confirma-se?~~ → **D10: sim, por participante.**
 - ~~"Renovar" é continuar ou criar sucessor?~~ → **[ADR-011](#adr-011--não-há-renovação-de-pacote-o-total-de-sessões-é-ajustável-a-qualquer-momento): não há renovação; total editável a qualquer momento.**
-- ~~Profissional em mais de uma clínica?~~ → **[ADR-012](#adr-012--profissional-pertence-a-uma-única-clínica-na-v1): um por clínica na v1.**
+- ~~Profissional em mais de uma clínica?~~ → **[ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel): SIM na v1 — identidade global multi-tenant (reverte o ADR-012).**
+- ~~Estratégia de login?~~ → **[ADR-015](#adr-015--autenticação-por-google-oauth--magic-link-sem-senha): Google OAuth + Magic Link, sem senha.**
+- ~~Modelo de papéis / owner?~~ → **[ADR-016](#adr-016--papel-owner-obrigatório-e-perfis-com-capabilities-embarcadas): owner·admin·profissional·recepção, capabilities embarcadas, ≥1 owner por tenant.**
 - ~~Prontuário/LGPD Art. 11 na v1?~~ → **[ADR-013](#adr-013--prontuário-clínico-lgpd-art-11-é-v2-a-v1-tem-apenas-a-ficha-do-paciente): v2; v1 só a ficha.**
 
 **Ainda em aberto:**
@@ -241,5 +309,5 @@ Estas **não** estão travadas e precisam de resposta antes de fatias específic
 | Salas / equipamentos como recurso com capacidade (hoje conflito é só por profissional) | Schema | v2 |
 | Preço varia por convênio/particular/reembolso? Há repasse ao profissional? | Subdomínio faturamento | v2 |
 | Faturamento, guias de convênio, nota fiscal | Subdomínio faturamento | v2 |
-| Multi-unidade dentro da mesma clínica | Modelo de filial | v2 |
-| Profissional em mais de uma clínica (reaberto na v2) | Vínculo prof↔clínica ([ADR-012](#adr-012--profissional-pertence-a-uma-única-clínica-na-v1)) | v2 |
+| **Visão consolidada cross-tenant** (relatórios/faturamento agregando várias unidades de uma mesma dona) | Leitura entre schemas ([ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel)) | v2 |
+| Multi-unidade *dentro* de um mesmo tenant (uma clínica, vários endereços, pacientes/equipe compartilhados) — ≠ multi-clínica | Modelo de filial | v2 |

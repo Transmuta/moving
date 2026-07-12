@@ -501,20 +501,27 @@ agendamento e removendo o item da fila (o `_fromFila` do `createAppt`,
 
 | Método | Rota | Ação Ash | Origem | Papéis |
 |---|---|---|---|---|
-| GET | `/members` | `:read` | [`:203`](../interface/Movimento.dc.html#L203) | admin |
-| POST | `/members/invite` | `:invite` | `saveMembro` [`:2500`](../interface/Movimento.dc.html#L2500) | admin |
-| PATCH | `/members/:id` | `:update` (papel/vínculo) | idem | admin |
-| DELETE | `/members/:id` | `:revoke_access` | [`:2509`](../interface/Movimento.dc.html#L2509) | admin |
+| GET | `/members` | `:read` | [`:203`](../interface/Movimento.dc.html#L203) | owner, admin |
+| POST | `/members/invite` | `:invite` | `saveMembro` [`:2500`](../interface/Movimento.dc.html#L2500) | owner, admin |
+| PATCH | `/members/:id` | `:update` (papel/vínculo) | idem | owner, admin |
+| DELETE | `/members/:id` | `:revoke_access` | [`:2509`](../interface/Movimento.dc.html#L2509) | owner, admin |
 
 `status` do membro: `ativo`/`pendente` ([`:206`](../interface/Movimento.dc.html#L206)).
-Convite cria membro `pendente`; ativa ao aceitar. Vínculo `profId` é opcional e único (um
-membro `profissional` aponta para um profissional).
+Convite cria membro `pendente` e envia **magic link**; ativa ao primeiro acesso (magic
+link/Google, ADR-015). Vínculo `profId` é opcional e único (um membro `profissional` aponta
+para um profissional daquela clínica — e o mesmo `User` pode ser profissional em outras).
+
+**Regras de papel (ADR-016):**
+- `admin` gerencia membros **exceto** owners; promover/rebaixar `owner` e mexer no quadro de
+  owners é **exclusivo de `owner`**.
+- **≥1 owner por tenant:** `PATCH` que rebaixaria o último owner e `DELETE` do último owner
+  falham com `422` (`last_owner`).
 
 ### 3.8 Relatórios
 
 | Método | Rota | Ação Ash | Papéis | Resposta |
 |---|---|---|---|---|
-| GET | `/reports/summary?date_from=&date_to=&professional_id?=` | ação genérica `:summary` | admin (todos); profissional (próprio) | KPIs agregados |
+| GET | `/reports/summary?date_from=&date_to=&professional_id?=` | ação genérica `:summary` | owner/admin (todos); profissional (próprio) | KPIs agregados |
 
 KPIs verificados em `renderRelatorios` ([`:3367`](../interface/Movimento.dc.html#L3367),
 [`:3455`](../interface/Movimento.dc.html#L3455)): atendimentos, concluídos, taxa de falta,
@@ -526,10 +533,10 @@ empurrado ao SQL, alimentado por snapshot noturno para não varrer a tabela ao v
 
 | Método | Rota | Ação Ash | Papéis | Notas |
 |---|---|---|---|---|
-| GET | `/patients/:id/attachments` | `:read` | admin, membro, profissional(próprio) | Metadados, não bytes |
+| GET | `/patients/:id/attachments` | `:read` | owner, admin, recepcao, profissional(próprio) | Metadados, não bytes |
 | POST | `/patients/:id/attachments` | `:request_upload` | idem | Retorna URL assinada de upload |
 | GET | `/attachments/:id/url` | `:signed_download` | idem | URL assinada de vida curta |
-| DELETE | `/attachments/:id` | `:destroy` | admin, profissional(próprio) | |
+| DELETE | `/attachments/:id` | `:destroy` | owner, admin, profissional(próprio) | |
 
 Anexos são laudos/exames — dado de saúde. Os **bytes nunca passam pela API**: o cliente
 faz upload/download direto no object storage privado por URL assinada de vida curta, e a API
@@ -538,8 +545,10 @@ persistido do protótipo. Toda leitura de anexo entra na trilha `AshPaperTrail`.
 
 ### 3.10 Autenticação
 
-Detalhada na [seção 8](#8-autenticação). Rotas: `POST /auth/sign_in`, `DELETE /auth/sign_out`,
-`GET /auth/me`, e a emissão do token efêmero de WebSocket via `GET /realtime/token`.
+Detalhada na [seção 8](#8-autenticação). Rotas (sem senha, ADR-015): `POST /auth/magic-link`
++ callback, `GET /auth/google` + callback, `DELETE /auth/sign_out`, `GET /auth/me` (com
+memberships + tenant ativo), `POST /auth/switch-tenant`, e o token efêmero de WebSocket via
+`GET /realtime/token`.
 
 ---
 
@@ -863,23 +872,43 @@ que o REST sempre pode reconstituir, nunca a única fonte de verdade.
 ## 8. Autenticação
 
 `AshAuthentication` com sessão por **cookie** `HttpOnly`, `Secure`, `SameSite=Lax`
-([04-arquitetura §5](04-arquitetura.md#5-autenticação)). O fluxo:
+([04-arquitetura §5](04-arquitetura.md#5-autenticação)). **Sem senha** — só **Google OAuth**
+e **Magic Link** (ADR-015). O fluxo:
 
-- `POST /auth/sign_in` `{email, password}` → `200` + `Set-Cookie` de sessão. O BFF do
-  SvelteKit guarda o cookie e o repassa nas chamadas server-to-server; **o cookie de sessão
-  nunca vai para o JS do navegador**.
+- **Magic Link:** `POST /auth/magic-link` `{email}` → `200` (envia o link; resposta neutra,
+  não revela se o e-mail existe). O clique cai num callback `GET /auth/magic-link/callback?token=…`
+  → `200` + `Set-Cookie` de sessão. Primeiro acesso cria/vincula o `User` pelo e-mail.
+- **Google OAuth:** `GET /auth/google` redireciona ao Google; `GET /auth/google/callback` →
+  `Set-Cookie` de sessão. Cria/vincula o `User` pelo e-mail verificado da conta Google.
 - `DELETE /auth/sign_out` → `204`, invalida a sessão.
-- `GET /auth/me` → `{user: {id, nome, papel, professional_id?}}`, para o BFF montar o menu e
-  as permissões de UI (que são espelho — a autoridade é a policy do servidor).
+- `GET /auth/me` → identidade global **+ os tenants do usuário + o tenant ativo** (ADR-014):
+  ```json
+  {
+    "user": { "id": "…", "nome": "…", "email": "…" },
+    "active_clinic_id": "…",
+    "papel": "owner",                 // papel no tenant ativo
+    "professional_id": "…",           // se for profissional no tenant ativo
+    "memberships": [
+      { "clinic_id": "…", "clinic_nome": "Centro", "papel": "owner",       "professional_id": null },
+      { "clinic_id": "…", "clinic_nome": "Zona Sul", "papel": "profissional", "professional_id": "…" }
+    ]
+  }
+  ```
+  O BFF usa `memberships` para renderizar o **seletor de clínica** (estilo Vercel) e `papel`
+  para as permissões de UI (que são espelho — a autoridade é a policy do servidor).
+- **Troca de tenant:** `POST /auth/switch-tenant` `{clinic_id}` → `200`, grava o tenant ativo
+  na sessão (valida que existe um `Membership` ativo do usuário naquela clínica) e devolve o
+  novo `/auth/me`. Nenhuma leitura resolve `clinic_id` pelo corpo/URL fora deste ponto de
+  sessão — o tenant das queries vem do escopo (`strategy :context`).
 - `GET /realtime/token` → `{token, expires_at}`. O BFF pede este **token efêmero**
   (Phoenix.Token, minutos de vida) em nome da sessão e o entrega ao cliente no `load`. É só
-  esse token que vai para o JS e para o WebSocket. Escopo do token: o `clinic_id` e o
-  `user_id`, para o `join` do Channel validar o tópico.
+  esse token que vai para o JS e para o WebSocket. Escopo do token: o **`clinic_id` ativo** e o
+  `user_id`, para o `join` do Channel validar o tópico. Trocar de tenant reemite o token.
 
 O `Authorization: Bearer` do diagrama de [04-arquitetura §1](04-arquitetura.md#1-visão-geral)
 é o **cookie repassado**, não um token de longa duração no browser — o único token no cliente
-é o efêmero de WebSocket. Convite de membro ([seção 3.7](#37-membros-equipe--acessos)) tem
-seu próprio fluxo de aceite, a ser detalhado quando `AshAuthentication` for scaffoldado
+é o efêmero de WebSocket. Convite de membro ([seção 3.7](#37-membros-equipe--acessos)) usa o
+mesmo **magic link** para ativar um `Membership` pendente (ADR-015)
 (`# NAO-VERIFICADO: confirmar estratégias e rotas geradas pelo AshAuthentication`).
 
 ---

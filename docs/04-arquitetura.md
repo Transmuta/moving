@@ -193,16 +193,18 @@ A consequência prática independe da verificação: **erros sem campo existem e
 
 ## 5. Autenticação
 
-`AshAuthentication` com sessão por cookie (`HttpOnly`, `Secure`, `SameSite=Lax`). O BFF do SvelteKit repassa o cookie nas chamadas server-to-server. Para o WebSocket, o BFF emite um **token efêmero de curta duração** (Phoenix.Token, minutos), entregue ao cliente no `load` — o cookie de sessão nunca vai para o JS.
+`AshAuthentication` com sessão por cookie (`HttpOnly`, `Secure`, `SameSite=Lax`). **Sem senha** (ADR-015): as estratégias são **Google OAuth** e **Magic Link**. O BFF do SvelteKit repassa o cookie nas chamadas server-to-server. Para o WebSocket, o BFF emite um **token efêmero de curta duração** (Phoenix.Token, minutos), entregue ao cliente no `load` — o cookie de sessão nunca vai para o JS.
+
+**Identidade global multi-tenant (ADR-014).** O `User` é global e pode ter vários `Membership`s; a sessão guarda o **tenant ativo**, e `actor.papel`/`actor.professional_id` derivam do `Membership` ativo. Trocar de clínica (`POST /auth/switch-tenant`, [09 §8](09-contrato-api.md)) troca o tenant ativo e **reemite** o token de WS.
 
 ```elixir
 # NAO-VERIFICADO: confirmar contra hexdocs ao scaffoldar
 # Emissão do token efêmero no BFF (via um endpoint do Phoenix) e verificação no socket:
-#   Phoenix.Token.sign(MovimentoWeb.Endpoint, "ws auth", %{user_id: id, clinic_id: cid})
+#   Phoenix.Token.sign(MovimentoWeb.Endpoint, "ws auth", %{user_id: id, clinic_id: active_cid})
 #   Phoenix.Token.verify(socket, "ws auth", token, max_age: 300)
 ```
 
-O token carrega `user_id` **e** `clinic_id`; o `connect/3` do socket rejeita se o tenant do token não bate com o que o Channel tenta assinar. Isso fecha a porta de um cliente autenticado numa clínica escutar tópico de outra.
+O token carrega `user_id` **e** o `clinic_id` **ativo**; o `connect/3` do socket rejeita se o tenant do token não bate com o que o Channel tenta assinar. Isso fecha a porta de um cliente autenticado numa clínica escutar tópico de outra — inclusive uma outra clínica **do mesmo usuário** que não seja a ativa.
 
 ---
 
@@ -278,7 +280,7 @@ ALTER TABLE appointments
 
 Leitura da constraint: para o par de linhas em que **ambas** têm `encaixe = false` e `status <> 'cancelado'`, é proibido que tenham o mesmo `professional_id` e intervalos que se toquem (`&&`) no meio-aberto `[)` (dois blocos adjacentes, um terminando 10:00 e outro começando 10:00, **não** conflitam). Uma linha de encaixe, ou uma cancelada, está fora do índice — pode sobrepor à vontade, e nada colide com ela. Isso reproduz `checkConflict` fielmente, agora com garantia transacional.
 
-**Interação com a tenancy (ADR-003).** Se a estratégia de multitenancy for schema-por-tenant (`strategy :context`), cada schema tem sua própria tabela `appointments` e a constraint já é naturalmente por-clínica. Se for por atributo (`clinic_id` na linha) e um mesmo profissional puder existir em mais de uma clínica (ADR-003 abre essa porta), a constraint precisa incluir `clinic_id WITH =` para que a garantia seja por-(clínica, profissional) e não vaze entre clínicas. A escolha da estratégia está em [01-dominio-ash.md](01-dominio-ash.md); esta constraint depende dela.
+**Interação com a tenancy (ADR-003/ADR-014).** A estratégia é **schema-por-tenant** (`strategy :context`, [01 §2](01-dominio-ash.md)): cada schema tem sua própria tabela `appointments`, então a constraint é **naturalmente por-clínica** e **não** precisa carregar `clinic_id`. Isso vale **mesmo com profissional multi-clínica** (agora v1, [ADR-014](00-decisoes.md)): a mesma pessoa tem um `Professional` distinto por schema, e cada `appointments` só enxerga o seu — não há sobreposição a garantir entre clínicas. (Se a estratégia fosse por atributo `clinic_id`, aí sim a constraint precisaria de `clinic_id WITH =`; não é o caso.)
 
 A validação Ash correspondente deve ser marcada como possivelmente atômica para casar com a operação de banco, mas ela é redundante para a *garantia* — sua função é a mensagem de erro por campo. A constraint é a verdade.
 
