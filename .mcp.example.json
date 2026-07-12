@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "node",
+      "args": [
+        "/home/ruby/.asdf/installs/nodejs/22.13.0/lib/node_modules/claude-playwright/dist/mcp/server.cjs"
+      ],
+      "env": {
+        "BASE_URL": "http://localhost:5173"
+      }
+    }
+  }
+}

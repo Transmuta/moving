@@ -1,0 +1,8 @@
+# Output
+.claude-playwright
+.mcp.json
+
+# Segredos locais (credenciais OAuth etc.) — NUNCA commitar.
+.env
+.env.*
+!.env.example
