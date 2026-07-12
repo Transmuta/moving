@@ -278,8 +278,30 @@ Dark mode continua por `data-theme` (`@custom-variant dark`), não por `class` n
 - [01 §2](01-dominio-ash.md) reescrito: a decisão passa a ser `:attribute`; a tabela comparativa foi mantida com o veredito invertido.
 - **Código:** `Professional` usa `strategy :attribute, attribute :clinic_id` + `belongs_to :clinic`; `Clinic` sem `manage_tenant`; `Repo` sem `all_tenants/0`; um único conjunto de migrations no schema público.
 - **Exclusion constraint da agenda** ([04 §7.1](04-arquitetura.md)): continua **sem** `clinic_id`, porque `Professional` é por-tenant e `professional_id` é único globalmente; `clinic_id` na constraint é defesa-em-profundidade **opcional**.
-- **Custo LGPD:** isolamento vira lógico. Mitigação obrigatória (vira checklist em [06 §6](06-seguranca-e-lgpd.md)): **(1)** nunca ler dado por-tenant fora do Ash; **(2)** teste de IDOR no CI (injetar `clinic_id` não vaza); **(3)** `clinic_id` como 1ª coluna dos índices sensíveis ([01 §9](01-dominio-ash.md)).
+- **Custo LGPD:** isolamento vira lógico. Mitigação obrigatória (vira checklist em [06 §6](06-seguranca-e-lgpd.md)): **(1)** isolamento imposto **no banco via RLS** ([ADR-018](#adr-018--rls-como-defesa-em-profundidade-da-tenancy-por-atributo)) — não só disciplina de app; **(2)** teste de IDOR no CI conectando como o role restrito; **(3)** `clinic_id` como 1ª coluna dos índices sensíveis ([01 §9](01-dominio-ash.md)).
 - **Observabilidade** ([05](05-observabilidade-e-producao.md)): `clinic_id` é atributo/coluna — anexar ao span do OTel fica direto (some a complicação do `search_path`).
+
+---
+
+## ADR-018 — RLS como defesa-em-profundidade da tenancy por atributo
+
+**Status:** Aceita (2026-07-12) · **Fortalece:** [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant) · **Contexto de saúde:** [ADR-007](#adr-007--dado-de-saúde-é-tratado-como-categoria-especial-da-lgpd)
+
+**Contexto.** O [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant) trocou isolamento físico (schema) por lógico (o Ash injeta `WHERE clinic_id = …`). O risco residual: dado de saúde de todas as clínicas convive na mesma tabela, e **uma** query crua (`Repo`/`Ecto`), um `authorize?: false` sem tenant ou um bug de filtro vazaria entre clínicas. Depender só de disciplina de app é frágil demais para LGPD Art. 11.
+
+**Decisão.** Ligar **PostgreSQL Row-Level Security** nas tabelas por-tenant, impondo o isolamento **no próprio banco**. Verificado empiricamente (POC na `professionals`):
+1. **Policy por `clinic_id`** em cada tabela por-tenant: `ENABLE`/`FORCE ROW LEVEL SECURITY` + `CREATE POLICY … USING/WITH CHECK (clinic_id = current_setting('movimento.clinic_id', true)::uuid)`. Sem a GUC setada → **0 linhas (fail-closed)**.
+2. **Role de app restrito** (`movimento_app`, `NOSUPERUSER`/`NOBYPASSRLS`, não-dono): o `phx.server` conecta como ele e fica **sujeito** à RLS. **Migrations rodam como `postgres`** (superusuário, bypassa RLS para DDL). ⚠️ Sem trocar o role, RLS é teatro — superusuário/dono ignoram policies.
+3. **GUC por transação** via `Api.Repo.with_clinic/2` (`set_config('movimento.clinic_id', clinic_id, true)` dentro de uma transação). O ponto de injeção no app é o **plug de scope da sessão** (ADR-014), que embrulha o trabalho por-tenant do request — a finalizar junto da fatia de auth.
+
+**Justificativa.** Devolve, no banco, a garantia "física" que o [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant) abriu mão — sem os schemas. Muda o modo de falha de **"esqueci o filtro ⇒ vaza"** (perigoso) para **"esqueci a GUC ⇒ 0 linhas"** (seguro). É a mitigação #1 do ADR-017, agora imposta pelo Postgres.
+
+**Consequências.**
+- **Docker/dev:** o entrypoint cria o role `movimento_app` + grants, roda migrations como `postgres`, e sobe o server como `movimento_app` — "mesma experiência", agora com RLS ligada (verificado: endpoints existentes seguem OK).
+- **Toda tabela por-tenant** ganha RLS na migration (via SQL de `ENABLE/FORCE/POLICY`); recursos globais (`users`/`clinics`/`memberships`) **não** têm RLS.
+- **Teste de IDOR** (mitigação #2 do ADR-017) passa a **conectar como `movimento_app`** e provar que query crua sem GUC não vê nada e que cross-tenant é bloqueado (INSERT com `WITH CHECK`).
+- **Leitura consolidada cross-tenant** (owner multi-unidade) exige um caminho deliberado: GUC com lista de `clinic_id` (`clinic_id = ANY(...)`) ou um role separado — a desenhar na fatia de relatórios.
+- **Custo:** operações por-tenant precisam passar por `with_clinic/2` (transação). Sem isso, retornam 0 linhas — falha segura, mas exige o padrão consistente no app.
 
 ---
 

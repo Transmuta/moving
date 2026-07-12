@@ -29,10 +29,15 @@ services:
       db:
         condition: service_healthy
     environment:
+      # Usuário privilegiado (dono): roda migrations/DDL, bypassa RLS.
       DATABASE_HOST: db
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: movimento_dev
+      # Role restrito do app (NOSUPERUSER/NOBYPASSRLS): o phx.server conecta como ele
+      # e fica sujeito às RLS policies (ADR-018).
+      DATABASE_APP_USER: movimento_app
+      DATABASE_APP_PASSWORD: movimento_app
       PORT: "4000"
     ports:
       # Host 4010 (4000 já usado por outro stack) -> Phoenix do container.
