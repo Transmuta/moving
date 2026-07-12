@@ -65,7 +65,7 @@ config :spark,
 config :api,
   generators: [timestamp_type: :utc_datetime],
   ecto_repos: [Api.Repo],
-  ash_domains: [Api.Meta]
+  ash_domains: [Api.Meta, Api.Accounts, Api.Directory]
 
 # Configure the endpoint
 config :api, ApiWeb.Endpoint,
