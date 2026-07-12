@@ -1,0 +1,218 @@
+/* Design system do Movimento (ADR-010 / doc 03 §4). Duas camadas:
+   1) proveniência — custom properties `--mv-*` com os hex verbatim do protótipo
+      (interface/Movimento.dc.html theme() :301-313), trocadas por [data-theme];
+   2) utilitários — `@theme inline` mapeia aquelas variáveis para os namespaces do
+      Tailwind v4, gerando bg-surface, text-muted, border-edge, etc. `inline` faz o
+      utilitário referenciar var(--mv-…) em vez de copiar o valor, então a troca de tema
+      em runtime continua sendo só um atributo no <html>. */
+@import 'tailwindcss';
+
+/* Dark por atributo, não por classe nem media pura: o SSR estampa data-theme no <html>
+   e não há flash (hooks.server.ts). */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ══ CAMADA 1 — proveniência. Hex verbatim do protótipo. ══════════════════════════ */
+
+:root {
+	--mv-font-sans: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif;
+	--mv-font-mono: 'Martian Mono', ui-monospace, monospace;
+
+	/* Raios (8px campos/botões, 14px cards, 999px pill) */
+	--mv-radius-sm: 6px;
+	--mv-radius: 8px;
+	--mv-radius-lg: 14px;
+	--mv-radius-pill: 999px;
+
+	/* Sombras — sutil no claro; pop de menus/cards flutuantes */
+	--mv-shadow-1: 0 1px 1px rgba(20, 24, 30, 0.03);
+	--mv-shadow-card: 0 12px 40px rgba(20, 24, 30, 0.08);
+	--mv-shadow-pop: 0 8px 24px rgba(8, 10, 12, 0.18);
+
+	/* Semânticas compartilhadas claro/escuro (:311) */
+	--mv-success: #2da160;
+	--mv-warning: #f5a623;
+	--mv-danger: #e5484d;
+	--mv-info: #2b7fff;
+
+	/* Teal — cor de marca / foco. solid/hover iguais nos dois temas (:303) */
+	--mv-teal-solid: #0fb5a6;
+	--mv-teal-hover: #0ba294;
+}
+
+/* ---- Tema claro (theme() com d=false) ---- */
+:root,
+:root[data-theme='light'] {
+	--mv-canvas: #fbfcfd;
+	--mv-surface: #ffffff;
+	--mv-surface2: #f6f8f9;
+	--mv-bs: #e4e7eb; /* borda sutil  */
+	--mv-bd: #cdd3d9; /* borda densa  */
+	--mv-text: #161a1e;
+	--mv-muted: #5c6670;
+	--mv-faint: #8a929b;
+	--mv-primary: #16181c;
+	--mv-primary-hover: #2a2e34;
+	--mv-on-primary: #ffffff;
+	--mv-teal-text: #0a7e73;
+	--mv-teal-subtle: #e5f7f4;
+	--mv-teal-border: #7fdacd;
+	--mv-card-shadow: var(--mv-shadow-card);
+}
+
+/* ---- Tema escuro (theme() com d=true) ---- */
+:root[data-theme='dark'] {
+	--mv-canvas: #0c0d0e;
+	--mv-surface: #16181c;
+	--mv-surface2: #1c1f24;
+	--mv-bs: #24282e;
+	--mv-bd: #313640;
+	--mv-text: #eceef0;
+	--mv-muted: #9aa3ac;
+	--mv-faint: #6b747d;
+	--mv-primary: #eceef0;
+	--mv-primary-hover: #ffffff;
+	--mv-on-primary: #16181c;
+	--mv-teal-text: #3fd6c7;
+	--mv-teal-subtle: rgba(15, 181, 166, 0.16);
+	--mv-teal-border: rgba(127, 218, 205, 0.45);
+	--mv-card-shadow: none; /* sombra do card só no claro (:1683) */
+}
+
+/* Respeita o SO quando não há escolha explícita de tema. */
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme]) {
+		--mv-canvas: #0c0d0e;
+		--mv-surface: #16181c;
+		--mv-surface2: #1c1f24;
+		--mv-bs: #24282e;
+		--mv-bd: #313640;
+		--mv-text: #eceef0;
+		--mv-muted: #9aa3ac;
+		--mv-faint: #6b747d;
+		--mv-primary: #eceef0;
+		--mv-primary-hover: #ffffff;
+		--mv-on-primary: #16181c;
+		--mv-teal-text: #3fd6c7;
+		--mv-teal-subtle: rgba(15, 181, 166, 0.16);
+		--mv-teal-border: rgba(127, 218, 205, 0.45);
+		--mv-card-shadow: none;
+	}
+}
+
+/* ══ CAMADA 2 — utilitários. `inline` → o utilitário referencia var(--mv-…). ══════ */
+
+@theme inline {
+	--font-sans: var(--mv-font-sans);
+	--font-mono: var(--mv-font-mono);
+
+	/* sobrescreve a escala de raio do Tailwind pela do protótipo, de propósito */
+	--radius-sm: var(--mv-radius-sm);
+	--radius-md: var(--mv-radius);
+	--radius-lg: var(--mv-radius-lg);
+	--radius-full: var(--mv-radius-pill);
+
+	--shadow-sm: var(--mv-shadow-1);
+	--shadow-card: var(--mv-card-shadow);
+	--shadow-pop: var(--mv-shadow-pop);
+
+	/* superfícies → bg-canvas, bg-surface, bg-surface-2 */
+	--color-canvas: var(--mv-canvas);
+	--color-surface: var(--mv-surface);
+	--color-surface-2: var(--mv-surface2);
+
+	/* bordas → border-edge / border-edge-strong (bs = sutil, bd = densa) */
+	--color-edge: var(--mv-bs);
+	--color-edge-strong: var(--mv-bd);
+
+	/* texto → text-ink / text-muted / text-faint (`ink` evita o feio `text-text`) */
+	--color-ink: var(--mv-text);
+	--color-muted: var(--mv-muted);
+	--color-faint: var(--mv-faint);
+
+	--color-primary: var(--mv-primary);
+	--color-primary-hover: var(--mv-primary-hover);
+	--color-on-primary: var(--mv-on-primary);
+
+	--color-teal: var(--mv-teal-solid);
+	--color-teal-hover: var(--mv-teal-hover);
+	--color-teal-text: var(--mv-teal-text);
+	--color-teal-subtle: var(--mv-teal-subtle);
+	--color-teal-border: var(--mv-teal-border);
+
+	--color-success: var(--mv-success);
+	--color-warning: var(--mv-warning);
+	--color-danger: var(--mv-danger);
+	--color-info: var(--mv-info);
+}
+
+/* As animações do protótipo viram tokens --animate-* → animate-* */
+@theme {
+	--animate-fade: mvFade 0.18s ease-out;
+	--animate-scale: mvScale 0.25s ease-out;
+
+	@keyframes mvFade {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	@keyframes mvScale {
+		from {
+			opacity: 0;
+			transform: scale(0.975);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+}
+
+/* O que o preflight do Tailwind não cobre, do <style> do protótipo. */
+@layer base {
+	html,
+	body {
+		overscroll-behavior-y: none;
+	}
+
+	body {
+		font-family: var(--mv-font-sans);
+		background-color: var(--mv-canvas);
+		color: var(--mv-text);
+	}
+
+	::-webkit-scrollbar {
+		width: 10px;
+		height: 10px;
+	}
+	::-webkit-scrollbar-thumb {
+		background: rgba(140, 150, 160, 0.32);
+		border-radius: 8px;
+		border: 2px solid transparent;
+		background-clip: padding-box;
+	}
+	::-webkit-scrollbar-thumb:hover {
+		background: rgba(140, 150, 160, 0.5);
+	}
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	:where(input, select, button, textarea, [tabindex]):focus-visible {
+		outline: 2px solid var(--mv-teal-solid);
+		outline-offset: 1px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.001ms !important;
+			transition-duration: 0.001ms !important;
+		}
+	}
+}
