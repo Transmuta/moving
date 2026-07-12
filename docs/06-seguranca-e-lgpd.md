@@ -486,17 +486,24 @@ papel→capabilities fixo em código (`Movimento.Accounts.Capabilities`, [01 §3
 ### 6.1 Policies de recurso (quem pode a ação)
 
 `Ash.Policy.Authorizer` em todo recurso sensível. Padrão-base: **tenant primeiro,
-papel depois.** O tenant é o **schema do escopo** (`strategy :context`, [01 §2](01-dominio-ash.md)):
-a query já roda dentro da clínica ativa (ADR-014), então não há linha de outra clínica
-alcançável — o papel vem do `Membership` ativo, nunca de `clinic_id` do cliente. `owner` e
-`admin` são bypass **dentro da própria clínica**, jamais global.
+papel depois.** O tenant é a coluna **`clinic_id`** (`strategy :attribute`, [ADR-017](00-decisoes.md)):
+o Ash injeta `WHERE clinic_id = <tenant ativo>` e **exige** o tenant nos recursos por-atributo
+(ler sem tenant é `Ash.Error.Invalid`, não um vazamento). O tenant ativo vem do `Membership`
+da sessão (ADR-014), **nunca** de `clinic_id` do cliente. `owner` e `admin` são bypass
+**dentro da própria clínica**, jamais global.
+
+> **⚠️ Isolamento é lógico (ADR-017), não físico.** Sem schema-por-tenant, a garantia depende
+> do filtro do Ash. Disciplina obrigatória: **(1)** nunca ler dado por-tenant fora do Ash
+> (nada de `Repo`/`Ecto` cru numa tabela por-tenant); **(2)** `authorize?: false` só com tenant
+> setado; **(3)** um **teste de IDOR no CI** que prove que injetar `clinic_id` no corpo/URL não
+> alcança dado de outra clínica (ver [08 roadmap](08-roadmap.md) e o checklist de §8).
 
 ```elixir
 # NAO-VERIFICADO: confirmar contra hexdocs ao scaffoldar
 # policies do
-#   # owner/admin da PRÓPRIA clínica (schema do escopo) podem tudo dentro dela
+#   # owner/admin da PRÓPRIA clínica (clinic_id do escopo) podem tudo dentro dela
 #   bypass actor_attribute_in(:papel, [:owner, :admin]) do
-#     authorize_if always()   # tenant já garantido pelo schema (:context)
+#     authorize_if always()   # tenant (clinic_id) já filtrado pelo Ash (:attribute)
 #   end
 #
 #   policy action_type(:read) do

@@ -364,8 +364,7 @@ defmodule Movimento.Release do
     for repo <- repos() do
       {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
     end
-    # 2) migrações de tenant — ver §5.4, depende da estratégia de tenancy
-    migrate_tenants()
+    # (ADR-017: tenancy por atributo → NÃO há migração de tenant; ver §5.4)
   end
 end
 ```
@@ -406,52 +405,25 @@ sintoma é o "lag de PubSub" da §3. A mitigação de UX já está desenhada —
 ([04-arquitetura.md](04-arquitetura.md) §6.2 e §8) —, então um netsplit degrada para
 polling, não para dado errado.
 
-### 5.4 Migrações multi-tenant no deploy (ADR-003)
+### 5.4 Migrações no deploy (ADR-017)
 
-Aqui há uma dependência que **não** posso fingir que está resolvida. O ADR-003 trava
-que tudo é multi-clínica, mas a **estratégia concreta** de tenancy do AshPostgres
-está definida em [01-dominio-ash.md](01-dominio-ash.md) — documento que pode ainda não
-existir. As `.claude/rules/ash_postgres.md` descrevem as duas famílias, e o passo de
-migração muda radicalmente entre elas:
+**Resolvido pelo [ADR-017](00-decisoes.md): tenancy por atributo (`strategy :attribute`,
+coluna `clinic_id`).** Há **um** conjunto de tabelas no schema público; toda linha por-tenant
+carrega `clinic_id`. A migração de deploy é a comum — roda as migrações do repo e acabou.
+**Não há "migrar tenants"**, nem `priv/repo/tenant_migrations`, nem `Repo.all_tenants/0`, nem
+iterar sobre schemas. Uma clínica nova fica pronta assim que sua linha em `clinics` existe (a
+criação não provisiona schema nenhum). É a família mais simples de operar e escalar.
 
-- **`strategy :attribute` (coluna `clinic_id`)** — há **um** conjunto de tabelas;
-  toda linha carrega o tenant. Migração é a comum: rodou as migrações do repo, acabou.
-  Não há "migrar tenants". A separação é por policy + índice, não por schema. É a mais
-  simples de operar e de escalar em número de clínicas.
-- **`strategy :context` com schema-por-tenant** — cada clínica tem seu **schema**
-  Postgres. Existe uma migração base (schema `public`/tenants) **e** um conjunto de
-  migrações de tenant (`priv/repo/tenant_migrations`) que precisa rodar **para cada
-  schema de clínica**. Uma clínica nova só está pronta depois que seu schema foi
-  criado e migrado. No deploy isso significa iterar sobre todas as clínicas.
+> *Histórico:* a v1 começou em `strategy :context` (schema-por-tenant), que exigia rodar
+> `priv/repo/tenant_migrations` para cada schema no deploy (`ash_postgres.migrate --tenants` +
+> `Repo.all_tenants/0`). O [ADR-017](00-decisoes.md) eliminou esse passo. O `migrate/0` da §5.2
+> não tem mais a etapa "2) migrações de tenant".
 
-```elixir
-# NAO-VERIFICADO: confirmar contra hexdocs ao scaffoldar
-# Só necessário no caso schema-por-tenant. O AshPostgres expõe uma mix task
-# (ash_postgres.migrate --tenants) e o repo precisa listar os schemas de tenant,
-# como em .claude/rules/ash_postgres.md (Repo.all_tenants/0).
-def migrate_tenants do
-  # equivalente em release ao "mix ash_postgres.migrate --tenants":
-  # para cada schema de tenant, rodar priv/repo/tenant_migrations
-  for tenant <- Movimento.Repo.all_tenants() do
-    Ecto.Migrator.run(Movimento.Repo, :up, all: true, prefix: tenant)
-  end
-end
-```
-
-**Cuidado operacional do caso schema-por-tenant:** migrar N schemas no `release_command`
-tem custo O(N). Com poucas clínicas é irrelevante; com centenas, o `release_command`
-pode estourar timeout e uma clínica pode ficar meia-migrada se falhar no meio. A
-mitigação é migração de tenant **idempotente e resumível** (registra progresso, pode
-recomeçar), e para volume grande, migração de tenants em background via Oban logo após
-o deploy em vez de tudo no `release_command` — pagando com uma janela curta em que
-clínicas diferentes rodam versões de schema diferentes, o que exige que a migração
-seja expand-only (§6.3). **A escolha entre `:attribute` e schema-por-tenant é o fator
-que mais afeta esta seção, e vem de [01-dominio-ash.md](01-dominio-ash.md) — documento
-que está sendo escrito nesta mesma rodada e ainda vai recomendar entre as duas
-estratégias.** As duas variantes de procedimento de migração acima estão escritas de
-propósito e explicitamente rotuladas; **uma delas será descartada assim que o
-01-dominio-ash.md fechar a decisão de tenancy.** Até lá o desenho de deploy suporta as
-duas, mas não presume nenhuma nem otimiza para uma só.
+Com o [ADR-017](00-decisoes.md) (tenancy por `clinic_id`), **este custo operacional some**:
+não há N schemas a migrar no `release_command`, então a migração de deploy é O(1) — as
+migrações comuns do repo. Some junto o risco de "clínica meia-migrada" e a necessidade de
+migração de tenant idempotente/resumível ou de background via Oban. O que **permanece** é a
+disciplina expand-only de schema (§6.3), que vale para qualquer estratégia num deploy rolling.
 
 ### 5.5 Object storage para anexos
 
@@ -614,21 +586,18 @@ não travar escrita — importante para a tabela de agendamentos, que é a mais 
 Restore total (recriar o banco de um snapshot) é o caminho fácil. O difícil, e
 específico deste produto multi-tenant (ADR-003), é **restaurar uma única clínica** —
 por exemplo, uma clínica que apagou dados por engano e quer voltar ao estado de ontem
-sem afetar as outras. A abordagem depende de novo da estratégia de tenancy
-([01-dominio-ash.md](01-dominio-ash.md)) — que **está sendo decidida nesta mesma rodada
-e ainda recomendará entre as duas famílias**. Por isso os dois procedimentos de restore
-abaixo estão escritos e rotulados; **um deles será descartado quando o 01 fechar a
-decisão**, e não há como escolher agora sem palpitar:
+sem afetar as outras. **Decidido pelo [ADR-017](00-decisoes.md): coluna `clinic_id`** — então
+vale o procedimento mais trabalhoso, e ele precisa ser **escrito e testado antes de ser
+preciso**, não durante o incidente:
 
-- **Schema-por-tenant:** relativamente limpo. Restaura-se o snapshot num banco de
-  rascunho, faz-se `pg_dump --schema=tenant_<id>` só daquele schema e restaura-se por
-  cima do schema da clínica em produção. O isolamento físico do schema é justamente o
-  que torna isso viável sem tocar nas vizinhas.
-- **Coluna `clinic_id`:** mais trabalhoso. Não há como restaurar "só as linhas da
-  clínica X" de um snapshot completo sem um export/import filtrado por `clinic_id`
-  linha a linha, respeitando ordem de FKs — um procedimento que precisa ser escrito e
-  testado antes de ser preciso, não durante o incidente. É o custo operacional escondido
-  da estratégia por atributo.
+- **Coluna `clinic_id` (nosso caso):** não há como restaurar "só as linhas da clínica X" de
+  um snapshot completo sem um **export/import filtrado por `clinic_id`**, linha a linha,
+  respeitando a ordem de FKs. É o custo operacional escondido da estratégia por atributo — e a
+  contrapartida que aceitamos no [ADR-017](00-decisoes.md) ao trocar o isolamento físico do
+  schema pela simplicidade de migration/operação. **Ação:** um runbook de restore-por-`clinic_id`
+  (com ordem de FKs e verificação) entra no Gate de produção antes do go-live.
+- *(Descartado — schema-por-tenant:* seria `pg_dump --schema=tenant_<id>` de um schema só,
+  trivial; deixou de valer com o ADR-017.)*
 
 Em ambos os casos, restaurar dados de saúde exige que a **chave do `AshCloak`** do
 período correspondente esteja disponível; rotação de chave sem versionamento
@@ -658,7 +627,7 @@ domínio; cada um tem um runbook de uma frase.
 | **Pico de conflito de agenda** | Taxa de rejeição da exclusion constraint acima do baseline por 5 min | Ver §3; checar se um deploy recente afrouxou a validação Ash vs. a constraint; a constraint é a verdade — a validação é que está deixando passar. Inspecionar traces `appointment.schedule` com erro |
 | **Fila Oban travada** | `expirar SlotHold` com jobs atrasados > 2 min | Vagas presas por hold não expirado; verificar worker Oban vivo e latência do banco; reprocessar a fila. Liga com "holds abandonados" |
 | **Lag de PubSub / netsplit** | Broadcast > 1 s no p95, ou nós do cluster < 2 | Provável partição de cluster; conferir DNS interno do Fly e conectividade dos nós (§5.3); a UX degrada para `invalidate()`, então é urgente mas não corrompe dado |
-| **Falha de migração no deploy** | `release_command` retornou erro | Deploy **não** promoveu a versão nova (o rolling só troca após o `release_command` OK); versão antiga segue no ar; corrigir a migração e reenviar. Se schema-por-tenant, checar se algum tenant ficou meio-migrado (§5.4) |
+| **Falha de migração no deploy** | `release_command` retornou erro | Deploy **não** promoveu a versão nova (o rolling só troca após o `release_command` OK); versão antiga segue no ar; corrigir a migração e reenviar. (Tenancy por `clinic_id`, ADR-017: uma migração só, sem tenants meio-migrados.) |
 | **Erro em URL assinada de anexo** | Taxa de 5xx em geração/download de anexo | Prontuário inacessível; checar credenciais do storage e clock skew (assinatura é sensível a relógio); confirmar que não virou proxy de bytes pelo BFF |
 | **Orçamento de erro esgotado** | Error budget de um SLO zerado no mês | Congelar deploy de risco no fluxo afetado (§4.1); priorizar confiabilidade |
 
@@ -721,12 +690,13 @@ de saúde não vaza para telemetria, esteja o coletor em São Paulo ou em Ashbur
 
 ## Resumo das dependências ainda abertas
 
-Este documento apoia-se em decisões travadas, mas três pontos dependem de trabalho que
+Este documento apoia-se em decisões travadas; dois pontos ainda dependem de trabalho que
 vive noutros documentos e **não** devem ser fechados por palpite aqui:
 
-- **Estratégia de tenancy** (`:attribute` vs. schema-por-tenant) — vem de
-  [01-dominio-ash.md](01-dominio-ash.md) e determina §5.4 (migração de tenant) e §7.2
-  (restore por clínica). O desenho suporta ambas; a operação ótima depende da escolha.
+- ~~**Estratégia de tenancy**~~ **Resolvida ([ADR-017](00-decisoes.md)): `strategy :attribute`
+  (`clinic_id`).** Simplifica §5.4 (sem migração de tenant) e define §7.2 (restore por
+  `clinic_id`, que precisa de runbook). O que resta é **escrever/testar o runbook de restore
+  por `clinic_id`** antes do go-live.
 - **Versionamento da chave do `AshCloak`** — vem do desenho de criptografia de campo
   (ADR-007 / [01-dominio-ash.md](01-dominio-ash.md)) e é pré-requisito de §7.1 e §7.2.
 - **Números de SLO/RPO/RTO** (§4.1, §7.3) — são pontos de partida conservadores; só

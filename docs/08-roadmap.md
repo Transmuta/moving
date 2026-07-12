@@ -85,10 +85,9 @@ O repositório hoje não tem projeto Elixir nem SvelteKit. O andaime cria os doi
    (prontuário, hold), para não pagar complexidade antes da hora.
 
 2. **Multitenancy desde o primeiro recurso.** O ADR-003 é explícito: toda entidade nasce
-   escopada a uma clínica. Mesmo o `Ping` do andaime carrega tenant. A escolha concreta
-   entre `strategy :context` (schema por tenant) e `strategy :attribute` (`clinic_id`) é do
-   [01-dominio-ash.md](01-dominio-ash.md); o andaime materializa a que ele recomendar.
-   O ponto de fazer isso já: adicionar tenancy depois de existir dado de saúde é caro
+   escopada a uma clínica. A estratégia concreta é **`strategy :attribute` (coluna `clinic_id`)**,
+   decidida no [ADR-017](00-decisoes.md) (após um começo em `:context`, trocado enquanto era
+   barato). O ponto de fazer cedo: adicionar tenancy depois de existir dado de saúde é caro
    (ADR-003).
 
 3. **Relógio injetável desde o primeiro recurso.** O ADR-009 proíbe qualquer módulo de
@@ -500,9 +499,11 @@ Cortar escopo é uma decisão de projeto, não um esquecimento. Fica de fora da 
 - **Multi-unidade *dentro* de um mesmo tenant.** Diferente de multi-clínica (que é v1: cada
   unidade é um tenant **isolado**, [ADR-014](00-decisoes.md)): aqui seria a mesma pessoa jurídica
   com filiais **compartilhando** pacientes/equipe sob um único schema. v2.
-- **Visão consolidada cross-tenant.** Um `owner` com várias unidades vê/opera **uma de cada vez**
-  (troca de tenant estilo Vercel). Relatório/faturamento agregando várias unidades atravessaria
-  schemas ([ADR-014](00-decisoes.md)) — v2.
+- **Visão consolidada cross-tenant.** No dia a dia, um `owner` com várias unidades vê/opera
+  **uma de cada vez** (troca de tenant estilo Vercel). Com o [ADR-017](00-decisoes.md) (tenancy
+  por `clinic_id`), um relatório/faturamento **somando** várias unidades é uma query normal e
+  deixou de ser bloqueado por schema — passa a ser **viável na v1** se o produto priorizar
+  (não é pré-requisito da agenda; entra quando a fatia de relatórios pedir).
 
 Nada disso significa "nunca". Significa que a v1 entrega uma clínica que agenda, atende,
 debita pacote, gerencia fila e prontuário com conformidade — e para por aí, de propósito.

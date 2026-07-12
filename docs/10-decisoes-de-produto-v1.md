@@ -132,8 +132,8 @@ Cada decisão marca a fatia que ela destrava e a consequência de schema/policy.
   clínica.~~ **REVERTIDA (2026-07-11) → SIM.** Um profissional pode atender em **mais de uma
   clínica** e uma dona pode ter **mais de uma unidade** (modelo Vercel, [ADR-014](00-decisoes.md)).
   → Vínculo profissional ↔ clínica é **por-`Membership`**: 1 `User` global → N memberships → N
-  registros `Professional` (um por schema). `strategy :context` **mantida**. Ver o bloco
-  **"Identidade, tenant e acesso"** abaixo.
+  registros `Professional` (um por `clinic_id`). Storage por atributo (`strategy :attribute`,
+  [ADR-017](00-decisoes.md)). Ver o bloco **"Identidade, tenant e acesso"** abaixo.
 
 ---
 

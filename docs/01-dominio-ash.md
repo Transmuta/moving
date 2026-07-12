@@ -26,8 +26,8 @@ Todo bloco que usa API de biblioteca escrita de memória (`AshCloak`, `AshPaperT
 `FilterCheck`, `Oban`) traz o comentário `# NAO-VERIFICADO: confirmar contra hexdocs ao
 scaffoldar`. O que está autorizado pelas regras do repositório
 (`.claude/rules/ash.md`, `.claude/rules/ash_postgres.md`) — `policies`, `field_policies`,
-`aggregates`, `calculations`, `manage_relationship`, `strategy :context`, `manage_tenant`
-— é afirmado sem marca.
+`aggregates`, `calculations`, `manage_relationship`, `strategy :attribute` (tenancy por
+`clinic_id`, ADR-017) — é afirmado sem marca.
 
 ---
 
@@ -56,87 +56,72 @@ resolve a sobrecarga de significado de `prof.avail` (correção **g**, §5). Ele
 
 ## 2. Multitenancy — a decisão
 
-**Recomendação: `strategy :context` (schema-por-tenant) do AshPostgres.** Cada clínica é
-um schema Postgres próprio (`tenant_<uuid>`); os recursos por-tenant da tabela acima moram
-dentro do schema do tenant; `User`, `Clinic` e `Membership` moram no schema público.
+**Decisão: `strategy :attribute` (coluna `clinic_id`) do AshPostgres** ([ADR-017](00-decisoes.md)).
+Uma tabela única por recurso por-tenant, com a coluna `clinic_id`; o Ash injeta
+`WHERE clinic_id = <tenant ativo>` em toda query e preenche `clinic_id` na criação.
+`User`, `Clinic` e `Membership` seguem **globais** (schema público, **sem** bloco
+`multitenancy`). *(Histórico: a v1 começou em `strategy :context` — schema-por-tenant — e
+migrou para `:attribute` em [ADR-017](00-decisoes.md), enquanto o custo era mínimo. A tabela
+abaixo é a comparação que embasou a troca.)*
 
 O AshPostgres oferece duas estratégias (`.claude/rules/ash_postgres.md`): `strategy
 :context` (schema-por-tenant) e `strategy :attribute` (uma coluna `clinic_id` em cada
-linha, uma tabela só). A escolha é a mais consequente do projeto porque toca todo índice,
-toda policy e a garantia de não-sobreposição. Os fatores concretos:
+linha, uma tabela só). A escolha toca todo índice, toda policy e a garantia de
+não-sobreposição. Os fatores concretos:
 
-| Fator | `:context` (schema-por-tenant) — **escolhido** | `:attribute` (`clinic_id`) |
+| Fator | `:context` (schema-por-tenant) | `:attribute` (`clinic_id`) — **escolhido** |
 |---|---|---|
-| **Nº esperado de clínicas** | Pequeno (o protótipo é clínica-única; a sidebar cita uma unidade "Centro"). Um nº pequeno de schemas é barato: sem explosão de conexões nem de catálogo. | Escala melhor para milhares de tenants — que **não** é o nosso caso. |
-| **Dado de saúde (LGPD Art. 11)** | Isolamento físico: dados de saúde de clínicas distintas jamais compartilham tabela. O pior erro possível (vazar prontuário entre clínicas) exige um bug de conexão de schema, não um `WHERE` esquecido. | Todo dado sensível de todas as clínicas convive na mesma tabela. Isolamento é só lógico. |
-| **Risco de IDOR entre tenants** | Estruturalmente baixo: a query já roda dentro do schema; não há linha de outra clínica alcançável. | Real e recorrente: **uma** policy ou um índice sem `clinic_id` vaza. É um modo de falha catastrófico para dado de saúde. |
-| **Restore de UMA clínica** | Trivial: `pg_dump`/`restore` de um schema. Recuperação cirúrgica sem tocar as demais. | Extração linha-a-linha por `clinic_id`, com risco de arrastar FKs de outras clínicas. Difícil e perigoso justamente no cenário de saúde. |
-| **Custo de migration** | Maior: cada migration roda em N schemas (`mix ash_postgres.migrate --tenants`, `Repo.all_tenants/0`, `priv/repo/tenant_migrations`). **Mas N é pequeno**, e o AshPostgres tem suporte de primeira classe para isso. | Menor: uma migration, uma tabela. |
-| **Exclusion constraint da agenda** (`04` §7.1) | **Naturalmente por-clínica**: cada schema tem sua própria tabela `appointments`, então `appointments_no_overlap` já garante não-sobreposição por-(clínica, profissional) sem coluna extra. | Precisa incluir `clinic_id WITH =` na constraint, senão a garantia vaza entre clínicas quando um profissional atende em mais de uma (ADR-003 abre essa porta). |
+| **Custo de migration** | Maior: cada migration roda em N schemas (`--tenants`, `all_tenants/0`, `tenant_migrations`). | **Menor: uma migration, uma tabela.** Sem provisionar schema no onboarding. |
+| **Visão consolidada cross-tenant** | Atravessa schemas; difícil (empurrada p/ v2). | **Query normal** — a dona vê as unidades somadas; viabiliza a v1. |
+| **Observabilidade** | O tenant vem do `search_path`, não de uma coluna — complica o span do OTel. | Tenant é atributo/coluna — trivial de anexar ao span. |
+| **Nº esperado de clínicas** | Pequeno; poucos schemas é barato. | Escala para muitos tenants (não é gargalo aqui). |
+| **Dado de saúde (LGPD Art. 11)** | Isolamento **físico**: clínicas distintas jamais compartilham tabela. | Isolamento **lógico**: todo dado convive na mesma tabela, filtrado por `clinic_id`. |
+| **Risco de IDOR entre tenants** | Estruturalmente baixo: a query roda dentro do schema. | Real, porém **contido pelo Ash** (auto-filtra e exige tenant nos recursos por-atributo). Escapes: query manual via Repo/Ecto, `authorize?: false` sem tenant. Mitigado por teste de IDOR obrigatório ([06 §6](06-seguranca-e-lgpd.md)). |
+| **Restore/exclusão de UMA clínica** | Trivial: `pg_dump`/`drop` de um schema. | DELETE/extração por `clinic_id`, cuidando das FKs. |
+| **Exclusion constraint da agenda** (`04` §7.1) | Naturalmente por-clínica (uma tabela por schema). | **Continua correta sem `clinic_id`** no nosso modelo: `Professional` é por-tenant, então `professional_id` é único globalmente e a sobreposição já é por-clínica. `clinic_id` na constraint fica como defesa-em-profundidade opcional. |
 
-O empate técnico é o custo de migration, e ele é limitado porque o número de clínicas é
-pequeno e o ferramental existe. Contra isso pesam três vantagens que valem mais para
-**este** domínio: restore de uma clínica trivial, IDOR estruturalmente improvável, e a
-constraint mais crítica do sistema fica mais simples (a agenda não precisa carregar
-`clinic_id` em cada índice de tempo). Para um SaaS de dado de saúde com poucos tenants
-grandes, isolamento vence densidade. **Decidido: `strategy :context`.**
+O que decidiu a troca: o custo de migration (único ponto fraco real do `:attribute`) some,
+e em troca ganhamos **visão consolidada cross-tenant** (alinhada ao owner multi-unidade do
+[ADR-014](00-decisoes.md)) e ops mais simples. O preço — isolamento lógico em vez de físico —
+é pago com três disciplinas: **(1)** nunca ler dado por-tenant fora do Ash; **(2)** um **teste
+de IDOR obrigatório no CI** (injetar `clinic_id` não vaza); **(3)** `clinic_id` como 1ª coluna
+dos índices sensíveis ([§9](#9-índices)). Como só existia um recurso por-tenant (`Professional`)
+quando a decisão foi tomada, a troca custou quase nada.
 
 ```elixir
-# Recurso por-tenant (padrão para Directory, Scheduling, Packages, Waitlist, Records)
-# NAO-VERIFICADO: confirmar o bloco `multitenancy` e o `strategy :context` contra hexdocs
+# Recurso por-tenant (padrão para Directory, Scheduling, Packages, Waitlist, Records).
+# VERIFICADO contra o código (Api.Directory.Professional).
 multitenancy do
-  strategy :context
+  strategy :attribute
+  attribute :clinic_id
 end
 
 postgres do
   table "appointments"
-  repo Movimento.Repo
+  repo Api.Repo
+end
+
+relationships do
+  # clinic_id é a coluna de tenant (FK -> clinics.id).
+  belongs_to :clinic, Api.Accounts.Clinic, allow_nil?: false
 end
 ```
 
 ```elixir
-# Recursos globais (Accounts): NÃO escopados a tenant — vivem no schema público.
-# `global? true` marca que a ação não exige tenant no escopo.
-# NAO-VERIFICADO: confirmar a forma de `global?` / recurso sem multitenancy no Ash 3.x
-multitenancy do
-  strategy :context
-  global? true
-end
-```
-
-**Repo com lista de tenants** (necessário para rodar migrations em todos os schemas):
-
-```elixir
-# NAO-VERIFICADO: confirmar `AshPostgres.Repo` e a assinatura de all_tenants/0
-defmodule Movimento.Repo do
-  use AshPostgres.Repo, otp_app: :movimento
-
-  def all_tenants do
-    import Ecto.Query, only: [from: 2]
-    all(from(c in "clinics", select: fragment("? || ?", "tenant_", c.id)))
-  end
-end
-```
-
-**Provisionamento de schema por clínica.** `Clinic` cria e gerencia o schema do tenant via
-`manage_tenant` (autorizado em `.claude/rules/ash_postgres.md`):
-
-```elixir
-# NAO-VERIFICADO: confirmar `manage_tenant`/`template` contra hexdocs ao scaffoldar
+# Recursos GLOBAIS (Accounts: User, Clinic, Membership): vivem no schema público e
+# NÃO levam bloco `multitenancy` nenhum. VERIFICADO: `strategy :context, global? true`
+# fazia o AshPostgres criar a tabela DENTRO de cada schema de tenant (duplicada) — errado.
 postgres do
-  table "clinics"
-  repo Movimento.Repo
-
-  manage_tenant do
-    template ["tenant_", :id]
-  end
+  table "users"
+  repo Api.Repo
 end
 ```
 
-**Consequência para o resto do conjunto.** `04` §7.1 pode manter a constraint sem
-`clinic_id`. `06` field_policies operam dentro do schema do tenant. `05` precisa que o
-`OpenTelemetry` carregue o tenant como atributo de span mesmo com schema separado (o tenant
-não está mais numa coluna — vem do escopo da conexão).
+**Consequência para o resto do conjunto.** Sem `manage_tenant`, sem `Repo.all_tenants/0`,
+sem `tenant_migrations` — um único conjunto de tabelas no schema público. `04` §7.1 mantém a
+constraint sem `clinic_id` (ver a nuance na tabela). `06` §6 troca a "segurança estrutural"
+do schema por policies de tenant + o teste de IDOR obrigatório. `05` anexa o `clinic_id`
+como atributo de span diretamente.
 
 ---
 
@@ -321,7 +306,7 @@ defmodule Movimento.Accounts.Clinic do
 
   actions do
     defaults [:read]
-    create :onboard          # cria a clínica e provisiona o schema (manage_tenant)
+    create :onboard          # cria a clínica (tenancy por atributo, ADR-017: sem schema)
     update :update_settings
   end
 end
@@ -868,7 +853,7 @@ defmodule Movimento.Packages.Package do
     # SIMPLIFICAÇÃO: quando falta_punitiva é nil, wouldConsume/pkgPunitivo [:1103] cai no default
     # da clínica (settings.noShowConsome ⇒ falta_consome_padrao). Esse ramo de fallback NÃO está
     # expresso abaixo — referenciar um setting de nível-clínica dentro do filtro de um aggregate é
-    # não-trivial no modelo schema-por-tenant; a reconciliar ao scaffoldar (senão usadas é
+    # não-trivial; a reconciliar ao scaffoldar (senão usadas é
     # subcontado quando falta_punitiva=nil e a clínica é punitiva).
     count :usadas, :appointments do
       filter expr(
@@ -1320,7 +1305,7 @@ configurações; o `profissional` é um **filtro** (`FilterCheck`) ao próprio.
 > mas o papel mora no `Membership` (por-tenant). A sessão resolve o **tenant ativo** e carrega
 > `actor.papel` + `actor.professional_id` a partir do `Membership` ativo **antes** de qualquer
 > ação. Trocar de clínica troca esses valores. Nenhuma policy lê `clinic_id` do cliente — o
-> tenant vem do escopo da conexão (`strategy :context`, §2).
+> tenant ativo é o `clinic_id` do escopo, filtrado pelo Ash (`strategy :attribute`, §2).
 
 ```elixir
 # NAO-VERIFICADO: FilterCheck é autorizado pelas regras (ash.md), mas confirmar a
@@ -1392,9 +1377,16 @@ de forma/entrada → validation Ash** (atômica quando possível, `.claude/rules
 
 ## 9. Índices
 
+> **`clinic_id` primeiro (ADR-017).** Com tenancy por atributo, toda tabela por-tenant tem
+> `clinic_id`, e o Ash filtra por ele em **toda** query. Por isso os índices por-tenant devem
+> **liderar com `clinic_id`** (ex.: `(clinic_id, starts_at)`), tanto por performance quanto como
+> a mitigação #3 do [§2](#2-multitenancy--a-decisão). Índices de igualdade exata sobre chave
+> naturalmente única (ex.: `professional_id`, `cpf_hash`) já são seletivos, mas ganham `clinic_id`
+> à frente quando servem a filtros de listagem. Os exemplos abaixo mostram a forma-alvo.
+
 ```sql
--- Agenda por (profissional, tempo) — dentro do schema do tenant, sem clinic_id (§2).
-CREATE INDEX appointments_prof_starts ON appointments (professional_id, starts_at);
+-- Agenda por (clínica, profissional, tempo) — clinic_id lidera (ADR-017).
+CREATE INDEX appointments_clinic_prof_starts ON appointments (clinic_id, professional_id, starts_at);
 -- (a não-sobreposição em si é a exclusion constraint GiST appointments_no_overlap, 04 §7.1)
 
 -- Sessões de um pacote (pkgAppts [:330]).
@@ -1506,8 +1498,8 @@ comportamento das ações, mas as **colunas**:
    confirmada, `complete`/`no_show` migram de vez para `Attendance` e o slot perde `concluido`/
    `faltou` do enum `AppointmentStatus` (passa a `AttendanceStatus`). **Muda o enum do slot.**
 
-6. **Profissional em mais de uma clínica (ADR-003).** Com `strategy :context`, uma pessoa
-   que atende em duas clínicas tem **dois** `Professional` (um por schema), ligados por
-   `Membership.professional_id` (global). Se produto exigir uma visão consolidada
+6. **Profissional em mais de uma clínica (ADR-003).** No modelo por-tenant (`clinic_id`,
+   ADR-017), uma pessoa que atende em duas clínicas tem **dois** `Professional` (um por
+   `clinic_id`), ligados por `Membership.professional_id` (global). Se produto exigir uma visão consolidada
    cross-clínica do profissional, entra um `Person` global acima dos `Professional` de
    tenant. **Bloqueia** o desenho de `Accounts` — hoje resolvido pelo `Membership` mole.

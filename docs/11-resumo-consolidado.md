@@ -63,8 +63,9 @@ clínica", [ADR-012](00-decisoes.md)) foi **revertida**: adotamos o **modelo de 
 estilo Vercel** ([ADR-014](00-decisoes.md)). Um `User` global pertence a **vários** tenants,
 com papel isolado em cada; um profissional atende em **mais de uma clínica** e uma dona tem
 **mais de uma unidade**, trocando entre elas por um seletor. A RN-52 **volta para a v1**. O
-`strategy :context` do `01` **sobrevive** porque a identidade global é o `User` (schema
-público), não o `Professional` (por-schema, ligado via `Membership.professional_id`). Junto
+modelo funciona **independente da estratégia de storage** porque a identidade global é o
+`User` (schema público), não o `Professional` (por-tenant, ligado via `Membership.professional_id`).
+A estratégia concreta é `strategy :attribute` ([ADR-017](00-decisoes.md), após um começo em `:context`). Junto
 vieram [ADR-015](00-decisoes.md) (login Google + Magic Link, sem senha) e
 [ADR-016](00-decisoes.md) (papéis `owner·admin·profissional·recepcao`, ≥1 owner por tenant).
 
@@ -131,6 +132,7 @@ Travadas — só mudam por um novo ADR. Fonte: [00-decisoes.md](00-decisoes.md).
 | 002 | **Backend Elixir + Ash 3.x** sobre Phoenix, exposto como **AshJsonApi**. Ganha policies, field policies, AshCloak, AshPaperTrail, agregados no SQL. |
 | 003 | **SaaS multi-clínica** desde o 1º commit; toda entidade escopada a um tenant. Um profissional pode estar em várias clínicas — **confirmado na v1 pelo [ADR-014](00-decisoes.md)** (identidade global estilo Vercel; ADR-012 revertido). |
 | 014/015/016 | **Modelo de identidade Vercel:** `User` global multi-tenant, profissional/owner multi-clínica ([014](00-decisoes.md)); login **Google + Magic Link**, sem senha ([015](00-decisoes.md)); papéis `owner·admin·profissional·recepcao` c/ capabilities embarcadas e **≥1 owner por tenant** ([016](00-decisoes.md)). |
+| 017 | **Tenancy por atributo (`clinic_id`)**, não schema-por-tenant ([017](00-decisoes.md)). Uma tabela por recurso; Ash filtra por `clinic_id`. Some `manage_tenant`/`tenant_migrations`/`all_tenants`. Custo: isolamento lógico (mitigado por teste de IDOR no CI + `clinic_id` nos índices). Ganho: migration simples + visão consolidada viável. |
 | 004 | **Agenda em tempo real** via Phoenix Channels + PubSub alimentado por notificações do Ash. Cliente Svelte usa o pacote `phoenix` direto. |
 | 005 | **SvelteKit como BFF**, nunca cliente de banco. `load`/`actions` chamam a API Phoenix portando o cookie de sessão. |
 | 006 | **Svelte 5 (runes) + TypeScript**, adapter-node. Port React→Svelte não é mecânico. |
@@ -218,6 +220,11 @@ sincronizados.
 profissional/owner multi-clínica), ADR-015 (Google + Magic Link, sem senha), ADR-016
 (papéis + owner obrigatório). Docs `00`, `01`, `06`, `09`, `10`, `11`, `12`, `04`, `08`
 sincronizados.
+
+**Reconciliado em 2026-07-12 (tenancy):** ADR-017 troca `strategy :context` (schema-por-tenant)
+por `strategy :attribute` (coluna `clinic_id`) enquanto só existia o `Professional` como recurso
+por-tenant. Docs `00 §2/ADR-017`, `01 §2/§9`, `04 §7.1`, `05 §5.4/§7.2`, `06 §6`, `08`, `11`
+sincronizados; código materializado e verificado.
 
 **Ainda em aberto:**
 

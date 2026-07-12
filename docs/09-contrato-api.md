@@ -899,7 +899,7 @@ e **Magic Link** (ADR-015). O fluxo:
 - **Troca de tenant:** `POST /auth/switch-tenant` `{clinic_id}` → `200`, grava o tenant ativo
   na sessão (valida que existe um `Membership` ativo do usuário naquela clínica) e devolve o
   novo `/auth/me`. Nenhuma leitura resolve `clinic_id` pelo corpo/URL fora deste ponto de
-  sessão — o tenant das queries vem do escopo (`strategy :context`).
+  sessão — o tenant das queries é o `clinic_id` do escopo, filtrado pelo Ash (`strategy :attribute`, ADR-017).
 - `GET /realtime/token` → `{token, expires_at}`. O BFF pede este **token efêmero**
   (Phoenix.Token, minutos de vida) em nome da sessão e o entrega ao cliente no `load`. É só
   esse token que vai para o JS e para o WebSocket. Escopo do token: o **`clinic_id` ativo** e o

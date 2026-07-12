@@ -45,7 +45,7 @@ Status possíveis: `Aceita` · `Proposta` · `Substituída por ADR-nn`
 
 **Contexto.** O protótipo assume clínica única: `hours`, `holidays` e `settings` são singletons globais no estado. A sidebar, porém, já cita "Centro" como unidade.
 
-**Decisão.** Toda entidade nasce escopada a uma **clínica (tenant)**. A estratégia concreta de multitenancy do AshPostgres (`strategy :context` com schema-por-tenant vs. `strategy :attribute` com `clinic_id`) está detalhada e recomendada em [01-dominio-ash.md](01-dominio-ash.md).
+**Decisão.** Toda entidade nasce escopada a uma **clínica (tenant)**. A estratégia concreta de multitenancy do AshPostgres é **`strategy :attribute` (coluna `clinic_id`)** — ver [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant) e [01-dominio-ash.md §2](01-dominio-ash.md).
 
 **Justificativa.** Adicionar tenancy depois de existirem dados de saúde em produção é caro e arriscado: exige migração de dados sensíveis, reescrita de todas as policies e revisão de todo índice. Fazer agora custa pouco.
 
@@ -207,13 +207,13 @@ Dark mode continua por `data-theme` (`@custom-variant dark`), não por `class` n
 3. **`Professional` continua por-schema.** Uma profissional que atende em 2 clínicas é **2 registros `Professional`** (um em cada schema), ligados ao mesmo `User` **através do `Membership`** (`Membership.professional_id`, UUID mole por clínica). Agenda, disponibilidade e preço são **por-clínica** — o que é correto, pois variam de fato entre unidades.
 4. **Tenant ativo na sessão.** A sessão guarda qual clínica está ativa. O `tenant` do Ash, o `actor.papel` e o `actor.professional_id` derivam **todos** do `Membership` ativo. Trocar de clínica = trocar o membership ativo (ver [09 §8](09-contrato-api.md)).
 
-**Justificativa.** A objeção do ADR-012 era o custo de "identidade de profissional global entre schemas". Ela **desaparece** quando a identidade global é o `User` (público) e o `Professional` permanece por-schema: não há FK entre schemas, não há dado de saúde compartilhado, e `strategy :context` fica **intacta** com todas as suas vantagens de isolamento LGPD ([01 §2](01-dominio-ash.md)). O modelo Vercel resolve, de brinde, a resolução de escopo do actor.
+**Justificativa.** A objeção do ADR-012 era o custo de "identidade de profissional global entre tenants". Ela **desaparece** quando a identidade global é o `User` (público) e o `Professional` permanece **por-tenant**: a mesma pessoa é um `Professional` distinto por clínica, ligado ao `User` pelo `Membership`. Isso vale **independente da estratégia de storage** — o modelo Vercel resolve, de brinde, a resolução de escopo do actor. *(A estratégia concreta era `strategy :context` quando este ADR foi escrito; foi trocada para `strategy :attribute` no [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant).)*
 
 **Consequências.**
 - **RN-52 volta para a v1.** O vínculo profissional↔clínica passa a ser **por-membership**, não por-pessoa.
-- **`strategy :context` mantida** ([01 §2](01-dominio-ash.md)); a exclusion constraint da agenda continua sem `clinic_id` (cada schema tem sua tabela `appointments`).
+- A escolha de storage do tenant é do [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant) (`strategy :attribute`, coluna `clinic_id`); a exclusion constraint da agenda continua sem `clinic_id` porque `professional_id` é único globalmente ([01 §2](01-dominio-ash.md)).
 - **`/auth/me` devolve a lista de memberships/tenants + o tenant ativo**, e existe um endpoint de **troca de tenant** ([09 §8](09-contrato-api.md)).
-- **Sem visão consolidada cross-tenant na v1.** Relatórios/faturamento agregando várias unidades de uma mesma dona atravessariam schemas — fica para a **v2** (ver "Decisões ainda em aberto").
+- **Visão consolidada cross-tenant** (relatórios/faturamento somando várias unidades de uma dona) fica **viável** com o [ADR-017](#adr-017--tenancy-por-atributo-clinic_id-em-vez-de-schema-por-tenant) (query normal por `clinic_id`), diferente do que o `:context` permitia.
 - **Multi-unidade *dentro* de um único tenant** (uma clínica com vários endereços que compartilham pacientes/equipe) continua **v2** e é coisa diferente: aqui cada unidade é um tenant **isolado**.
 
 ---
@@ -261,6 +261,25 @@ Dark mode continua por `data-theme` (`@custom-variant dark`), não por `class` n
 - O enum `Movimento.Accounts.Role` ([01 §3](01-dominio-ash.md)) passa a `[:owner, :admin, :profissional, :recepcao]`.
 - As policies ([01 §7](01-dominio-ash.md), [06 §6](06-seguranca-e-lgpd.md)) ganham `owner` (bypass acima de `admin`) e derivam o papel do **`Membership` do tenant ativo** ([ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel)).
 - Nova invariante em [01 §8](01-dominio-ash.md): "≥1 owner por tenant".
+
+---
+
+## ADR-017 — Tenancy por atributo (`clinic_id`) em vez de schema-por-tenant
+
+**Status:** Aceita (2026-07-12) · **Supersede:** a estratégia `strategy :context` de [01 §2](01-dominio-ash.md) · **Ajusta:** [ADR-003](#adr-003--saas-multi-clínica-desde-o-primeiro-commit), [ADR-014](#adr-014--identidade-global-multi-tenant-modelo-vercel)
+
+**Contexto.** A v1 começou em **schema-por-tenant** (`strategy :context`): cada clínica num schema Postgres `tenant_<uuid>`, escolhido em [01 §2](01-dominio-ash.md) pelo isolamento físico do dado de saúde. A fatia de fundação já materializou isso (Clinic com `manage_tenant`, `Professional` per-schema, `Repo.all_tenants/0`). Na prática, dois fatores pesaram contra: **(a)** o custo operacional de migrations em N schemas, e **(b)** o produto quer **visão consolidada** para a dona multi-unidade (ADR-014), que com schema-por-tenant atravessa schemas e foi empurrada para a v2.
+
+**Decisão.** Migrar para **`strategy :attribute` com a coluna `clinic_id`**. Recursos por-tenant (`Professional` e os futuros `Appointment`, `Patient`, etc.) viram **uma tabela única** com `clinic_id`; o Ash injeta `WHERE clinic_id = <tenant ativo>` em toda query e preenche `clinic_id` na criação. `User`, `Clinic` e `Membership` seguem **globais** (schema público, sem `multitenancy`). Some `manage_tenant`, `Repo.all_tenants/0` e `tenant_migrations`.
+
+**Justificativa.** O único ponto fraco real do `:attribute` (isolamento lógico, não físico) é **contido pelo Ash**, que auto-filtra e exige tenant nos recursos por-atributo — o modo de falha "esqueci o `WHERE`" do SQL cru quase não existe. Em troca, migrations ficam triviais e a visão consolidada cross-tenant fica viável na v1. **A troca foi feita quando só existia um recurso por-tenant (`Professional`)** — custo quase zero; depois de `Appointment`/`Patient` existirem seria caro.
+
+**Consequências.**
+- [01 §2](01-dominio-ash.md) reescrito: a decisão passa a ser `:attribute`; a tabela comparativa foi mantida com o veredito invertido.
+- **Código:** `Professional` usa `strategy :attribute, attribute :clinic_id` + `belongs_to :clinic`; `Clinic` sem `manage_tenant`; `Repo` sem `all_tenants/0`; um único conjunto de migrations no schema público.
+- **Exclusion constraint da agenda** ([04 §7.1](04-arquitetura.md)): continua **sem** `clinic_id`, porque `Professional` é por-tenant e `professional_id` é único globalmente; `clinic_id` na constraint é defesa-em-profundidade **opcional**.
+- **Custo LGPD:** isolamento vira lógico. Mitigação obrigatória (vira checklist em [06 §6](06-seguranca-e-lgpd.md)): **(1)** nunca ler dado por-tenant fora do Ash; **(2)** teste de IDOR no CI (injetar `clinic_id` não vaza); **(3)** `clinic_id` como 1ª coluna dos índices sensíveis ([01 §9](01-dominio-ash.md)).
+- **Observabilidade** ([05](05-observabilidade-e-producao.md)): `clinic_id` é atributo/coluna — anexar ao span do OTel fica direto (some a complicação do `search_path`).
 
 ---
 

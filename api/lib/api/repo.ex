@@ -1,13 +1,6 @@
 defmodule Api.Repo do
   use AshPostgres.Repo, otp_app: :api
 
-  # Lista os schemas de tenant para rodar as tenant migrations em todos eles
-  # (ADR-014, strategy :context). Um schema por clínica: `tenant_<uuid>`.
-  def all_tenants do
-    import Ecto.Query, only: [from: 2]
-    all(from(c in "clinics", select: fragment("? || ?", "tenant_", type(c.id, :string))))
-  end
-
   def min_pg_version do
     %Version{major: 16, minor: 0, patch: 0}
   end

@@ -1,4 +1,4 @@
-defmodule Api.Repo.Migrations.AddAccountsAndTenancy do
+defmodule Api.Repo.Migrations.SwitchToAttributeTenancy do
   @moduledoc """
   Updates resources based on their most recent snapshots.
 
@@ -25,6 +25,23 @@ defmodule Api.Repo.Migrations.AddAccountsAndTenancy do
     end
 
     create unique_index(:users, [:email], name: "users_unique_email_index")
+
+    create table(:professionals, primary_key: false) do
+      add(:id, :uuid, null: false, default: fragment("uuid_generate_v7()"), primary_key: true)
+      add(:nome, :text, null: false)
+
+      add(:inserted_at, :utc_datetime_usec,
+        null: false,
+        default: fragment("(now() AT TIME ZONE 'utc')")
+      )
+
+      add(:updated_at, :utc_datetime_usec,
+        null: false,
+        default: fragment("(now() AT TIME ZONE 'utc')")
+      )
+
+      add(:clinic_id, :uuid, null: false)
+    end
 
     create table(:memberships, primary_key: false) do
       add(:id, :uuid, null: false, default: fragment("uuid_generate_v7()"), primary_key: true)
@@ -67,6 +84,18 @@ defmodule Api.Repo.Migrations.AddAccountsAndTenancy do
 
     create table(:clinics, primary_key: false) do
       add(:id, :uuid, null: false, default: fragment("uuid_generate_v7()"), primary_key: true)
+    end
+
+    alter table(:professionals) do
+      modify(
+        :clinic_id,
+        references(:clinics,
+          column: :id,
+          name: "professionals_clinic_id_fkey",
+          type: :uuid,
+          prefix: "public"
+        )
+      )
     end
 
     alter table(:memberships) do
@@ -118,6 +147,12 @@ defmodule Api.Repo.Migrations.AddAccountsAndTenancy do
       modify(:clinic_id, :uuid)
     end
 
+    drop(constraint(:professionals, "professionals_clinic_id_fkey"))
+
+    alter table(:professionals) do
+      modify(:clinic_id, :uuid)
+    end
+
     drop(table(:clinics))
 
     drop(constraint(:memberships, "memberships_user_id_fkey"))
@@ -135,6 +170,8 @@ defmodule Api.Repo.Migrations.AddAccountsAndTenancy do
     )
 
     drop(table(:memberships))
+
+    drop(table(:professionals))
 
     drop_if_exists(unique_index(:users, [:email], name: "users_unique_email_index"))
 

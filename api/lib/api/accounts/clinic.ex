@@ -10,16 +10,12 @@ defmodule Api.Accounts.Clinic do
     domain: Api.Accounts,
     data_layer: AshPostgres.DataLayer
 
-  # A Clinic é o registry de tenants: a tabela em si é GLOBAL (schema público, sem
-  # bloco `multitenancy`). O `manage_tenant` abaixo é o que provisiona o schema
-  # `tenant_<uuid>` (e roda as tenant migrations nele) quando uma clínica é criada.
+  # A Clinic é o registry de tenants (schema público). Com tenancy por atributo
+  # (ADR-017), a clínica não provisiona schema nenhum — os recursos por-tenant
+  # carregam a coluna `clinic_id` apontando para aqui.
   postgres do
     table "clinics"
     repo Api.Repo
-
-    manage_tenant do
-      template ["tenant_", :id]
-    end
   end
 
   actions do
