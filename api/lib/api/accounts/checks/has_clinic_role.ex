@@ -39,7 +39,9 @@ defmodule Api.Accounts.Checks.HasClinicRole do
   end
 
   defp filter_roles(query, :any), do: query
-  defp filter_roles(query, roles) when is_list(roles), do: Ash.Query.filter(query, papel in ^roles)
+
+  defp filter_roles(query, roles) when is_list(roles),
+    do: Ash.Query.filter(query, papel in ^roles)
 
   defp clinic_id(%{subject: subject}, opts) do
     case Keyword.get(opts, :clinic_from, :tenant) do

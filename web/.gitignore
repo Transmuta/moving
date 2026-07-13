@@ -9,6 +9,15 @@ node_modules
 /build
 .claude-playwright
 
+# Playwright
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+
+# Cobertura (Vitest)
+/coverage
+
 # OS
 .DS_Store
 Thumbs.db

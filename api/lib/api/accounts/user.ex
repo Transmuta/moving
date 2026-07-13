@@ -55,27 +55,6 @@ defmodule Api.Accounts.User do
     end
   end
 
-  policies do
-    # O próprio AshAuthentication precisa operar o recurso (upsert por token, lookup
-    # por subject) sem passar por policy de negócio.
-    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
-      authorize_if always()
-    end
-
-    # Entrypoints públicos de autenticação (ADR-015): a segurança está no token/OAuth
-    # validado dentro da ação, não numa policy. Chamados direto pelo code interface
-    # (controller), eles não recebem a flag de "interaction", então liberamos aqui.
-    policy action([:request_magic_link, :sign_in_with_magic_link, :register_with_google]) do
-      authorize_if always()
-    end
-
-    # Um usuário só enxerga a si mesmo. A visão multi-tenant (memberships) é filtrada
-    # pelas policies de `Membership` (ponto 4).
-    policy action_type(:read) do
-      authorize_if expr(id == ^actor(:id))
-    end
-  end
-
   # Global: o User é a identidade única e vive no schema público (sem `multitenancy`).
   postgres do
     table "users"
@@ -156,6 +135,27 @@ defmodule Api.Accounts.User do
       end
 
       run AshAuthentication.Strategy.MagicLink.Request
+    end
+  end
+
+  policies do
+    # O próprio AshAuthentication precisa operar o recurso (upsert por token, lookup
+    # por subject) sem passar por policy de negócio.
+    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
+      authorize_if always()
+    end
+
+    # Entrypoints públicos de autenticação (ADR-015): a segurança está no token/OAuth
+    # validado dentro da ação, não numa policy. Chamados direto pelo code interface
+    # (controller), eles não recebem a flag de "interaction", então liberamos aqui.
+    policy action([:request_magic_link, :sign_in_with_magic_link, :register_with_google]) do
+      authorize_if always()
+    end
+
+    # Um usuário só enxerga a si mesmo. A visão multi-tenant (memberships) é filtrada
+    # pelas policies de `Membership` (ponto 4).
+    policy action_type(:read) do
+      authorize_if expr(id == ^actor(:id))
     end
   end
 

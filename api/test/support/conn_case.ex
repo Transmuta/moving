@@ -31,7 +31,12 @@ defmodule ApiWeb.ConnCase do
     end
   end
 
-  setup _tags do
+  setup tags do
+    # Sandbox transacional: testes de controller que falam com o domínio (sign-in,
+    # memberships) precisam do banco. `shared` fora de :async para que o processo da
+    # requisição (dispatch síncrono no processo do teste) enxergue a mesma conexão.
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Api.Repo, shared: not tags[:async])
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

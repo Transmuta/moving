@@ -40,7 +40,10 @@ defmodule Api.Accounts.Membership do
       argument :user_id, :uuid, allow_nil?: false
       argument :clinic_id, :uuid, allow_nil?: false
       get? true
-      filter expr(user_id == ^arg(:user_id) and clinic_id == ^arg(:clinic_id) and status == :ativo)
+
+      filter expr(
+               user_id == ^arg(:user_id) and clinic_id == ^arg(:clinic_id) and status == :ativo
+             )
     end
 
     # Convite: cria pendente; ativa no primeiro acesso (magic link/Google, ADR-015).

@@ -28,7 +28,10 @@ defmodule Api.Accounts do
       define :list_memberships, action: :read
       # Resolução do scope da sessão (ADR-014):
       define :list_active_memberships, action: :active_for_user, args: [:user_id]
-      define :get_active_membership, action: :active_for_user_and_clinic, args: [:user_id, :clinic_id]
+
+      define :get_active_membership,
+        action: :active_for_user_and_clinic,
+        args: [:user_id, :clinic_id]
     end
 
     resource Api.Accounts.Token

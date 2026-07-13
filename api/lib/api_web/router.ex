@@ -55,7 +55,7 @@ defmodule ApiWeb.Router do
   # `ApiWeb.AuthStrategyController.success/4` / `failure/3`.
   scope "/" do
     pipe_through :oauth
-    auth_routes ApiWeb.AuthStrategyController, Api.Accounts.User, path: "/api/auth/strategy"
+    auth_routes(ApiWeb.AuthStrategyController, Api.Accounts.User, path: "/api/auth/strategy")
   end
 
   # Preview da caixa de e-mail em dev: veja os magic links em /dev/mailbox.
