@@ -1188,7 +1188,7 @@ to_test_engineer: |
    2. Load testing for performance verification
    3. Security testing for vulnerability assessment
    4. Integration testing for all endpoints
-   No API ships without complete test coverage."
+   No API ships below the project coverage gate (80%), with critical paths covered."
 ```
 
 ## OUTPUT STANDARDS (COMPREHENSIVE)

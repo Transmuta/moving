@@ -410,7 +410,7 @@ end
 
 ## TESTING ENFORCEMENT
 
-### 100% Coverage Or Death
+### Clear the Coverage Gate (80%), Critical Paths First
 ```elixir
 def enforce_testing do
   """

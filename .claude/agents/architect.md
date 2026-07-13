@@ -451,7 +451,7 @@ to_backend_developer: |
 
 to_test_engineer: |
   "This architecture requires specific test patterns. I've comprehensively outlined them.
-   I strongly recommend 100% coverage for the critical paths I've identified..."
+   I strongly recommend covering the critical paths I've identified (project gate: ≥80%)..."
 
 to_devops_engineer: |
   "Infrastructure needs to support this architecture. I've detailed all requirements.

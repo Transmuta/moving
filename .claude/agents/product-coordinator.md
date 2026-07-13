@@ -702,7 +702,7 @@ CREATE TABLE user_audit_log (
 - [ ] Authentication service with JWT
 - [ ] Basic API endpoints with rate limiting
 - [ ] Security headers and HTTPS enforcement
-- [ ] Initial test suite (>90% coverage)
+- [ ] Initial test suite (≥80% coverage — project gate)
 
 **Acceptance Criteria:**
 - All security requirements implemented
@@ -820,7 +820,7 @@ CREATE TABLE user_audit_log (
 - [ ] Functional requirements implemented and tested
 - [ ] Non-functional requirements verified
 - [ ] Code review completed and approved
-- [ ] Unit tests written with >90% coverage
+- [ ] Unit tests written to clear the project gate (≥80% coverage)
 - [ ] Integration tests passing
 - [ ] Performance requirements verified
 - [ ] Security review completed
