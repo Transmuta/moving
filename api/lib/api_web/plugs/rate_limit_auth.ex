@@ -21,12 +21,15 @@ defmodule ApiWeb.Plugs.RateLimitAuth do
 
   alias Api.RateLimiter
 
-  # Janela e limites. ATENÇÃO: o Hammer quer `scale` em **milissegundos** (`hit(key, scale_ms,
-  # limite)`), não em segundos — passar 60 aqui daria uma janela de 60ms (bug que só a app viva
-  # pegou; o teste in-process passava por caber nos 60ms). `:timer.minutes(1)` = 60_000 ms.
-  @scale :timer.minutes(1)
+  # Janelas e limites. ATENÇÃO: o Hammer quer `scale` em **milissegundos** (`hit(key, scale_ms,
+  # limite)`), não em segundos — passar 60 daria uma janela de 60ms (bug que só a app viva pegou;
+  # o teste in-process passava por caber nos 60ms). `:timer.minutes/1` = minutos em ms.
+  #   e-mail: 5 pedidos / 1 min (bombardear um alvo)
+  #   IP:     10 pedidos / 2 min (um IP disparando para vários e-mails)
+  @email_scale :timer.minutes(1)
   @email_limit 5
-  @ip_limit 20
+  @ip_scale :timer.minutes(2)
+  @ip_limit 10
 
   @impl true
   def init(opts), do: opts
@@ -54,8 +57,14 @@ defmodule ApiWeb.Plugs.RateLimitAuth do
     ip = client_ip(conn)
 
     case magic_link_email(conn) do
-      nil -> [{"ml:ip:" <> ip, @scale, @ip_limit}]
-      email -> [{"ml:email:" <> email, @scale, @email_limit}, {"ml:ip:" <> ip, @scale, @ip_limit}]
+      nil ->
+        [{"ml:ip:" <> ip, @ip_scale, @ip_limit}]
+
+      email ->
+        [
+          {"ml:email:" <> email, @email_scale, @email_limit},
+          {"ml:ip:" <> ip, @ip_scale, @ip_limit}
+        ]
     end
   end
 
@@ -66,7 +75,7 @@ defmodule ApiWeb.Plugs.RateLimitAuth do
         _ -> "ip:" <> client_ip(conn)
       end
 
-    [{"auth:" <> conn.request_path <> ":" <> id, @scale, @ip_limit}]
+    [{"auth:" <> conn.request_path <> ":" <> id, @ip_scale, @ip_limit}]
   end
 
   defp magic_link_email(conn) do

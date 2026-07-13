@@ -145,8 +145,8 @@ divisão do scope (as 8 seguem sob `:authenticated`).
 > - **Rate limit por IP — ✅ fechado:** o BFF agora repassa o IP real do cliente
 >   (`X-Forwarded-For` via `getClientAddress()`/`ADDRESS_HEADER=Fly-Client-IP`), e o plug lê
 >   `Fly-Client-IP` (público, autoritativo do Fly) → `X-Forwarded-For` (interno, do BFF) →
->   `remote_ip`. O key por e-mail (5/min) barra bombardear um alvo; o por IP (20/min) barra um
->   IP disparando para muitos e-mails.
+>   `remote_ip`. O key por e-mail (5/min) barra bombardear um alvo; o por IP (10 a cada 2 min)
+>   barra um IP disparando para muitos e-mails.
 > - **Lição do smoke test:** o `scale` do Hammer é em **milissegundos**, não segundos — o plug
 >   estava com janela de 60ms (o teste in-process passava por caber nela; só o `curl` no release
 >   de prod, com latência de rede, expôs). Corrigido para `:timer.minutes(1)` e **provado no

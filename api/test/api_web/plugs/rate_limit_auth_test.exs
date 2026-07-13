@@ -12,28 +12,31 @@ defmodule ApiWeb.Plugs.RateLimitAuthTest do
     :ok
   end
 
-  test "magic-link: 5 pedidos passam e o 6º do mesmo e-mail é barrado (429)", %{conn: conn} do
-    email = "flood-#{System.unique_integer([:positive])}@example.com"
-
-    for _ <- 1..5 do
-      resp = post(build_conn(), ~p"/api/auth/magic-link", %{email: email})
-      assert json_response(resp, 200) == %{"ok" => true}
-    end
-
-    barrado = post(conn, ~p"/api/auth/magic-link", %{email: email})
-    assert json_response(barrado, 429) == %{"error" => "rate_limited"}
+  # IP fixo e próprio por teste (via XFF) para o cap por IP (10/2min) não colidir entre testes.
+  defp post_ml(ip, email) do
+    build_conn()
+    |> put_req_header("x-forwarded-for", ip)
+    |> post(~p"/api/auth/magic-link", %{email: email})
   end
 
-  test "o limite é por e-mail: um endereço novo não herda a contagem do outro", %{conn: conn} do
+  test "magic-link: 5 pedidos passam e o 6º do mesmo e-mail é barrado (429)", %{conn: _conn} do
+    email = "flood-#{System.unique_integer([:positive])}@example.com"
+    ip = "198.51.100.1"
+
+    for _ <- 1..5, do: assert(json_response(post_ml(ip, email), 200) == %{"ok" => true})
+
+    assert json_response(post_ml(ip, email), 429) == %{"error" => "rate_limited"}
+  end
+
+  test "o limite é por e-mail: um endereço novo não herda a contagem do outro", %{conn: _conn} do
+    ip = "198.51.100.2"
     quente = "quente-#{System.unique_integer([:positive])}@example.com"
-    for _ <- 1..5, do: post(build_conn(), ~p"/api/auth/magic-link", %{email: quente})
-    assert post(conn, ~p"/api/auth/magic-link", %{email: quente}).status == 429
+
+    for _ <- 1..5, do: post_ml(ip, quente)
+    assert post_ml(ip, quente).status == 429
 
     novo = "novo-#{System.unique_integer([:positive])}@example.com"
-
-    assert json_response(post(conn, ~p"/api/auth/magic-link", %{email: novo}), 200) == %{
-             "ok" => true
-           }
+    assert json_response(post_ml(ip, novo), 200) == %{"ok" => true}
   end
 
   test "brute force no mesmo e-mail de IPs diferentes: o limite por e-mail barra mesmo assim", %{
@@ -56,6 +59,33 @@ defmodule ApiWeb.Plugs.RateLimitAuthTest do
       build_conn()
       |> put_req_header("x-forwarded-for", "10.0.0.99")
       |> post(~p"/api/auth/magic-link", %{email: email})
+
+    assert json_response(barrado, 429) == %{"error" => "rate_limited"}
+  end
+
+  test "limite por IP: 10 pedidos do mesmo IP (e-mails diferentes) passam, o 11º barra", %{
+    conn: _conn
+  } do
+    ip = "192.0.2.50"
+
+    # E-mails sempre diferentes: a chave de e-mail nunca conta 2x o mesmo; quem barra é o IP.
+    for _ <- 1..10 do
+      email = "ipcap-#{System.unique_integer([:positive])}@example.com"
+
+      resp =
+        build_conn()
+        |> put_req_header("x-forwarded-for", ip)
+        |> post(~p"/api/auth/magic-link", %{email: email})
+
+      assert json_response(resp, 200) == %{"ok" => true}
+    end
+
+    barrado =
+      build_conn()
+      |> put_req_header("x-forwarded-for", ip)
+      |> post(~p"/api/auth/magic-link", %{
+        email: "ipcap-#{System.unique_integer([:positive])}@example.com"
+      })
 
     assert json_response(barrado, 429) == %{"error" => "rate_limited"}
   end
