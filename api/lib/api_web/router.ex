@@ -22,6 +22,11 @@ defmodule ApiWeb.Router do
     plug :fetch_session
   end
 
+  # Rate limiting dos endpoints de auth (auditoria doc 13, causa A). No-op fora de produção.
+  pipeline :rate_limited do
+    plug ApiWeb.Plugs.RateLimitAuth
+  end
+
   # AshJsonApi (recursos do domínio) — sob :authenticated, então cada request já chega
   # com actor e `clinic_id` (tenant) resolvidos do escopo, nunca do corpo/URL (09 §8).
   scope "/api/json" do
@@ -34,17 +39,24 @@ defmodule ApiWeb.Router do
     forward "/", ApiWeb.AshJsonApiRouter
   end
 
+  # Endpoints de auth com rate limit (auditoria doc 13, causa A): os que geram e-mail/token
+  # ou trocam de tenant. No-op fora de produção.
+  scope "/api", ApiWeb do
+    pipe_through [:api, :authenticated, :rate_limited]
+
+    # Autenticação sem senha (ADR-015, contrato 09 §8).
+    post "/auth/magic-link", AuthController, :request_magic_link
+    get "/auth/google", AuthController, :google
+    post "/auth/switch-tenant", AuthController, :switch_tenant
+  end
+
   scope "/api", ApiWeb do
     pipe_through [:api, :authenticated]
 
     get "/health", HealthController, :show
 
-    # Autenticação sem senha (ADR-015, contrato 09 §8).
-    post "/auth/magic-link", AuthController, :request_magic_link
     get "/auth/magic-link/callback", AuthController, :magic_link_callback
-    get "/auth/google", AuthController, :google
     get "/auth/me", AuthController, :me
-    post "/auth/switch-tenant", AuthController, :switch_tenant
     delete "/auth/sign-out", AuthController, :sign_out
 
     # Token efêmero de WebSocket (ADR-014, 09 §8).

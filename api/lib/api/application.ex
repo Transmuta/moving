@@ -11,6 +11,9 @@ defmodule Api.Application do
       ApiWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:api, :dns_cluster_query) || :ignore},
       Api.Repo,
+      # Rate limiter (Hammer/ETS). Sobe em todos os ambientes; a enforcement é gated a prod
+      # no plug (auditoria doc 13, causa A).
+      {Api.RateLimiter, [clean_period: :timer.minutes(1)]},
       {Phoenix.PubSub, name: Api.PubSub},
       # Start a worker by calling: Api.Worker.start_link(arg)
       # {Api.Worker, arg},

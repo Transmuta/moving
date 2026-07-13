@@ -13,7 +13,14 @@
 	<div class="mb-8 flex items-center justify-between">
 		<Logo />
 		{#if me}
-			<a href="/auth/sign-out" class="text-[13px] font-semibold text-muted hover:text-ink">Sair</a>
+			<form method="POST" action="/auth/sign-out">
+				<button
+					type="submit"
+					class="text-[13px] font-semibold text-muted hover:text-ink"
+				>
+					Sair
+				</button>
+			</form>
 		{/if}
 	</div>
 
@@ -46,13 +53,4 @@
 			</div>
 		</div>
 	{/if}
-
-	<!-- Prova do pipeline (browser → BFF → API como movimento_app → Postgres). -->
-	<div class="mt-8 text-[12px] text-faint">
-		{#if data.error}
-			<p class="text-danger">⚠ {data.error}</p>
-		{:else}
-			<p>Pipeline OK · {data.pings.length} ping(s) via Ash JSON:API</p>
-		{/if}
-	</div>
 </main>

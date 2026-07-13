@@ -18,5 +18,16 @@ defmodule Api.Accounts.UserIdentity do
   postgres do
     table "user_identities"
     repo Api.Repo
+
+    # FK sem índice + sem on_delete (auditoria doc 13, causas C/D): indexa `user_id` (lookup
+    # por usuário e checagem de cascata) e faz a identidade morrer junto com o `User` — antes
+    # o RESTRICT bloqueava apagar um usuário que tivesse login Google.
+    references do
+      reference :user, on_delete: :delete
+    end
+
+    custom_indexes do
+      index [:user_id]
+    end
   end
 end

@@ -50,6 +50,7 @@ defmodule Api.MixProject do
   defp deps do
     [
       {:picosat_elixir, "~> 0.2"},
+      {:hammer, "~> 7.0"},
       {:ash_authentication, "~> 4.0"},
       {:ash_authentication_phoenix, "~> 2.0"},
       {:swoosh, "~> 1.16"},

@@ -96,14 +96,58 @@ porta aberta para o próximo recurso do `Meta`.
 
 ---
 
-## 4. O que foi corrigido
+## 4. O que foi corrigido (rodadas 3–5)
 
-**Nada** — a pedido, esta passada é só caça (rodadas 1 e 2). Todos os achados vão para o
-handoff abaixo.
+Consertado numa segunda passada, na ordem segurança → performance → refatoração. Cada item traz
+a **re-sonda da rodada 5** provando o conserto na app rodando + o teste que ficou verde. Suíte
+final: **49 testes, 0 falhas**; `mix compile --warnings-as-errors` limpo; `svelte-check` 0/0.
+
+> Decisões suas nesta passada: **remover o `Ping` inteiro** (recurso + rota + tabela + demo do
+> web) e **adicionar rate limiting agora, só-prod, com janela deslizante**.
+
+| Causa | Conserto | Re-sonda (rodada 5) |
+|---|---|---|
+| **B** | `Api.Meta.Ping` + rota + tabela `pings` removidos (migration `drop_pings_scaffold`, reversível); demo de pings tirado do web. | `GET/POST /api/json/pings` → **404** (era 200 público). `to_regclass('pings')` → vazio. |
+| **A** | `Hammer` (ETS, **sliding window**) + `ApiWeb.Plugs.RateLimitAuth` nos endpoints de auth, por e-mail **e** IP; gated a prod (`config :api, rate_limit_enabled` no `prod.exs`). | Teste `rate_limit_auth_test`: 6º pedido do mesmo e-mail → **429**. Flood no dev segue **200** (só-prod, por design). |
+| **C** | `custom_indexes` — `index [:clinic_id]` em `Professional`, `index [:user_id]` em `UserIdentity`. | `EXPLAIN` (como `movimento_app`) → **`Index Scan using professionals_clinic_id_index`** (era Seq Scan). |
+| **D** | `on_delete: :delete` em **ambas** as FKs de tenant: `UserIdentity.user` e `Professional.clinic` (esta via drop+add constraint em SQL cru — `modify` da coluna falha com `0A000`, pois `clinic_id` é usado na policy RLS). | `pg_get_constraintdef` → as duas com **`ON DELETE CASCADE`**; policy `tenant_isolation` intacta. |
+| **E** (parcial) | Web: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` no `hooks.server.ts`; **sign-out GET→POST** (fecha CSRF de logout, ganha a checagem de origem do SvelteKit). Cookie `secure` já é automático (default do SvelteKit fora de localhost). | `curl -D-` → 3 headers presentes; `GET /auth/sign-out` → **405**, `POST` → 303. |
+| **F** | `overrides: { cookie: "^0.7.0" }` no `web/package.json` (o kit ainda fixa `^0.6`). | `npm audit` → **0 vulnerabilidades**; cookie 0.7.2. |
+| **G** | `loadPings` removido do `+page.server.ts` (sobrou um `await` — o waterfall some junto com o Ping). | `GET /` (web) → **200**; `svelte-check` 0/0. |
+| **H** | Moduledocs mentirosos corrigidos: `Clinic` (não provisiona schema, ADR-017) e `Directory` (`:attribute`, não `:context`). | Leitura. |
+| **I** | `Api.web_app_url/0` como fonte única; removidas as 3 cópias (`AuthController`, `AuthStrategyController`, `Emails`). | Compila; 49 testes verdes. |
+| **J** (parcial) | Testes novos: `rate_limit_auth_test` (causa A) e `professional_tenant_isolation_test` (isolamento por atributo). | Verdes. RLS-layer não testável no sandbox (conecta como `postgres`/BYPASSRLS) — provada na mão na rodada 2. |
+
+**Auditoria do diff dos consertos (rodada 5):** a única superfície nova é o plug de rate limit
+— chave ETS por termo (sem injeção), entradas expiram em 60s + `clean_period` de 1min (ETS não
+cresce sem poda), enforcement só-prod. Nenhum endpoint novo; nenhuma rota de auth perdida na
+divisão do scope (as 8 seguem sob `:authenticated`).
+
+> Observado durante o conserto: o branch ganhou, em paralelo, um plug `VerifyTokenSubject`
+> (binding jti↔sub) e vários testes novos + Vitest/Playwright no web. Não encostei nesse
+> trabalho; os consertos convivem com ele (49 testes incluem os dois lados).
 
 ---
 
 ## 5. O que ficou para você (handoff)
+
+> **Status pós-consertos:** **A, B, C, D, E (headers+sign-out), F, G, H, I e J corrigidos**
+> (seção 4). Os itens A–J abaixo ficam como registro do que **era** o problema. Permanece
+> **aberto**, e só:
+>
+> - **CSP** — ✅ **feito** na fatia de prod (`svelte.config.js` `kit.csp`, `mode: auto`);
+>   provado no build (`content-security-policy: … script-src 'self' 'nonce-…'`). Ver
+>   [docs/17](17-deploy-fly.md).
+> - **Prod/deploy** — ✅ **feito** para o **Fly.io** (docs/17): `Dockerfile.prod` (release +
+>   adapter-node), `fly.toml` (api/web), `Api.Release` (migrations + role restrito), TLS/HSTS na
+>   edge do Fly. A API não é exposta ao browser exceto OAuth/WebSocket; o BFF fala com ela pela
+>   rede privada.
+> - **Aberto de verdade — rate limit por IP:** o magic link chega à API **pelo BFF**, então
+>   `remote_ip` é sempre o do web, não o do cliente. O key por **e-mail** funciona (limita o
+>   alvo); o key por **IP** só volta a valer quando o BFF repassar o IP do cliente
+>   (`X-Forwarded-For`) e o plug confiar nele. Handoff.
+> - **Decisões suas, já tomadas:** magic link segue `require_interaction? false` (um clique a
+>   mais não compensa); `professionals` **cascateia** ao apagar a clínica.
 
 Ordem sugerida: **segurança → performance → refatoração**, causa antes de sintoma.
 

@@ -18,7 +18,7 @@ defmodule Api.Accounts.Emails do
         email -> to_string(email)
       end
 
-    link = web_app_url() <> "/auth/callback?" <> URI.encode_query(token: token)
+    link = Api.web_app_url() <> "/auth/callback?" <> URI.encode_query(token: token)
 
     new()
     |> to(address)
@@ -35,6 +35,4 @@ defmodule Api.Accounts.Emails do
     """)
     |> Api.Mailer.deliver()
   end
-
-  defp web_app_url, do: Application.get_env(:api, :web_app_url, "http://localhost:5173")
 end

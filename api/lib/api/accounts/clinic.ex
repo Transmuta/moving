@@ -1,7 +1,8 @@
 defmodule Api.Accounts.Clinic do
   @moduledoc """
   A clínica — o **tenant** (ADR-014). Recurso global (schema público) que serve de
-  registry de tenants e provisiona o schema `tenant_<uuid>` via `manage_tenant`.
+  registry de tenants. Com tenancy por atributo (ADR-017) a clínica **não** provisiona
+  schema nenhum: os recursos por-tenant carregam a coluna `clinic_id` apontando para aqui.
   Reúne o que o protótipo mantinha como singletons globais (hours/settings), agora
   escopado por clínica.
   """

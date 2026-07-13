@@ -1,0 +1,52 @@
+# Imagem de produção da API (Phoenix + Ash) — build multi-stage → mix release.
+# Difere do Dockerfile.dev: compila um release imutável (não roda mix/phx.server), sem
+# ferramentas de build no runtime, como usuário não-root.
+
+# ---- build ----
+FROM elixir:1.18.4-otp-27 AS build
+
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends build-essential git \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mix local.hex --force && mix local.rebar --force
+
+ENV MIX_ENV=prod \
+    LANG=C.UTF-8
+
+WORKDIR /app
+
+# Deps primeiro (camada cacheável). Só as de prod.
+COPY mix.exs mix.lock ./
+RUN mix deps.get --only prod
+
+COPY config config
+RUN mix deps.compile
+
+COPY priv priv
+COPY lib lib
+RUN mix compile
+
+# runtime.exs vai junto no release; monta a config a partir das envs no boot.
+RUN mix release
+
+# ---- runtime ----
+FROM debian:bookworm-slim AS app
+
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV LANG=C.UTF-8 \
+    MIX_ENV=prod \
+    PHX_SERVER=true
+
+WORKDIR /app
+RUN useradd --create-home --uid 1000 app && chown app:app /app
+COPY --from=build --chown=app:app /app/_build/prod/rel/api ./
+
+USER app
+EXPOSE 4000
+
+# O serviço `migrate` do compose sobrescreve o comando para rodar `Api.Release.setup()`.
+CMD ["bin/api", "start"]

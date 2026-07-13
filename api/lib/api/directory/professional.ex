@@ -20,6 +20,19 @@ defmodule Api.Directory.Professional do
   postgres do
     table "professionals"
     repo Api.Repo
+
+    # Apagar a clínica apaga seus profissionais (decisão da auditoria doc 13, causa D):
+    # o tenant é a clínica; sem ela o Professional não tem sentido.
+    references do
+      reference :clinic, on_delete: :delete
+    end
+
+    # A RLS injeta `WHERE clinic_id = <tenant>` em TODA query desta tabela (ADR-018) — e
+    # `clinic_id` não é indexado por padrão. Sem este índice, cada leitura por-tenant é seq
+    # scan conforme a tabela cresce (auditoria doc 13, causa C).
+    custom_indexes do
+      index [:clinic_id]
+    end
   end
 
   actions do

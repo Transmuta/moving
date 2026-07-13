@@ -1,0 +1,32 @@
+# Fly.io — app da API (Phoenix/Ash). Deploy a partir de api/:  fly deploy
+# Ajuste `app`, `primary_region` e os hostnames conforme sua conta. Ver docs/17-deploy-fly.md.
+#
+# TLS/HSTS/redirect http→https são da edge do Fly (force_https), não do app — por isso o
+# `force_ssl` foi tirado do prod.exs (a API também é chamada internamente por http).
+
+app = "movimento-api"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile.prod"
+
+[deploy]
+  # Roda migrations (DDL, como owner via DATABASE_ADMIN_URL) + provisiona o role restrito
+  # ANTES de trocar as máquinas. Idempotente.
+  release_command = "/app/bin/api eval Api.Release.setup()"
+
+[env]
+  PHX_SERVER = "true"
+  PORT = "4000"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Sempre 1 quente: o BFF chama a API a cada request (evita cold start no caminho crítico).
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

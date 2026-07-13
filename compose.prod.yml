@@ -1,0 +1,74 @@
+# SMOKE TEST LOCAL das imagens de PRODUÇÃO — NÃO é o deploy.
+# O deploy real é no Fly.io (api/fly.toml + web/fly.toml, ver docs/17-deploy-fly.md); lá o TLS,
+# o proxy e os secrets são do Fly. Este arquivo só sobe as MESMAS imagens de prod localmente
+# para provar que o release compila, migra, cria o role restrito e serve — antes de dar deploy.
+#
+#   docker compose -p movimento-smoke -f compose.prod.yml up --build
+#   # API em http://localhost:4020, web em http://localhost:3020
+#
+# Use `-p movimento-smoke` para não colidir com o stack de dev (mesmo diretório).
+# Credenciais/segredos abaixo são LOCAIS e descartáveis — nunca use em produção.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: movimento_prod_smoke
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.prod
+    command: ["bin/api", "eval", "Api.Release.setup()"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_ADMIN_URL: "ecto://postgres:postgres@db/movimento_prod_smoke"
+      DATABASE_URL: "ecto://movimento_app:movimento_app@db/movimento_prod_smoke"
+      DATABASE_APP_USER: movimento_app
+      DATABASE_APP_PASSWORD: movimento_app
+      SECRET_KEY_BASE: "smoke-only-secret-key-base-com-64-bytes-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+      TOKEN_SIGNING_SECRET: "smoke-only-token-signing-secret"
+      PHX_SERVER: "false"
+    restart: "no"
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # Restrito (NOBYPASSRLS): o app fica sujeito à RLS, como em prod.
+      DATABASE_URL: "ecto://movimento_app:movimento_app@db/movimento_prod_smoke"
+      SECRET_KEY_BASE: "smoke-only-secret-key-base-com-64-bytes-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+      TOKEN_SIGNING_SECRET: "smoke-only-token-signing-secret"
+      PHX_HOST: "localhost"
+      WEB_APP_URL: "http://localhost:3020"
+      PHX_SERVER: "true"
+      PORT: "4000"
+    ports:
+      - "4020:4000"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.prod
+    depends_on:
+      - api
+    environment:
+      API_URL: "http://api:4000"
+      API_PUBLIC_ORIGIN: "http://localhost:4020"
+      ORIGIN: "http://localhost:3020"
+      PORT: "3000"
+    ports:
+      - "3020:3000"

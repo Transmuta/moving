@@ -1,0 +1,32 @@
+# Imagem de produção do web BFF (SvelteKit + adapter-node). Build → servidor Node standalone.
+# Difere do Dockerfile.dev: `vite build` (não `vite dev`), sem devDeps no runtime, não-root.
+
+# ---- build ----
+FROM node:22 AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+# Descarta devDeps para a imagem final.
+RUN npm prune --omit=dev
+
+# ---- runtime ----
+FROM node:22-slim AS app
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+WORKDIR /app
+COPY --from=build --chown=node:node /app/build ./build
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/package.json ./package.json
+
+USER node
+EXPOSE 3000
+
+# adapter-node: servidor em build/. Precisa de ORIGIN (CSRF/URLs) e API_URL (BFF→API) por env.
+CMD ["node", "build"]

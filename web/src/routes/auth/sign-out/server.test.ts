@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 
-import { GET } from './+server';
+import { POST } from './+server';
 import { SESSION_COOKIE } from '$lib/server/api';
 
 async function caught(fn: () => Promise<unknown>) {
@@ -24,10 +24,10 @@ function fakeEvent(fetchImpl?: ReturnType<typeof vi.fn>) {
 	};
 }
 
-describe('GET /auth/sign-out', () => {
+describe('POST /auth/sign-out', () => {
 	it('invalida na API (DELETE), apaga o cookie local e vai para /entrar', async () => {
 		const { event, fetch, del } = fakeEvent();
-		const r = await caught(() => GET(event));
+		const r = await caught(() => POST(event));
 
 		const [url, init] = fetch.mock.calls[0];
 		expect(url).toContain('/api/auth/sign-out');
@@ -40,7 +40,7 @@ describe('GET /auth/sign-out', () => {
 	it('mesmo se a API falhar, apaga o cookie e redireciona', async () => {
 		const failing = vi.fn().mockRejectedValue(new Error('down'));
 		const { event, del } = fakeEvent(failing);
-		const r = await caught(() => GET(event));
+		const r = await caught(() => POST(event));
 
 		expect(del).toHaveBeenCalledWith(SESSION_COOKIE, { path: '/' });
 		expect(r.location).toBe('/entrar');

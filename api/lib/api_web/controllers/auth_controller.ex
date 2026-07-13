@@ -32,12 +32,12 @@ defmodule ApiWeb.AuthController do
       {:ok, user} ->
         conn
         |> Helpers.store_in_session(user)
-        |> redirect(external: web_app_url())
+        |> redirect(external: Api.web_app_url())
 
       {:error, _reason} ->
         conn
         |> put_status(:unauthorized)
-        |> redirect(external: web_app_url() <> "/login?erro=magic_link")
+        |> redirect(external: Api.web_app_url() <> "/login?erro=magic_link")
     end
   end
 
@@ -161,6 +161,4 @@ defmodule ApiWeb.AuthController do
   defp unauthenticated(conn) do
     conn |> put_status(:unauthorized) |> json(%{error: "not_authenticated"})
   end
-
-  defp web_app_url, do: Application.get_env(:api, :web_app_url, "http://localhost:5173")
 end

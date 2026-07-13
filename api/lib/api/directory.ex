@@ -1,7 +1,8 @@
 defmodule Api.Directory do
   @moduledoc """
-  Domínio do quadro da clínica — recursos **por-tenant** (`strategy :context`). Por ora
-  só `Professional`; `AppointmentType`/`PriceVersion` entram nas fatias seguintes.
+  Domínio do quadro da clínica — recursos **por-tenant** por atributo (`strategy :attribute`
+  sobre `clinic_id`, ADR-017). Por ora só `Professional`; `AppointmentType`/`PriceVersion`
+  entram nas fatias seguintes.
   """
   use Ash.Domain, otp_app: :api
 
