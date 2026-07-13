@@ -21,6 +21,12 @@ export function apiFetch(event: RequestEvent, path: string, init: RequestInit = 
 	const headers = new Headers(init.headers);
 	const session = event.cookies.get(SESSION_COOKIE);
 	if (session) headers.set('cookie', `${SESSION_COOKIE}=${session}`);
+	// Repassa o IP real do cliente para o rate limit por IP da API (doc 13, causa A). A API é
+	// interna (6PN), então confia neste header vindo só do BFF. `getClientAddress()` já resolve
+	// o IP real atrás do Fly via ADDRESS_HEADER=Fly-Client-IP (web/fly.toml). Best-effort: em
+	// request handling real ele sempre existe.
+	const clientIp = event.getClientAddress?.();
+	if (clientIp) headers.set('x-forwarded-for', clientIp);
 	return event.fetch(`${apiBase()}${path}`, { ...init, headers });
 }
 

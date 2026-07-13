@@ -15,6 +15,9 @@ primary_region = "gru"
   API_PUBLIC_ORIGIN = "https://movimento-api.fly.dev"
   # adapter-node: origem para a checagem de CSRF (forms, ex. sign-out) e URLs absolutas.
   ORIGIN = "https://movimento-web.fly.dev"
+  # getClientAddress() lê o IP real do cliente daqui (a edge do Fly seta Fly-Client-IP), para o
+  # BFF repassar ao rate limit por IP da API (doc 13, causa A).
+  ADDRESS_HEADER = "Fly-Client-IP"
 
 [http_service]
   internal_port = 3000

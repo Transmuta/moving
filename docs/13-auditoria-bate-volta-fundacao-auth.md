@@ -142,10 +142,15 @@ divisão do scope (as 8 seguem sob `:authenticated`).
 >   adapter-node), `fly.toml` (api/web), `Api.Release` (migrations + role restrito), TLS/HSTS na
 >   edge do Fly. A API não é exposta ao browser exceto OAuth/WebSocket; o BFF fala com ela pela
 >   rede privada.
-> - **Aberto de verdade — rate limit por IP:** o magic link chega à API **pelo BFF**, então
->   `remote_ip` é sempre o do web, não o do cliente. O key por **e-mail** funciona (limita o
->   alvo); o key por **IP** só volta a valer quando o BFF repassar o IP do cliente
->   (`X-Forwarded-For`) e o plug confiar nele. Handoff.
+> - **Rate limit por IP — ✅ fechado:** o BFF agora repassa o IP real do cliente
+>   (`X-Forwarded-For` via `getClientAddress()`/`ADDRESS_HEADER=Fly-Client-IP`), e o plug lê
+>   `Fly-Client-IP` (público, autoritativo do Fly) → `X-Forwarded-For` (interno, do BFF) →
+>   `remote_ip`. O key por e-mail (5/min) barra bombardear um alvo; o por IP (20/min) barra um
+>   IP disparando para muitos e-mails.
+> - **Lição do smoke test:** o `scale` do Hammer é em **milissegundos**, não segundos — o plug
+>   estava com janela de 60ms (o teste in-process passava por caber nela; só o `curl` no release
+>   de prod, com latência de rede, expôs). Corrigido para `:timer.minutes(1)` e **provado no
+>   release**: 6 pedidos do mesmo e-mail de 6 IPs → o 6º volta 429.
 > - **Decisões suas, já tomadas:** magic link segue `require_interaction? false` (um clique a
 >   mais não compensa); `professionals` **cascateia** ao apagar a clínica.
 

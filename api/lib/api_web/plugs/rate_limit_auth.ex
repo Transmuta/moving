@@ -21,8 +21,10 @@ defmodule ApiWeb.Plugs.RateLimitAuth do
 
   alias Api.RateLimiter
 
-  # Janela padrão (segundos) e limites. Sliding window: hit(key, scale_segundos, limite).
-  @scale 60
+  # Janela e limites. ATENÇÃO: o Hammer quer `scale` em **milissegundos** (`hit(key, scale_ms,
+  # limite)`), não em segundos — passar 60 aqui daria uma janela de 60ms (bug que só a app viva
+  # pegou; o teste in-process passava por caber nos 60ms). `:timer.minutes(1)` = 60_000 ms.
+  @scale :timer.minutes(1)
   @email_limit 5
   @ip_limit 20
 
@@ -47,7 +49,7 @@ defmodule ApiWeb.Plugs.RateLimitAuth do
     end
   end
 
-  # Monta a lista de chaves {key, scale_segundos, limite} conforme a rota.
+  # Monta a lista de chaves {key, scale_ms, limite} conforme a rota.
   defp keys_for(%Plug.Conn{request_path: "/api/auth/magic-link"} = conn) do
     ip = client_ip(conn)
 
@@ -81,7 +83,29 @@ defmodule ApiWeb.Plugs.RateLimitAuth do
 
   defp normalize_email(_), do: nil
 
-  defp client_ip(%Plug.Conn{remote_ip: ip}), do: ip |> :inet.ntoa() |> to_string()
+  # IP real do cliente para o key por IP. A conexão TCP na API é sempre de um proxy (o BFF, na
+  # rede interna; ou a edge do Fly, no tráfego público), nunca do browser — então `remote_ip`
+  # sozinho é o do proxy. Ordem de confiança:
+  #   1. `fly-client-ip` — setado pela edge do Fly no tráfego PÚBLICO, autoritativo (a edge
+  #      sobrescreve qualquer valor do cliente), à prova de spoof.
+  #   2. `x-forwarded-for` — setado pelo BFF no tráfego INTERNO (6PN, inalcançável de fora),
+  #      então confiável nesse hop.
+  #   3. `remote_ip` — fallback (dev/local sem proxy).
+  defp client_ip(conn) do
+    forwarded(conn, "fly-client-ip") || forwarded(conn, "x-forwarded-for") || peer_ip(conn)
+  end
+
+  defp forwarded(conn, header) do
+    case get_req_header(conn, header) do
+      [value | _] -> value |> String.split(",") |> List.first() |> String.trim() |> nil_if_empty()
+      [] -> nil
+    end
+  end
+
+  defp nil_if_empty(""), do: nil
+  defp nil_if_empty(value), do: value
+
+  defp peer_ip(%Plug.Conn{remote_ip: ip}), do: ip |> :inet.ntoa() |> to_string()
 
   defp deny(conn) do
     conn

@@ -31,6 +31,7 @@ describe('apiFetch (BFF repassa o cookie de sessão)', () => {
 		const fetch = vi.fn().mockResolvedValue(new Response('ok'));
 		return {
 			fetch,
+			getClientAddress: () => '203.0.113.7',
 			cookies: { get: (name: string) => (name === SESSION_COOKIE ? sessionValue : undefined) }
 		} as never;
 	}
@@ -60,6 +61,14 @@ describe('apiFetch (BFF repassa o cookie de sessão)', () => {
 
 		const [url] = (event as unknown as { fetch: ReturnType<typeof vi.fn> }).fetch.mock.calls[0];
 		expect(url).toBe('http://api:4000/api/health');
+	});
+
+	it('repassa o IP do cliente em x-forwarded-for (rate limit por IP da API)', async () => {
+		const event = fakeEvent('x');
+		await apiFetch(event, '/api/auth/magic-link', { method: 'POST' });
+
+		const [, init] = (event as unknown as { fetch: ReturnType<typeof vi.fn> }).fetch.mock.calls[0];
+		expect((init.headers as Headers).get('x-forwarded-for')).toBe('203.0.113.7');
 	});
 });
 
